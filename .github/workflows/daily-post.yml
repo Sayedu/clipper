@@ -1,0 +1,58 @@
+name: Daily TikTok post
+
+# TODO: pick the real time before turning this on for real. Cron times here
+# are UTC. 17:00 UTC ≈ 12:00 PM US Eastern (1:00 PM during daylight saving).
+on:
+  schedule:
+    - cron: "0 17 * * *"
+  workflow_dispatch: {} # lets us trigger it by hand from the Actions tab to test
+
+concurrency:
+  group: daily-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Install Chromium (for the headless render)
+        run: npx playwright install --with-deps chromium
+
+      - name: Make sure ffmpeg is present
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the small audio-synthesis venv
+        # Only numpy/scipy/soundfile — the 3 rotation games just need procedural
+        # sound synthesis, none of the heavy ML stack (torch/whisper/etc) that
+        # scripts/setup.sh installs for the full sourced-video pipeline. Keeps
+        # this job fast instead of pulling in gigabytes nothing here uses.
+        run: |
+          python3 -m venv python/.venv
+          python/.venv/bin/pip install --quiet numpy soundfile scipy
+
+      - name: Render today's game and post it to TikTok via Buffer
+        run: npx tsx scripts/post/daily.ts
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          BUFFER_CHANNEL_ID: ${{ secrets.BUFFER_CHANNEL_ID }}
+          OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
+          OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
