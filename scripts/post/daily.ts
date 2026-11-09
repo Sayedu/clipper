@@ -43,6 +43,8 @@ const logProgress: Broadcaster = (_jobId, _eventId, event) => {
     }
   } else if (event.type === 'job:error') {
     console.error(`[${event.step}] ERROR — ${event.message}`);
+  } else if (event.type === 'log') {
+    console.log(`[${event.step}] ${event.line}`);
   }
 };
 
