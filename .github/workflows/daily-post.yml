@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       force_pick:
-        description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball) — leave blank for normal behavior"
+        description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball / eyetest) — leave blank for normal behavior"
         required: false
         type: string
 

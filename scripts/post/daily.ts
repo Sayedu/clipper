@@ -67,14 +67,17 @@ const BUFFER_CHANNEL_ID = need('BUFFER_CHANNEL_ID');
 const OUTPUT_REPO = need('OUTPUT_REPO'); // e.g. "Sayedu/clipper-output"
 const OUTPUT_REPO_TOKEN = need('OUTPUT_REPO_TOKEN'); // a PAT with repo scope on THAT repo
 
-// the daily rotation — add to this list to add a 4th game later (e.g. 'quotes')
-const ROTATION = ['colorwar', 'lasernationsDuel', 'followball'] as const;
+// the daily rotation — add to this list to add a 5th game later (e.g. 'quotes')
+const ROTATION = ['colorwar', 'lasernationsDuel', 'followball', 'eyetest'] as const;
 type Rotation = (typeof ROTATION)[number];
 
 function settingsFor(kind: Rotation): Settings {
   const base: Settings = { ...DEFAULT_SETTINGS, clipsPerRun: 1 };
-  if (kind === 'colorwar') return { ...base, contentType: 'colorwar', colorWarMode: 'classic' };
-  if (kind === 'followball') return { ...base, contentType: 'followball', followBallMode: 'sprint' };
+  if (kind === 'colorwar') return { ...base, contentType: 'colorwar', colorWarMode: 'bigtiles' };
+  if (kind === 'followball') return { ...base, contentType: 'followball', followBallMode: 'random' };
+  if (kind === 'eyetest') {
+    return { ...base, contentType: 'eyetest', eyeTestBallsPerRound: [5, 6, 8], eyeTestShuffleSec: 6 };
+  }
   // random nations, random winner — same as the un-forced duel preview, no scripted outcome
   return {
     ...base,
