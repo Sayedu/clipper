@@ -142,9 +142,6 @@ const renderOne = async (seed, mode) => {
     if (DIAG) diagWrite += performance.now() - tWriteStart;
     for (const ev of r.events) allEvents.push(ev);
 
-    if (DIAG && frame <= 20) {
-      log(`DIAG frame ${frame}: step=${(performance.now() - tStepStart).toFixed(0)}ms total=${(Date.now() - diagT0)}ms elapsed`);
-    }
     if (DIAG && frame % 20 === 0) {
       log(`DIAG @frame ${frame}: cumulative step=${diagStep.toFixed(0)}ms shot=${diagShot.toFixed(0)}ms write=${diagWrite.toFixed(0)}ms wall=${Date.now() - diagT0}ms`);
     }

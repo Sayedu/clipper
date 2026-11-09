@@ -50,3 +50,6 @@ render/quotes/_result.json
 # os / editor
 .DS_Store
 *.log
+
+# Claude Code's own local session state — not project source
+.claude/
