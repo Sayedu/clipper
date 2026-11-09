@@ -170,7 +170,7 @@ async function publishToOutputRepo(videoPath: string, title: string, body: strin
  *  see developers.buffer.com/examples/create-video-post.html. */
 async function postToBuffer(opts: { channelId: string; text: string; videoUrl: string }): Promise<string> {
   const query = `
-    mutation CreatePost($channelId: String!, $text: String!, $videoUrl: String!) {
+    mutation CreatePost($channelId: ChannelId!, $text: String!, $videoUrl: String!) {
       createPost(input: {
         text: $text
         channelId: $channelId
