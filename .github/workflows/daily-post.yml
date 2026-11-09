@@ -1,19 +1,16 @@
 name: Daily TikTok post
 
-# ~3:00 AM US Eastern (Buffer's channel is set to New York). Cron here is
-# always UTC and GitHub Actions has no timezone/DST support, so this is
-# pinned to EST (UTC-5) — it'll quietly run at ~4:00 AM Eastern instead of
-# ~3:00 AM during daylight saving (mid-March to early November). If that 1hr
-# drift ever matters, change the hour below twice a year (08 in winter, 07
-# in summer) — not worth more automation for a run nobody's awake to notice.
-#
-# Minute is 13, not 0: GitHub documents that scheduled workflows are more
-# likely to be delayed (sometimes skipped) right at the top of the hour,
-# since every repo on GitHub that schedules "on the hour" piles onto the
-# same UTC minute worldwide. An off minute avoids that specific congestion.
+# NO `schedule:` trigger here on purpose. GitHub's own cron silently failed
+# to fire in 2 separate controlled tests (a real 3am run, and an isolated
+# 35-minute-lead-time test workflow with nothing else going on) — this
+# matches a known, unresolved pattern other people report for newer repos
+# (GitHub Community discussions #203822, #185212: "scheduled workflows never
+# trigger... workflow_dispatch works correctly"). Triggered externally
+# instead — a free cron-job.org job calls this via the REST API
+# (POST .../actions/workflows/daily-post.yml/dispatches), which is exactly
+# the workflow_dispatch event below, just fired by a timer instead of a
+# person clicking "Run workflow." Daily at ~3:00 AM US Eastern.
 on:
-  schedule:
-    - cron: "13 8 * * *"
   workflow_dispatch:
     inputs:
       force_pick:
