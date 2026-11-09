@@ -57,7 +57,12 @@ const opts = {
   //       browser blits it 1:1 — no soft compositor downscale.
   // out = final output multiplier vs w/h. ss > out means the capture is
   //       lanczos-downscaled to the 4K output in the worker step (clean supersample).
-  ss: Math.max(1, Math.min(4, numArg('ss', 3))),
+  // ss=2 captures at exactly the 4K output resolution (no ffmpeg scaling at
+  // all — neither upscale-blur from ss=1 nor the ~4x slower downscale ss=3
+  // needs), which measured as sharp as ss=3 with ~4-5x less per-frame
+  // screenshot-capture time in CI (ss=3's ~1.3s/frame is why renders were
+  // timing out — see scripts/post/daily.ts commit history).
+  ss: Math.max(1, Math.min(4, numArg('ss', 2))),
   out: Math.max(1, Math.min(4, numArg('out-scale', 2))),
   outFrames: arg('out-frames', join(process.cwd(), 'render/colorwar/_frames')),
   outJson: arg('out', join(process.cwd(), 'render/colorwar/_result.json')),

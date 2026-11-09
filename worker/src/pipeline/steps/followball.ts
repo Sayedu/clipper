@@ -71,10 +71,6 @@ export async function runFollowBall(ctx: StepContext): Promise<{ render: RenderR
       '--fps', String(fps),
       '--out-frames', framesDir,
       '--out', resultPath,
-      // TEMP diagnostic override — isolating whether supersampling resolution
-      // is why CDP screenshot capture is ~1.3s/frame in CI (see scripts/post/
-      // daily.ts commit history). Remove once the root cause is confirmed fixed.
-      ...(process.env.RENDER_SS ? ['--ss', process.env.RENDER_SS] : []),
     ],
     {
       signal: ctx.signal,

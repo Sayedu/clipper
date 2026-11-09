@@ -11,10 +11,6 @@ on:
         description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball) — leave blank for normal behavior"
         required: false
         type: string
-      render_ss:
-        description: "TEMP diagnostic: override Follow The Ball's supersampling factor (default 3) — leave blank for normal behavior"
-        required: false
-        type: string
 
 concurrency:
   group: daily-post
@@ -23,7 +19,12 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Color War at ss=2 (real 4K native capture, no scaling) runs ~280-350ms/
+    # screenshot in CI — worst case (full 3960-frame cap) is ~20-24min for
+    # capture alone, plus audio + mux. 35min gives real headroom. The repo is
+    # public now, so Actions minutes are unlimited — no cost reason to keep
+    # this tight anymore.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -72,4 +73,3 @@ jobs:
           OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
           OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
           FORCE_PICK: ${{ inputs.force_pick }}
-          RENDER_SS: ${{ inputs.render_ss }}

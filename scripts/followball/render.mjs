@@ -49,7 +49,12 @@ const opts = {
   // ss = deviceScaleFactor — the page renders (and every frame is captured) at
   // ss× the logical size; the game canvas sizes its backing store to its
   // on-screen box × ss so the browser blits it 1:1 (no soft compositor downscale).
-  ss: Math.max(1, Math.min(4, numArg('ss', 3))),
+  // ss=2 captures at exactly the 4K output resolution (no ffmpeg scaling at
+  // all — neither upscale-blur from ss=1 nor the ~4x slower downscale ss=3
+  // needs), which measured as sharp as ss=3 with ~4-5x less per-frame
+  // screenshot-capture time in CI (ss=3's ~1.3s/frame is why renders were
+  // timing out — see scripts/post/daily.ts commit history).
+  ss: Math.max(1, Math.min(4, numArg('ss', 2))),
   out: Math.max(1, Math.min(4, numArg('out-scale', 2))),
   outFrames: arg('out-frames', join(process.cwd(), 'render/followball/_frames')),
   outJson: arg('out', join(process.cwd(), 'render/followball/_result.json')),
@@ -114,37 +119,19 @@ const renderOne = async (seed, mode) => {
   let frame = 0;
   const cap = meta.totalFrames;
 
-  // TEMP DIAGNOSTIC — isolating a CI-only slowdown (see scripts/post/daily.ts
-  // commit history). Breaks down where per-frame time actually goes: the
-  // page-side JS step(), the CDP screenshot capture, or the file write queue.
-  // Remove once the root cause is confirmed fixed.
-  const DIAG = !!process.env.CI;
-  let diagStep = 0, diagShot = 0, diagWrite = 0;
-  const diagT0 = Date.now();
-
   while (true) {
-    const tStepStart = DIAG ? performance.now() : 0;
     const r = await page.evaluate(() => window.FTB.step());
-    if (DIAG) diagStep += performance.now() - tStepStart;
     frame = r.frame;
     const idx = String(frame).padStart(5, '0');
     // PNG, not JPEG: flat gradients, crisp cup edges + DOM text — exactly what
     // JPEG's DCT rings and smears. PNG is lossless and compresses this well.
-    const tShotStart = DIAG ? performance.now() : 0;
     const shot = await cdp.send('Page.captureScreenshot', {
       format: 'png', optimizeForSpeed: true,
       clip: { x: 0, y: 0, width: opts.w, height: opts.h, scale: opts.ss },
     });
-    if (DIAG) diagShot += performance.now() - tShotStart;
-    const tWriteStart = DIAG ? performance.now() : 0;
     writes.push(writeFile(join(opts.outFrames, `f_${idx}.png`), Buffer.from(shot.data, 'base64')));
     if (writes.length >= 16) await Promise.all(writes.splice(0));
-    if (DIAG) diagWrite += performance.now() - tWriteStart;
     for (const ev of r.events) allEvents.push(ev);
-
-    if (DIAG && frame % 20 === 0) {
-      log(`DIAG @frame ${frame}: cumulative step=${diagStep.toFixed(0)}ms shot=${diagShot.toFixed(0)}ms write=${diagWrite.toFixed(0)}ms wall=${Date.now() - diagT0}ms`);
-    }
 
     if (frame % 15 === 0 || r.done) progress(0.05 + 0.9 * (frame / cap), `frame ${frame}/${cap}`);
     if (r.done || frame >= cap) break;

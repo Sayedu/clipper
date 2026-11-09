@@ -65,7 +65,11 @@ const opts = {
   fps: numArg('fps', 60, true),
   w: numArg('w', 1080, true),
   h: numArg('h', 1920, true),
-  ss: Math.max(1, Math.min(4, numArg('ss', 3))),
+  // ss=2 captures at exactly the 4K output resolution (no ffmpeg scaling at
+  // all), which measured as sharp as ss=3 with ~4-5x less per-frame
+  // screenshot-capture time in CI (not in the current posting rotation, but
+  // shares the same render.mjs pattern as the 3 that are).
+  ss: Math.max(1, Math.min(4, numArg('ss', 2))),
   out: Math.max(1, Math.min(4, numArg('out-scale', 2))),
   outFrames: arg('out-frames', join(process.cwd(), 'render/eyetest/_frames')),
   outJson: arg('out', join(process.cwd(), 'render/eyetest/_result.json')),
