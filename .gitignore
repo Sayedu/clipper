@@ -21,9 +21,7 @@ render/marblerace/_*
 .env
 secrets/
 
-# models / big assets fetched by setup (regenerated, not source)
-assets/fonts/*.ttf
-assets/fonts/*.otf
+# models fetched by setup (regenerated, not source)
 assets/models/*.onnx
 assets/sfx/*/*.wav
 # Kokoro TTS voice model (310MB — over GitHub's 100MB hard limit anyway) — only
