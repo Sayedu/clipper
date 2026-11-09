@@ -2,25 +2,33 @@
  * The daily autonomous poster. Renders ALL 4 rotation games, in a random
  * order picked fresh each run, through the SAME pipeline the dashboard uses
  * (so the caption, hashtags and render settings never drift out of sync with
- * the app), then:
+ * the app) — ONE AT A TIME, fully publishing and posting each one before
+ * starting the next, rather than rendering all 4 first and posting at the
+ * end. For each game, in order:
  *
- *   1. commits all 4 finished mp4s into a small PUBLIC hand-off repo in one
- *      push and serves them via jsDelivr's CDN (Buffer needs a public,
- *      direct, no-auth video URL with a real video/* content-type — see
- *      developers.buffer.com/guides/hosting-media.html — which is NOT what
- *      GitHub Release assets serve: those force Content-Disposition:
- *      attachment, built for software downloads, not embeddable media)
- *   2. adds each one to Buffer's queue (`addToQueue`), in that same random
- *      order — Buffer's OWN configured posting schedule (set in its
- *      dashboard, not here) is what actually spreads them across the day at
- *      specific times. This script doesn't pick post times, just the queue
- *      order, once a day.
+ *   1. renders it
+ *   2. commits its mp4 into a small PUBLIC hand-off repo and serves it via
+ *      jsDelivr's CDN (Buffer needs a public, direct, no-auth video URL with
+ *      a real video/* content-type — see developers.buffer.com/guides/
+ *      hosting-media.html — which is NOT what GitHub Release assets serve:
+ *      those force Content-Disposition: attachment, built for software
+ *      downloads, not embeddable media)
+ *   3. adds it to Buffer's queue (`addToQueue`) immediately — Buffer's OWN
+ *      configured posting schedule (set in its dashboard, not here) is what
+ *      actually spreads posts across the day at specific times. This script
+ *      doesn't pick post times, just the queue order, once a day.
  *
- * One game failing doesn't block the other 3 — each is tried independently
- * and the run only fails outright if every single one does.
+ * Interleaving like this (rather than render-all-then-post-all) means
+ * whatever's already posted by the time a later game fails, or the run gets
+ * cut off, is safely sitting in Buffer's queue already — not lost waiting on
+ * a final batch step that never ran. One game failing at any step doesn't
+ * block the rest; the run only fails outright if every single one does.
  *
- * Meant to run once a day from a GitHub Actions schedule — see
- * .github/workflows/daily-post.yml. Run it by hand with:
+ * Meant to run once a day — GitHub's own `schedule:` trigger turned out to
+ * be unreliable for this repo (see git history / .github/workflows/
+ * daily-post.yml), so this is actually fired by an external cron service
+ * calling the workflow_dispatch REST endpoint on a timer. Run it by hand
+ * with:
  *   npx tsx scripts/post/daily.ts
  *
  * Required env vars (see .env.example):
@@ -143,41 +151,40 @@ async function main() {
   }
   console.log(`today's order: ${order.join(', ')}`);
 
-  // render every game first (each independent — one failing doesn't stop the rest)
-  const rendered: Array<{ kind: Rotation; videoPath: string; text: string }> = [];
-  for (const kind of order) {
-    try {
-      rendered.push(await renderOne(kind));
-    } catch (err) {
-      console.error(`[${kind}] render failed, skipping: ${(err as Error).message}`);
+  const outputRepo = await OutputRepo.open();
+  try {
+    // render → push → post, ONE game at a time — not render-all-then-post-all.
+    // A game failing at any step doesn't stop the rest, and whatever's
+    // already posted by the time a later game fails (or the run times out)
+    // is safely queued on Buffer already, not stuck waiting on a final batch
+    // step that never runs.
+    let posted = 0, rendered = 0;
+    for (const kind of order) {
+      try {
+        const r = await renderOne(kind);
+        rendered++;
+        const videoUrl = await outputRepo.publish(r.kind, r.videoPath);
+        console.log(`[${kind}] video public at: ${videoUrl}`);
+        const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: r.text, videoUrl });
+        console.log(`[${kind}] queued on Buffer — post id ${postId}`);
+        posted++;
+      } catch (err) {
+        console.error(`[${kind}] failed, skipping: ${(err as Error).message}`);
+      }
     }
+    if (rendered === 0) throw new Error('every game failed to render — nothing to post');
+    if (posted === 0) throw new Error('every render succeeded but every publish/post failed');
+    console.log(`\n${posted}/${order.length} posted today`);
+  } finally {
+    await outputRepo.close();
   }
-  if (rendered.length === 0) throw new Error('every game failed to render — nothing to post');
-
-  // one clone, one push with all of today's videos, in the same random order
-  const videoUrls = await publishToOutputRepo(rendered);
-
-  // queue each on Buffer in that order — Buffer's own configured posting
-  // schedule is what actually spreads them across the day
-  let posted = 0;
-  for (const r of rendered) {
-    const videoUrl = videoUrls.get(r.kind)!;
-    try {
-      const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: r.text, videoUrl });
-      console.log(`[${r.kind}] queued on Buffer — post id ${postId}`);
-      posted++;
-    } catch (err) {
-      console.error(`[${r.kind}] Buffer post failed: ${(err as Error).message}`);
-    }
-  }
-  if (posted === 0) throw new Error('every render succeeded but every Buffer post failed');
-  console.log(`\n${posted}/${rendered.length} posted today`);
 }
 
-/** Commits all of today's mp4s into the public hand-off repo in ONE push and
- *  serves them via jsDelivr's CDN — NOT GitHub Release assets. GitHub serves
- *  every release asset with `Content-Disposition: attachment` and
- *  `Content-Type: application/octet-stream` (confirmed with curl — it's
+/** Commits each of today's mp4s into the public hand-off repo as its OWN
+ *  push (one per game, as soon as that game is ready — not batched to the
+ *  end) and serves them via jsDelivr's CDN — NOT GitHub Release assets.
+ *  GitHub serves every release asset with `Content-Disposition: attachment`
+ *  and `Content-Type: application/octet-stream` (confirmed with curl — it's
  *  built for software downloads, not embeddable media), which is exactly
  *  why Buffer rejected it with "Video could not be read from its URL": that
  *  combination tells any fetcher "save this file," not "this is a video."
@@ -188,15 +195,20 @@ async function main() {
  *  reused one — jsDelivr caches a given path at its edge for up to 12h
  *  (`s-maxage=43200`), so reusing a path risks Buffer fetching a stale video
  *  instead of today's. A fresh path is never cached, so the first request
- *  always goes straight to the origin. Yesterday's videos are deleted from
- *  the tree (not the repo's history — see `git log`) so it never accumulates. */
-async function publishToOutputRepo(
-  items: Array<{ kind: Rotation; videoPath: string }>,
-): Promise<Map<Rotation, string>> {
-  const [owner, repo] = OUTPUT_REPO.split('/');
-  const dir = await mkdtemp(join(tmpdir(), 'clipper-output-'));
-  try {
-    const git = (...args: string[]) => pexec('git', ['-C', dir, ...args]);
+ *  always goes straight to the origin. Yesterday's videos are deleted once,
+ *  on the FIRST publish of the run (not re-checked per game — deleting
+ *  mid-run would risk removing a sibling video this same run already handed
+ *  to Buffer, before Buffer has necessarily fetched it yet). */
+class OutputRepo {
+  private constructor(
+    private readonly dir: string,
+    private readonly owner: string,
+    private readonly repo: string,
+  ) {}
+
+  static async open(): Promise<OutputRepo> {
+    const [owner, repo] = OUTPUT_REPO.split('/');
+    const dir = await mkdtemp(join(tmpdir(), 'clipper-output-'));
     await pexec('git', ['clone', '--depth', '1', `https://x-access-token:${OUTPUT_REPO_TOKEN}@github.com/${owner}/${repo}.git`, dir]);
 
     const videosDir = join(dir, 'v');
@@ -204,21 +216,24 @@ async function publishToOutputRepo(
     for (const f of prior) await unlink(join(videosDir, f)).catch(() => {});
     await mkdir(videosDir, { recursive: true });
 
-    const urls = new Map<Rotation, string>();
-    const ts = Date.now();
-    for (const { kind, videoPath } of items) {
-      const name = `${ts}-${kind}.mp4`;
-      await copyFile(videoPath, join(videosDir, name));
-      urls.set(kind, `https://cdn.jsdelivr.net/gh/${owner}/${repo}@main/v/${name}`);
-    }
+    return new OutputRepo(dir, owner!, repo!);
+  }
 
-    await git('add', '-A');
-    await git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', `post: ${items.map((i) => i.kind).join(', ')}`);
-    await git('push');
+  private git(...args: string[]) {
+    return pexec('git', ['-C', this.dir, ...args]);
+  }
 
-    return urls;
-  } finally {
-    await rm(dir, { recursive: true, force: true });
+  async publish(kind: Rotation, videoPath: string): Promise<string> {
+    const name = `${Date.now()}-${kind}.mp4`;
+    await copyFile(videoPath, join(this.dir, 'v', name));
+    await this.git('add', '-A');
+    await this.git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', `post: ${kind}`);
+    await this.git('push');
+    return `https://cdn.jsdelivr.net/gh/${this.owner}/${this.repo}@main/v/${name}`;
+  }
+
+  async close(): Promise<void> {
+    await rm(this.dir, { recursive: true, force: true });
   }
 }
 

@@ -201,7 +201,15 @@ export async function runLaserDuel(ctx: StepContext): Promise<{ render: RenderRe
       '-i', audio,
       '-map', '0:v', '-map', '1:a',
       '-vf', vf,
-      '-c:v', 'libx264', '-preset', 'medium', '-crf', '19',
+      // crf 23 (was 19) + a maxrate/bufsize ceiling — a duel has NO fixed
+      // timer (ends whenever someone hits 0 hp, only a 90s safety backstop),
+      // so crf alone gives no real guarantee on file size: a 34MB sample at
+      // crf 19 already blew past jsDelivr's hard 20MB-per-file limit (the
+      // daily auto-poster serves videos through jsDelivr — see scripts/post/
+      // daily.ts). maxrate/bufsize bounds the worst case (a fight that runs
+      // the full 90s) to comfortably under 20MB; crf still drives quality
+      // for the common case of a shorter fight that ends well before that.
+      '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-maxrate', '1300k', '-bufsize', '2600k',
       '-x264-params', 'aq-mode=3:aq-strength=0.9',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-shortest',

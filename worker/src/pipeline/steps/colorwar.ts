@@ -184,11 +184,18 @@ export async function runColorWar(ctx: StepContext): Promise<{ render: RenderRes
       '-i', audio,
       '-map', '0:v', '-map', '1:a',
       '-vf', vf,
-      // low CRF — flat block art is cheap to encode, so spend the bits on keeping
-      // every tile edge and the 1px grid crisp. `fast` preset because the ss=3
-      // capture + lanczos already makes this step the render's long pole and
-      // flat-block art barely benefits from slower motion search.
-      '-c:v', 'libx264', '-preset', 'fast', '-crf', '17',
+      // crf 25 (was 17) + a maxrate/bufsize ceiling — at 17 a ~42s 4K render
+      // came out ~46MB, well over jsDelivr's hard 20MB-per-file limit (the
+      // daily auto-poster serves videos through jsDelivr — see scripts/post/
+      // daily.ts), so every real post was silently failing at the Buffer
+      // step. crf alone only gives a statistical margin, and this board can
+      // run long in overtime (~50-53s, see the comment on `capSec` above) —
+      // maxrate/bufsize is what actually GUARANTEES the worst case stays
+      // under 20MB rather than just hoping a typical run does. Flat block
+      // art holds up fine at 25 — this isn't photographic/grainy content.
+      // `fast` preset because the ss=2 capture already makes this step the
+      // render's long pole.
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '25', '-maxrate', '2200k', '-bufsize', '4400k',
       '-x264-params', 'aq-mode=3:aq-strength=0.8',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-shortest',
