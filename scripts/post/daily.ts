@@ -203,10 +203,8 @@ async function main() {
  *
  *  Each video goes to a NEW path (`v/<timestamp>-<kind>.mp4`) rather than a
  *  reused one, so a stale cached response is never a concern either way.
- *  Yesterday's videos are deleted once, on the FIRST publish of the run
- *  (not re-checked per game — deleting mid-run would risk removing a
- *  sibling video this same run already handed to Buffer, before Buffer has
- *  necessarily fetched it yet). */
+ *  Stale (48h+) videos are pruned once, on `open()` — see the comment there
+ *  for why "wipe everything" broke a real queued Buffer post. */
 class OutputRepo {
   private constructor(
     private readonly dir: string,
@@ -219,9 +217,22 @@ class OutputRepo {
     const dir = await mkdtemp(join(tmpdir(), 'clipper-output-'));
     await pexec('git', ['clone', '--depth', '1', `https://x-access-token:${OUTPUT_REPO_TOKEN}@github.com/${owner}/${repo}.git`, dir]);
 
+    // Only prune videos older than 48h (parsed from each file's own
+    // `<timestamp>-<kind>.mp4` name) -- NOT everything. Wiping everything
+    // unconditionally broke a real queued Buffer post in production: Buffer
+    // schedules posts for LATER in the day rather than fetching instantly,
+    // and a second same-day run (a manual re-test, but a genuine retry after
+    // a partial failure would do the same) deleted an earlier run's
+    // still-unfetched video out from under a pending Buffer post, which then
+    // failed with "media URL not accessible" once its scheduled time came
+    // up. 48h gives ~2x margin past the ~24h single-day posting window.
     const videosDir = join(dir, 'v');
     const prior = await readdir(videosDir).catch(() => [] as string[]);
-    for (const f of prior) await unlink(join(videosDir, f)).catch(() => {});
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    for (const f of prior) {
+      const ts = Number(f.split('-')[0]);
+      if (!Number.isFinite(ts) || ts < cutoff) await unlink(join(videosDir, f)).catch(() => {});
+    }
     await mkdir(videosDir, { recursive: true });
 
     return new OutputRepo(dir, owner!, repo!);
