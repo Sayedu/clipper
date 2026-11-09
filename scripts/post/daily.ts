@@ -1,15 +1,23 @@
 /**
- * The daily autonomous poster. Picks one of the rotation games at random,
- * renders it through the SAME pipeline the dashboard uses (so the caption,
- * hashtags and render settings never drift out of sync with the app), then:
+ * The daily autonomous poster. Renders ALL 4 rotation games, in a random
+ * order picked fresh each run, through the SAME pipeline the dashboard uses
+ * (so the caption, hashtags and render settings never drift out of sync with
+ * the app), then:
  *
- *   1. commits the finished mp4 into a small PUBLIC hand-off repo and serves
- *      it via jsDelivr's CDN (Buffer needs a public, direct, no-auth video
- *      URL with a real video/* content-type — see developers.buffer.com/
- *      guides/hosting-media.html — which is NOT what GitHub Release assets
- *      serve: those force Content-Disposition: attachment, built for
- *      software downloads, not embeddable media)
- *   2. asks Buffer's API to post it to TikTok on the connected channel
+ *   1. commits all 4 finished mp4s into a small PUBLIC hand-off repo in one
+ *      push and serves them via jsDelivr's CDN (Buffer needs a public,
+ *      direct, no-auth video URL with a real video/* content-type — see
+ *      developers.buffer.com/guides/hosting-media.html — which is NOT what
+ *      GitHub Release assets serve: those force Content-Disposition:
+ *      attachment, built for software downloads, not embeddable media)
+ *   2. adds each one to Buffer's queue (`addToQueue`), in that same random
+ *      order — Buffer's OWN configured posting schedule (set in its
+ *      dashboard, not here) is what actually spreads them across the day at
+ *      specific times. This script doesn't pick post times, just the queue
+ *      order, once a day.
+ *
+ * One game failing doesn't block the other 3 — each is tried independently
+ * and the run only fails outright if every single one does.
  *
  * Meant to run once a day from a GitHub Actions schedule — see
  * .github/workflows/daily-post.yml. Run it by hand with:
@@ -93,50 +101,82 @@ function isRotation(v: string): v is Rotation {
   return (ROTATION as readonly string[]).includes(v);
 }
 
-async function main() {
-  // FORCE_PICK lets a manual workflow_dispatch test one specific game instead of
-  // whatever the random pick lands on — useful for isolating a slow/broken game.
-  const forced = process.env.FORCE_PICK;
-  let pick: Rotation;
-  if (forced) {
-    if (!isRotation(forced)) throw new Error(`FORCE_PICK must be one of ${ROTATION.join(', ')}, got "${forced}"`);
-    pick = forced;
-  } else {
-    pick = ROTATION[randomInt(0, ROTATION.length)]!;
+function shuffled<T>(arr: readonly T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1);
+    [out[i], out[j]] = [out[j]!, out[i]!];
   }
-  console.log(`today's pick: ${pick}`);
-
-  const job = createJob({ settings: settingsFor(pick) });
-  await runPipeline({ jobId: job.id, signal: new AbortController().signal, broadcast: logProgress });
-
-  const finished = getJob(job.id);
-  if (!finished || finished.status !== 'awaiting_review' || !finished.draftText) {
-    throw new Error(`render did not finish cleanly — status: ${finished?.status}, error: ${finished?.errorMessage ?? 'none'}`);
-  }
-  const videoPath = jobCandidateFile(job.id, 0, 'video');
-  const { caption, hashtags = [] } = finished.draftText;
-  // TikTok allows at most 5 hashtags — the source caption templates already stay
-  // under that, but this is the actual enforcement point before anything posts.
-  const tags = hashtags.slice(0, 5);
-
-  console.log(`rendered ${videoPath}`);
-  console.log(`caption: ${caption}`);
-  console.log(`hashtags: ${tags.join(', ')}`);
-
-  const videoUrl = await publishToOutputRepo(videoPath, `post: ${pick}`);
-  console.log(`video public at: ${videoUrl}`);
-
-  const postId = await postToBuffer({
-    channelId: BUFFER_CHANNEL_ID,
-    text: [caption, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n'),
-    videoUrl,
-  });
-  console.log(`queued on Buffer — post id ${postId}`);
+  return out;
 }
 
-/** Commits the mp4 straight into the public hand-off repo and serves it
- *  through jsDelivr's CDN — NOT a GitHub Release asset. GitHub serves every
- *  release asset with `Content-Disposition: attachment` and
+function renderOne(kind: Rotation) {
+  console.log(`\n=== rendering ${kind} ===`);
+  const job = createJob({ settings: settingsFor(kind) });
+  return runPipeline({ jobId: job.id, signal: new AbortController().signal, broadcast: logProgress }).then(() => {
+    const finished = getJob(job.id);
+    if (!finished || finished.status !== 'awaiting_review' || !finished.draftText) {
+      throw new Error(`render did not finish cleanly — status: ${finished?.status}, error: ${finished?.errorMessage ?? 'none'}`);
+    }
+    const videoPath = jobCandidateFile(job.id, 0, 'video');
+    const { caption, hashtags = [] } = finished.draftText;
+    // TikTok allows at most 5 hashtags — the source caption templates already stay
+    // under that, but this is the actual enforcement point before anything posts.
+    const tags = hashtags.slice(0, 5);
+    console.log(`rendered ${videoPath}`);
+    console.log(`caption: ${caption}`);
+    console.log(`hashtags: ${tags.join(', ')}`);
+    return { kind, videoPath, text: [caption, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n') };
+  });
+}
+
+async function main() {
+  // FORCE_PICK lets a manual workflow_dispatch test one specific game instead of
+  // the full 4-game rotation — useful for isolating a slow/broken game.
+  const forced = process.env.FORCE_PICK;
+  let order: Rotation[];
+  if (forced) {
+    if (!isRotation(forced)) throw new Error(`FORCE_PICK must be one of ${ROTATION.join(', ')}, got "${forced}"`);
+    order = [forced];
+  } else {
+    order = shuffled(ROTATION);
+  }
+  console.log(`today's order: ${order.join(', ')}`);
+
+  // render every game first (each independent — one failing doesn't stop the rest)
+  const rendered: Array<{ kind: Rotation; videoPath: string; text: string }> = [];
+  for (const kind of order) {
+    try {
+      rendered.push(await renderOne(kind));
+    } catch (err) {
+      console.error(`[${kind}] render failed, skipping: ${(err as Error).message}`);
+    }
+  }
+  if (rendered.length === 0) throw new Error('every game failed to render — nothing to post');
+
+  // one clone, one push with all of today's videos, in the same random order
+  const videoUrls = await publishToOutputRepo(rendered);
+
+  // queue each on Buffer in that order — Buffer's own configured posting
+  // schedule is what actually spreads them across the day
+  let posted = 0;
+  for (const r of rendered) {
+    const videoUrl = videoUrls.get(r.kind)!;
+    try {
+      const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: r.text, videoUrl });
+      console.log(`[${r.kind}] queued on Buffer — post id ${postId}`);
+      posted++;
+    } catch (err) {
+      console.error(`[${r.kind}] Buffer post failed: ${(err as Error).message}`);
+    }
+  }
+  if (posted === 0) throw new Error('every render succeeded but every Buffer post failed');
+  console.log(`\n${posted}/${rendered.length} posted today`);
+}
+
+/** Commits all of today's mp4s into the public hand-off repo in ONE push and
+ *  serves them via jsDelivr's CDN — NOT GitHub Release assets. GitHub serves
+ *  every release asset with `Content-Disposition: attachment` and
  *  `Content-Type: application/octet-stream` (confirmed with curl — it's
  *  built for software downloads, not embeddable media), which is exactly
  *  why Buffer rejected it with "Video could not be read from its URL": that
@@ -144,14 +184,15 @@ async function main() {
  *  jsDelivr serves a plain git-committed file with the correct
  *  `Content-Type: video/mp4` and no attachment disposition.
  *
- *  Each post goes to a NEW path (`v/<timestamp>.mp4`) rather than reusing one
- *  — jsDelivr caches a given path at its edge for up to 12h
- *  (`s-maxage=43200`), so reusing a path risks Buffer fetching yesterday's
- *  cached video instead of today's. A fresh path is never cached, so the
- *  first request always goes straight to the origin. Old video files are
- *  deleted (not the repo's history — see `git log`) so the repo's current
- *  tree never accumulates them. */
-async function publishToOutputRepo(videoPath: string, commitMessage: string): Promise<string> {
+ *  Each video goes to a NEW path (`v/<timestamp>-<kind>.mp4`) rather than a
+ *  reused one — jsDelivr caches a given path at its edge for up to 12h
+ *  (`s-maxage=43200`), so reusing a path risks Buffer fetching a stale video
+ *  instead of today's. A fresh path is never cached, so the first request
+ *  always goes straight to the origin. Yesterday's videos are deleted from
+ *  the tree (not the repo's history — see `git log`) so it never accumulates. */
+async function publishToOutputRepo(
+  items: Array<{ kind: Rotation; videoPath: string }>,
+): Promise<Map<Rotation, string>> {
   const [owner, repo] = OUTPUT_REPO.split('/');
   const dir = await mkdtemp(join(tmpdir(), 'clipper-output-'));
   try {
@@ -163,14 +204,19 @@ async function publishToOutputRepo(videoPath: string, commitMessage: string): Pr
     for (const f of prior) await unlink(join(videosDir, f)).catch(() => {});
     await mkdir(videosDir, { recursive: true });
 
-    const name = `${Date.now()}.mp4`;
-    await copyFile(videoPath, join(videosDir, name));
+    const urls = new Map<Rotation, string>();
+    const ts = Date.now();
+    for (const { kind, videoPath } of items) {
+      const name = `${ts}-${kind}.mp4`;
+      await copyFile(videoPath, join(videosDir, name));
+      urls.set(kind, `https://cdn.jsdelivr.net/gh/${owner}/${repo}@main/v/${name}`);
+    }
 
     await git('add', '-A');
-    await git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', commitMessage);
+    await git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', `post: ${items.map((i) => i.kind).join(', ')}`);
     await git('push');
 
-    return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@main/v/${name}`;
+    return urls;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

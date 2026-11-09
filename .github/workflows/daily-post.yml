@@ -1,10 +1,14 @@
 name: Daily TikTok post
 
-# TODO: pick the real time before turning this on for real. Cron times here
-# are UTC. 17:00 UTC ≈ 12:00 PM US Eastern (1:00 PM during daylight saving).
+# 3:00 AM US Eastern (Buffer's channel is set to New York). Cron here is
+# always UTC and GitHub Actions has no timezone/DST support, so this is
+# pinned to EST (UTC-5) — it'll quietly run at 4:00 AM Eastern instead of
+# 3:00 AM during daylight saving (mid-March to early November). If that 1hr
+# drift ever matters, change this line twice a year (08 in winter, 07 in
+# summer) — not worth more automation for a run nobody's awake to notice.
 on:
   schedule:
-    - cron: "0 17 * * *"
+    - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
       force_pick:
