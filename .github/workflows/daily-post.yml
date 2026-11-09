@@ -23,12 +23,13 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
-    # Color War at ss=2 (real 4K native capture, no scaling) runs ~280-350ms/
-    # screenshot in CI — worst case (full 3960-frame cap) is ~20-24min for
-    # capture alone, plus audio + mux. 35min gives real headroom. The repo is
-    # public now, so Actions minutes are unlimited — no cost reason to keep
-    # this tight anymore.
-    timeout-minutes: 35
+    # This run renders ALL 4 rotation games back to back, not just one.
+    # Measured in CI: Follow The Ball ~8min, Eye Test ~14min (3 rounds of real
+    # physics is heavier than it looks) — Color War and Laser Nations Duel
+    # haven't been measured yet but could plausibly land in the same range.
+    # Worst case all 4 could sum to 45-60+ min. The repo is public, so Actions
+    # minutes are unlimited — generous headroom costs nothing.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
