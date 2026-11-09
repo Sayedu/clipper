@@ -1,14 +1,19 @@
 name: Daily TikTok post
 
-# 3:00 AM US Eastern (Buffer's channel is set to New York). Cron here is
+# ~3:00 AM US Eastern (Buffer's channel is set to New York). Cron here is
 # always UTC and GitHub Actions has no timezone/DST support, so this is
-# pinned to EST (UTC-5) — it'll quietly run at 4:00 AM Eastern instead of
-# 3:00 AM during daylight saving (mid-March to early November). If that 1hr
-# drift ever matters, change this line twice a year (08 in winter, 07 in
-# summer) — not worth more automation for a run nobody's awake to notice.
+# pinned to EST (UTC-5) — it'll quietly run at ~4:00 AM Eastern instead of
+# ~3:00 AM during daylight saving (mid-March to early November). If that 1hr
+# drift ever matters, change the hour below twice a year (08 in winter, 07
+# in summer) — not worth more automation for a run nobody's awake to notice.
+#
+# Minute is 13, not 0: GitHub documents that scheduled workflows are more
+# likely to be delayed (sometimes skipped) right at the top of the hour,
+# since every repo on GitHub that schedules "on the hour" piles onto the
+# same UTC minute worldwide. An off minute avoids that specific congestion.
 on:
   schedule:
-    - cron: "0 8 * * *"
+    - cron: "13 8 * * *"
   workflow_dispatch:
     inputs:
       force_pick:
