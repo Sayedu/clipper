@@ -195,9 +195,11 @@ async function main() {
  *  Pages serves the same correct `video/mp4` content-type (confirmed with
  *  curl) with NO 20MB-class limit — the real ceiling is git's own
  *  ~100MB/file. The one real cost: Pages has actual deploy lag after a
- *  push (unlike jsDelivr's instant availability), so `publish()` polls the
- *  Pages builds API for OUR commit specifically rather than guessing a
- *  fixed wait — see `waitForPagesDeploy`.
+ *  push (unlike jsDelivr's instant availability), so `publish()` polls for
+ *  OUR commit's deploy to finish rather than guessing a fixed wait — see
+ *  `waitForPagesDeploy` (clipper-output deploys via its own Actions
+ *  workflow, not GitHub's legacy branch-build pipeline, which was too slow
+ *  and inconsistent to poll against reliably).
  *
  *  Each video goes to a NEW path (`v/<timestamp>-<kind>.mp4`) rather than a
  *  reused one, so a stale cached response is never a concern either way.
@@ -241,23 +243,29 @@ class OutputRepo {
   }
 
   /** GitHub Pages (unlike jsDelivr) has real deploy lag after a push — the
-   *  file isn't actually live the instant `git push` returns. Poll the
-   *  Pages builds API for OUR commit specifically rather than guessing a
-   *  fixed delay. `.nojekyll` must already be committed to the repo root
-   *  (done once, manually) — without it, legacy Pages tries to run Jekyll
-   *  over the mp4 files and the build errors out every time. */
+   *  file isn't actually live the instant `git push` returns. clipper-output
+   *  deploys Pages via its own `.github/workflows/pages.yml` (Actions-based
+   *  deploy, `build_type: workflow`) rather than the legacy branch-build
+   *  pipeline — the legacy one queued on a shared GitHub build worker with
+   *  wildly inconsistent timing (seen anywhere from ~23s to 4+ minutes with
+   *  zero progress signal in between), which blew past this function's
+   *  original 3-minute budget outright in testing. An Actions deploy is a
+   *  normal job, so this polls that workflow's run for OUR commit instead. */
   private async waitForPagesDeploy(sha: string): Promise<void> {
     const start = Date.now();
     while (Date.now() - start < 180_000) {
-      const builds = (await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/pages/builds`, {
-        headers: { Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`, Accept: 'application/vnd.github+json' },
-      }).then((r) => r.json())) as Array<{ commit: string; status: string; error?: { message?: string } }>;
-      const match = builds.find((b) => b.commit === sha);
-      if (match?.status === 'built') return;
-      if (match?.status === 'errored') throw new Error(`Pages build failed for ${sha}: ${match.error?.message ?? 'unknown error'}`);
-      await new Promise((r) => setTimeout(r, 8_000));
+      const runs = (await fetch(
+        `https://api.github.com/repos/${this.owner}/${this.repo}/actions/runs?event=push&head_sha=${sha}`,
+        { headers: { Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`, Accept: 'application/vnd.github+json' } },
+      ).then((r) => r.json())) as { workflow_runs: Array<{ status: string; conclusion: string | null; html_url: string }> };
+      const match = runs.workflow_runs[0];
+      if (match?.status === 'completed') {
+        if (match.conclusion === 'success') return;
+        throw new Error(`Pages deploy failed for ${sha}: ${match.html_url}`);
+      }
+      await new Promise((r) => setTimeout(r, 5_000));
     }
-    throw new Error(`Pages build for ${sha} didn't finish within 3 minutes`);
+    throw new Error(`Pages deploy for ${sha} didn't finish within 3 minutes`);
   }
 
   async close(): Promise<void> {
