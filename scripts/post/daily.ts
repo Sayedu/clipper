@@ -8,11 +8,10 @@
  *
  *   1. renders it
  *   2. commits its mp4 into a small PUBLIC hand-off repo and serves it via
- *      jsDelivr's CDN (Buffer needs a public, direct, no-auth video URL with
- *      a real video/* content-type — see developers.buffer.com/guides/
- *      hosting-media.html — which is NOT what GitHub Release assets serve:
- *      those force Content-Disposition: attachment, built for software
- *      downloads, not embeddable media)
+ *      GitHub Pages (Buffer needs a public, direct, no-auth video URL with a
+ *      real video/* content-type — see developers.buffer.com/guides/
+ *      hosting-media.html — see the OutputRepo doc comment below for why
+ *      that ruled out both GitHub Release assets AND jsDelivr)
  *   3. adds it to Buffer's queue (`addToQueue`) immediately — Buffer's OWN
  *      configured posting schedule (set in its dashboard, not here) is what
  *      actually spreads posts across the day at specific times. This script
@@ -182,23 +181,30 @@ async function main() {
 
 /** Commits each of today's mp4s into the public hand-off repo as its OWN
  *  push (one per game, as soon as that game is ready — not batched to the
- *  end) and serves them via jsDelivr's CDN — NOT GitHub Release assets.
- *  GitHub serves every release asset with `Content-Disposition: attachment`
- *  and `Content-Type: application/octet-stream` (confirmed with curl — it's
- *  built for software downloads, not embeddable media), which is exactly
- *  why Buffer rejected it with "Video could not be read from its URL": that
- *  combination tells any fetcher "save this file," not "this is a video."
- *  jsDelivr serves a plain git-committed file with the correct
- *  `Content-Type: video/mp4` and no attachment disposition.
+ *  end) and serves them via GitHub Pages — NOT GitHub Release assets, and
+ *  NOT jsDelivr (tried both first, in that order):
+ *   - Release assets force `Content-Disposition: attachment` and
+ *     `Content-Type: application/octet-stream` (confirmed with curl — built
+ *     for software downloads, not embeddable media), which is exactly why
+ *     Buffer rejected it with "Video could not be read from its URL": that
+ *     combination tells any fetcher "save this file," not "this is a video."
+ *   - jsDelivr serves the right content-type, but its GitHub CDN hard-caps
+ *     at 20MB/file (confirmed via jsDelivr's own error response) — too
+ *     small for a real 4K Color War or a long Laser Nations Duel without
+ *     compressing them enough to visibly hurt quality.
+ *  Pages serves the same correct `video/mp4` content-type (confirmed with
+ *  curl) with NO 20MB-class limit — the real ceiling is git's own
+ *  ~100MB/file. The one real cost: Pages has actual deploy lag after a
+ *  push (unlike jsDelivr's instant availability), so `publish()` polls the
+ *  Pages builds API for OUR commit specifically rather than guessing a
+ *  fixed wait — see `waitForPagesDeploy`.
  *
  *  Each video goes to a NEW path (`v/<timestamp>-<kind>.mp4`) rather than a
- *  reused one — jsDelivr caches a given path at its edge for up to 12h
- *  (`s-maxage=43200`), so reusing a path risks Buffer fetching a stale video
- *  instead of today's. A fresh path is never cached, so the first request
- *  always goes straight to the origin. Yesterday's videos are deleted once,
- *  on the FIRST publish of the run (not re-checked per game — deleting
- *  mid-run would risk removing a sibling video this same run already handed
- *  to Buffer, before Buffer has necessarily fetched it yet). */
+ *  reused one, so a stale cached response is never a concern either way.
+ *  Yesterday's videos are deleted once, on the FIRST publish of the run
+ *  (not re-checked per game — deleting mid-run would risk removing a
+ *  sibling video this same run already handed to Buffer, before Buffer has
+ *  necessarily fetched it yet). */
 class OutputRepo {
   private constructor(
     private readonly dir: string,
@@ -229,7 +235,29 @@ class OutputRepo {
     await this.git('add', '-A');
     await this.git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', `post: ${kind}`);
     await this.git('push');
-    return `https://cdn.jsdelivr.net/gh/${this.owner}/${this.repo}@main/v/${name}`;
+    const sha = (await this.git('rev-parse', 'HEAD')).stdout.trim();
+    await this.waitForPagesDeploy(sha);
+    return `https://${this.owner.toLowerCase()}.github.io/${this.repo}/v/${name}`;
+  }
+
+  /** GitHub Pages (unlike jsDelivr) has real deploy lag after a push — the
+   *  file isn't actually live the instant `git push` returns. Poll the
+   *  Pages builds API for OUR commit specifically rather than guessing a
+   *  fixed delay. `.nojekyll` must already be committed to the repo root
+   *  (done once, manually) — without it, legacy Pages tries to run Jekyll
+   *  over the mp4 files and the build errors out every time. */
+  private async waitForPagesDeploy(sha: string): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < 180_000) {
+      const builds = (await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/pages/builds`, {
+        headers: { Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`, Accept: 'application/vnd.github+json' },
+      }).then((r) => r.json())) as Array<{ commit: string; status: string; error?: { message?: string } }>;
+      const match = builds.find((b) => b.commit === sha);
+      if (match?.status === 'built') return;
+      if (match?.status === 'errored') throw new Error(`Pages build failed for ${sha}: ${match.error?.message ?? 'unknown error'}`);
+      await new Promise((r) => setTimeout(r, 8_000));
+    }
+    throw new Error(`Pages build for ${sha} didn't finish within 3 minutes`);
   }
 
   async close(): Promise<void> {

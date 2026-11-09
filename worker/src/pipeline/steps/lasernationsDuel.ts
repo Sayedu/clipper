@@ -201,15 +201,16 @@ export async function runLaserDuel(ctx: StepContext): Promise<{ render: RenderRe
       '-i', audio,
       '-map', '0:v', '-map', '1:a',
       '-vf', vf,
-      // crf 23 (was 19) + a maxrate/bufsize ceiling — a duel has NO fixed
+      // crf 19 + a loose maxrate/bufsize safety net — a duel has NO fixed
       // timer (ends whenever someone hits 0 hp, only a 90s safety backstop),
-      // so crf alone gives no real guarantee on file size: a 34MB sample at
-      // crf 19 already blew past jsDelivr's hard 20MB-per-file limit (the
-      // daily auto-poster serves videos through jsDelivr — see scripts/post/
-      // daily.ts). maxrate/bufsize bounds the worst case (a fight that runs
-      // the full 90s) to comfortably under 20MB; crf still drives quality
-      // for the common case of a shorter fight that ends well before that.
-      '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-maxrate', '1300k', '-bufsize', '2600k',
+      // so crf alone gives no hard guarantee on file size for a freak long
+      // fight. The daily auto-poster (scripts/post/daily.ts) now serves
+      // videos through GitHub Pages, not jsDelivr — Pages' real limit is
+      // git's own ~100MB/file, not jsDelivr's tight 20MB CDN cap — so this
+      // ceiling is sized to bound even a full 90s fight to well under THAT
+      // (not under 20MB), meaning it only binds on a truly pathological
+      // run, not on normal output like the tighter version did.
+      '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-maxrate', '5900k', '-bufsize', '11800k',
       '-x264-params', 'aq-mode=3:aq-strength=0.9',
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-shortest',
