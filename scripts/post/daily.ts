@@ -73,8 +73,21 @@ function settingsFor(kind: Rotation): Settings {
   };
 }
 
+function isRotation(v: string): v is Rotation {
+  return (ROTATION as readonly string[]).includes(v);
+}
+
 async function main() {
-  const pick = ROTATION[randomInt(0, ROTATION.length)]!;
+  // FORCE_PICK lets a manual workflow_dispatch test one specific game instead of
+  // whatever the random pick lands on — useful for isolating a slow/broken game.
+  const forced = process.env.FORCE_PICK;
+  let pick: Rotation;
+  if (forced) {
+    if (!isRotation(forced)) throw new Error(`FORCE_PICK must be one of ${ROTATION.join(', ')}, got "${forced}"`);
+    pick = forced;
+  } else {
+    pick = ROTATION[randomInt(0, ROTATION.length)]!;
+  }
   console.log(`today's pick: ${pick}`);
 
   const job = createJob({ settings: settingsFor(pick) });

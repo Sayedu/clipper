@@ -5,7 +5,12 @@ name: Daily TikTok post
 on:
   schedule:
     - cron: "0 17 * * *"
-  workflow_dispatch: {} # lets us trigger it by hand from the Actions tab to test
+  workflow_dispatch:
+    inputs:
+      force_pick:
+        description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball) — leave blank for normal behavior"
+        required: false
+        type: string
 
 concurrency:
   group: daily-post
@@ -62,3 +67,4 @@ jobs:
           BUFFER_CHANNEL_ID: ${{ secrets.BUFFER_CHANNEL_ID }}
           OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
           OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
+          FORCE_PICK: ${{ inputs.force_pick }}
