@@ -96,12 +96,6 @@ const renderOne = async (seed, mode) => {
     executablePath: chromium.executablePath(),
     headless: true,
     args: [
-      // CI runners have no real GPU. Without an explicit software-GL backend,
-      // Chromium can fall back to a far slower raw-CPU canvas path instead of
-      // SwiftShader (measured ~1 frame/sec on GitHub Actions without these —
-      // a 45s render took 20+ minutes and still wasn't done). Scoped to CI
-      // only (GitHub Actions sets CI=true) — a real local GPU is already fine.
-      ...(process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []),
       '--hide-scrollbars', '--mute-audio', '--force-color-profile=srgb',
       '--font-render-hinting=none', '--disable-lcd-text',
       '--disable-gpu-vsync', '--disable-frame-rate-limit',
