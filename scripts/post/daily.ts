@@ -34,7 +34,10 @@ const logProgress: Broadcaster = (_jobId, _eventId, event) => {
     lastLoggedPct = -1;
   } else if (event.type === 'step:progress') {
     const pct = Math.round(event.pct * 100);
-    if (pct >= lastLoggedPct + 10) {
+    // 2%, not 10% — at 10% a 1560-frame render needed ~156 frames before the
+    // FIRST line appeared, making "no output yet" indistinguishable between
+    // "0 frames captured" and "150 frames captured, just under the threshold".
+    if (pct >= lastLoggedPct + 2) {
       console.log(`[${event.step}] ${pct}%${event.detail ? ` — ${event.detail}` : ''}`);
       lastLoggedPct = pct;
     }
