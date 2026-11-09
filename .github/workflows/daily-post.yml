@@ -9,7 +9,8 @@ name: Daily TikTok post
 # instead — a free cron-job.org job calls this via the REST API
 # (POST .../actions/workflows/daily-post.yml/dispatches), which is exactly
 # the workflow_dispatch event below, just fired by a timer instead of a
-# person clicking "Run workflow." Daily at ~3:00 AM US Eastern.
+# person clicking "Run workflow." Daily at 12:01 AM (cron-job.org's own
+# configured time/timezone — not set here).
 on:
   workflow_dispatch:
     inputs:
