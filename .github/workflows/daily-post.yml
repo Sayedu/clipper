@@ -27,7 +27,13 @@ jobs:
         run: npm ci
 
       - name: Install Chromium (for the headless render)
-        run: npx playwright install --with-deps chromium
+        # `npx playwright-core` (not `npx playwright`) — the project only depends on
+        # playwright-core (see package.json), so this resolves to the LOCALLY
+        # installed, package-lock-pinned version. Plain `npx playwright install`
+        # fetches whatever's latest on npm, which downloads a different Chromium
+        # build revision than what playwright-core actually expects at runtime —
+        # that mismatch is exactly what failed the first test run.
+        run: npx playwright-core install --with-deps chromium
 
       - name: Make sure ffmpeg is present
         run: |
