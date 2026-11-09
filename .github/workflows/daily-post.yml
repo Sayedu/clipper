@@ -11,6 +11,10 @@ on:
         description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball) — leave blank for normal behavior"
         required: false
         type: string
+      render_ss:
+        description: "TEMP diagnostic: override Follow The Ball's supersampling factor (default 3) — leave blank for normal behavior"
+        required: false
+        type: string
 
 concurrency:
   group: daily-post
@@ -68,3 +72,4 @@ jobs:
           OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
           OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
           FORCE_PICK: ${{ inputs.force_pick }}
+          RENDER_SS: ${{ inputs.render_ss }}
