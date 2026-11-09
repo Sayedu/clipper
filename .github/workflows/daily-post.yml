@@ -27,11 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     # This run renders ALL 4 rotation games back to back, not just one.
     # Measured in CI: Follow The Ball ~8min, Eye Test ~14min (3 rounds of real
-    # physics is heavier than it looks) — Color War and Laser Nations Duel
-    # haven't been measured yet but could plausibly land in the same range.
-    # Worst case all 4 could sum to 45-60+ min. The repo is public, so Actions
-    # minutes are unlimited — generous headroom costs nothing.
-    timeout-minutes: 120
+    # physics is heavier than it looks), Color War ~15min. Laser Nations Duel
+    # has no fixed timer (runs a dramatic-fight seed search, then the actual
+    # fight plays out until someone hits 0 hp) and ran notably longer in
+    # testing — worst case all 4 summing past 120min is plausible. The repo is
+    # public, so Actions minutes are unlimited — generous headroom costs nothing.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
