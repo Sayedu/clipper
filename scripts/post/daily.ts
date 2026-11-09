@@ -3,9 +3,12 @@
  * renders it through the SAME pipeline the dashboard uses (so the caption,
  * hashtags and render settings never drift out of sync with the app), then:
  *
- *   1. publishes the finished mp4 as a Release asset on a small PUBLIC
- *      hand-off repo (Buffer needs a public, direct, no-auth video URL —
- *      see developers.buffer.com/guides/hosting-media.html)
+ *   1. commits the finished mp4 into a small PUBLIC hand-off repo and serves
+ *      it via jsDelivr's CDN (Buffer needs a public, direct, no-auth video
+ *      URL with a real video/* content-type — see developers.buffer.com/
+ *      guides/hosting-media.html — which is NOT what GitHub Release assets
+ *      serve: those force Content-Disposition: attachment, built for
+ *      software downloads, not embeddable media)
  *   2. asks Buffer's API to post it to TikTok on the connected channel
  *
  * Meant to run once a day from a GitHub Actions schedule — see
@@ -16,13 +19,18 @@
  *   BUFFER_API_KEY, BUFFER_CHANNEL_ID, OUTPUT_REPO, OUTPUT_REPO_TOKEN
  */
 import { randomInt } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { mkdtemp, rm, readdir, unlink, mkdir, copyFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createJob, getJob } from '../../worker/src/db.ts';
 import { runPipeline } from '../../worker/src/pipeline/run.ts';
 import type { Broadcaster } from '../../worker/src/pipeline/context.ts';
 import { jobCandidateFile } from '../../worker/src/library.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../../worker/src/types.ts';
+
+const pexec = promisify(execFile);
 
 // the HTTP API streams these to the dashboard's progress bar; here they're the
 // only visibility a CI log has into a multi-minute render, so just print them —
@@ -112,7 +120,7 @@ async function main() {
   console.log(`caption: ${caption}`);
   console.log(`hashtags: ${tags.join(', ')}`);
 
-  const videoUrl = await publishToOutputRepo(videoPath, `Daily post — ${pick}`, caption ?? '');
+  const videoUrl = await publishToOutputRepo(videoPath, `post: ${pick}`);
   console.log(`video public at: ${videoUrl}`);
 
   const postId = await postToBuffer({
@@ -123,47 +131,46 @@ async function main() {
   console.log(`queued on Buffer — post id ${postId}`);
 }
 
-/** Uploads the mp4 as a GitHub Release asset on the public hand-off repo, after
- *  deleting any prior release there so the repo never accumulates old videos. */
-async function publishToOutputRepo(videoPath: string, title: string, body: string): Promise<string> {
+/** Commits the mp4 straight into the public hand-off repo and serves it
+ *  through jsDelivr's CDN — NOT a GitHub Release asset. GitHub serves every
+ *  release asset with `Content-Disposition: attachment` and
+ *  `Content-Type: application/octet-stream` (confirmed with curl — it's
+ *  built for software downloads, not embeddable media), which is exactly
+ *  why Buffer rejected it with "Video could not be read from its URL": that
+ *  combination tells any fetcher "save this file," not "this is a video."
+ *  jsDelivr serves a plain git-committed file with the correct
+ *  `Content-Type: video/mp4` and no attachment disposition.
+ *
+ *  Each post goes to a NEW path (`v/<timestamp>.mp4`) rather than reusing one
+ *  — jsDelivr caches a given path at its edge for up to 12h
+ *  (`s-maxage=43200`), so reusing a path risks Buffer fetching yesterday's
+ *  cached video instead of today's. A fresh path is never cached, so the
+ *  first request always goes straight to the origin. Old video files are
+ *  deleted (not the repo's history — see `git log`) so the repo's current
+ *  tree never accumulates them. */
+async function publishToOutputRepo(videoPath: string, commitMessage: string): Promise<string> {
   const [owner, repo] = OUTPUT_REPO.split('/');
-  const gh = (path: string, init?: RequestInit) =>
-    fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        ...init?.headers,
-      },
-    });
+  const dir = await mkdtemp(join(tmpdir(), 'clipper-output-'));
+  try {
+    const git = (...args: string[]) => pexec('git', ['-C', dir, ...args]);
+    await pexec('git', ['clone', '--depth', '1', `https://x-access-token:${OUTPUT_REPO_TOKEN}@github.com/${owner}/${repo}.git`, dir]);
 
-  const prior = (await gh('/releases').then((r) => r.json())) as Array<{ id: number; tag_name: string }>;
-  for (const rel of prior) {
-    await gh(`/releases/${rel.id}`, { method: 'DELETE' }).catch(() => {});
-    await gh(`/git/refs/tags/${rel.tag_name}`, { method: 'DELETE' }).catch(() => {});
+    const videosDir = join(dir, 'v');
+    const prior = await readdir(videosDir).catch(() => [] as string[]);
+    for (const f of prior) await unlink(join(videosDir, f)).catch(() => {});
+    await mkdir(videosDir, { recursive: true });
+
+    const name = `${Date.now()}.mp4`;
+    await copyFile(videoPath, join(videosDir, name));
+
+    await git('add', '-A');
+    await git('-c', 'user.email=bot@clipper.local', '-c', 'user.name=clipper-bot', 'commit', '-m', commitMessage);
+    await git('push');
+
+    return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@main/v/${name}`;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
-
-  const tag = `post-${Date.now()}`;
-  const release = (await gh('/releases', {
-    method: 'POST',
-    body: JSON.stringify({ tag_name: tag, name: title, body, prerelease: false }),
-  }).then((r) => r.json())) as { upload_url?: string; message?: string };
-  if (!release.upload_url) throw new Error(`release create failed: ${JSON.stringify(release)}`);
-
-  const uploadUrl = release.upload_url.replace('{?name,label}', `?name=${encodeURIComponent(basename(videoPath))}`);
-  const bytes = await readFile(videoPath);
-  const asset = (await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`,
-      'Content-Type': 'video/mp4',
-      'Content-Length': String(bytes.length),
-    },
-    body: bytes,
-  }).then((r) => r.json())) as { browser_download_url?: string; message?: string };
-  if (!asset.browser_download_url) throw new Error(`asset upload failed: ${JSON.stringify(asset)}`);
-
-  return asset.browser_download_url;
 }
 
 /** Hands the public video URL to Buffer, which does the actual TikTok publish —
