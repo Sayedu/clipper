@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ *
+ *  Design tokens — calm, neutral, one accent. Light + dark.
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-bg: #fcfcfc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f6f6f7;
+  --color-text: #191919;
+  --color-muted: #8a8a8a;
+  --color-faint: #b6b6b6;
+  --color-hairline: #ececec;
+  --color-hairline-strong: #dcdcdc;
+
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft: #eef0ff;
+  --color-accent-ring: #c7d2fe;
+
+  --color-ok: #3f9d5a;
+  --color-danger: #c93b3b;
+  --color-danger-soft: #fdeceb;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+
+  --text-meta: 0.8125rem; /* 13 */
+  --text-meta--line-height: 1.4;
+  --text-body: 0.9375rem; /* 15 */
+  --text-body--line-height: 1.6;
+  --text-lead: 1.0625rem; /* 17 */
+  --text-lead--line-height: 1.55;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+}
+
+/* dark — system default */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #0e0e10;
+    --color-surface: #17171a;
+    --color-surface-2: #1e1e22;
+    --color-text: #ededed;
+    --color-muted: #8f8f93;
+    --color-faint: #5f5f65;
+    --color-hairline: #262629;
+    --color-hairline-strong: #35353a;
+
+    --color-accent: #7d78f0;
+    --color-accent-hover: #918dff;
+    --color-accent-soft: #211f3a;
+    --color-accent-ring: #3b3766;
+
+    --color-ok: #4fb06a;
+    --color-danger: #e26a6a;
+    --color-danger-soft: #2c1b1b;
+  }
+}
+
+/* dark — explicit toggle (wins over system in both directions) */
+:root[data-theme='dark'] {
+  --color-bg: #0e0e10;
+  --color-surface: #17171a;
+  --color-surface-2: #1e1e22;
+  --color-text: #ededed;
+  --color-muted: #8f8f93;
+  --color-faint: #5f5f65;
+  --color-hairline: #262629;
+  --color-hairline-strong: #35353a;
+
+  --color-accent: #7d78f0;
+  --color-accent-hover: #918dff;
+  --color-accent-soft: #211f3a;
+  --color-accent-ring: #3b3766;
+
+  --color-ok: #4fb06a;
+  --color-danger: #e26a6a;
+  --color-danger-soft: #2c1b1b;
+}
+
+/* ------------------------------------------------------------------ */
+* {
+  border-color: var(--color-hairline);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-feature-settings: 'cv11', 'ss01';
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.014em;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes clip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.clip-spin {
+  animation: clip-spin 0.9s linear infinite;
+}
+
+@keyframes clip-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.clip-fade-up {
+  animation: clip-fade-up 0.28s ease-out both;
+}

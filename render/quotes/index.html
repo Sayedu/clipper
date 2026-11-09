@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reminders</title>
+
+<script>
+  // Render mode is decided before first paint so animations never start.
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* Montserrat — bundled locally (variable font, weight 100–900 in one file)
+     so the headless render never touches the network. Relative path (not
+     /assets/…) so this works BOTH from the local dev server (rooted at the
+     repo) and from the worker's /render/quotes/ proxy under the web app's
+     own origin (an absolute path would resolve against the WRONG origin). */
+  @font-face{
+    font-family:"Montserrat"; font-weight:100 900; font-display:block;
+    src:url("../../assets/fonts/Montserrat-VariableFont.ttf") format("truetype-variations"),
+        url("../../assets/fonts/Montserrat-VariableFont.ttf") format("truetype");
+  }
+
+  :root{
+    --void:#05060a;
+    --ink:#f3efe4;
+    --ink-dim:#8a8f9e;
+    --steel:#9fb0b4;
+    --steel-dim:#4a5558;
+    --font:"Montserrat",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);
+    color:var(--ink);
+    font-family:var(--font);
+    overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  #stage{
+    position:relative;
+    height:100dvh;
+    aspect-ratio:9/16;
+    max-width:100vw;
+    background:var(--void);
+    overflow:hidden;
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:100vw} }
+
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  #controls{position:absolute;left:0;right:0;bottom:2%;display:flex;justify-content:center;
+    pointer-events:auto}
+  #restart{padding:1.4vh 4.2vh;font-size:clamp(10px,1.55vh,13px);font-weight:700;letter-spacing:.25em;
+    text-transform:uppercase;color:var(--ink);background:rgba(20,22,30,.72);border:1px solid rgba(200,190,160,.22);
+    border-radius:999px;font-family:var(--font);cursor:pointer;transition:border-color .2s,box-shadow .2s}
+  #restart:hover{border-color:var(--steel);box-shadow:0 0 26px -5px rgba(159,176,180,.5)}
+
+  html.rmode #controls, html.embed #controls{ display:none !important; }
+
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="controls">
+    <button id="restart" aria-label="Show a new reminder">New Reminder</button>
+  </div>
+</div>
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__QT_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    window.__QT_ERROR = String((e.reason && e.reason.stack) || e.reason);
+  });
+</script>
+<script src="./quotes.js"></script>
+<script src="./game.js"></script>
+</body>
+</html>

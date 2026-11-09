@@ -1,0 +1,6 @@
+These sound effects were synthesized locally with ffmpeg oscillators/noise
+generators as part of project setup. They contain no third-party recordings.
+Released to the public domain (CC0 1.0). Do whatever you like with them.
+
+Drop your own .wav / .mp3 files into any folder under assets/sfx/<packname>/
+and they will show up as a selectable pack in the dashboard.

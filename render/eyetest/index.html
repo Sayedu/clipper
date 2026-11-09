@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Eye Test — Ghost Object Tracker</title>
+
+<script>
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* relative paths so the page works BOTH from the render server (rooted at the
+     repo) and from the worker's /render/eyetest/ + /assets/fonts/ routes. */
+  @font-face{ font-family:"Chakra Petch"; font-weight:500; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Medium.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Bold.ttf") format("truetype"); }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    margin:0; color:#fff; background:#0d0e12;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    overflow:hidden; display:flex; align-items:center; justify-content:center; gap:22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  html:not(.rmode) body{ overflow:auto; padding:16px; }
+  html:not(.rmode) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
+  @media (max-width:760px){
+    html:not(.rmode) body{ flex-direction:column; }
+    html:not(.rmode) #stage{ height:auto; width:min(94vw, 52dvh); }
+    #studio{ width:min(94vw, 420px) !important; }
+  }
+  @keyframes etPop{0%{transform:scale(.55);opacity:0}62%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:1}}
+
+  /* the game frame — 9:16, dark theme (#0d0e12), a faint cyber-blue bloom
+     echoing the arena's own neon stroke. */
+  #stage{
+    position:relative; container-type:size;
+    aspect-ratio:9/16; height:98dvh; max-width:98vw;
+    border-radius:26px; overflow:hidden; background:#0d0e12;
+    box-shadow:0 0 0 1px #1c2430, 0 0 60px rgba(0,229,255,.12), 0 30px 90px rgba(0,0,0,.7);
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:98vw} }
+  #c{display:block;width:100%;height:100%}
+
+  /* small round indicator — "ROUND 2 / 3" — only shown when the plan has
+     more than one round; sits just above the big phase label. */
+  #roundPill{position:absolute;left:0;right:0;top:2.2cqh;text-align:center;pointer-events:none;
+    display:none;font-weight:600;font-size:3cqw;letter-spacing:.3em;color:#00e5ff;
+    text-shadow:0 0 1.6cqw currentColor}
+
+  /* top text overlay — SPEC §2: "prominent, clean bold text overlay at the
+     top" whose copy swaps per phase (game.js's hud() drives textContent). */
+  #big{position:absolute;left:0;right:0;top:5cqh;
+    display:flex;flex-direction:column;align-items:center;pointer-events:none;
+    padding:0 6cqw;box-sizing:border-box}
+  #bigLabel{font-weight:700;font-size:6.2cqw;line-height:1.12;text-align:center;color:#fff;
+    text-shadow:0 0 2.4cqw currentColor,0 0 7cqw currentColor}
+
+  /* end-of-clip score card — one row per round, gold numbers, cyber-blue
+     title. Its near-opaque background is what hides the frozen arena
+     underneath; the canvas keeps drawing, it's just covered. */
+  #scoreCard{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:3cqw;padding:8cqw;box-sizing:border-box;pointer-events:none;
+    background:linear-gradient(180deg,rgba(13,14,18,.94) 0%,rgba(13,14,18,.995) 55%)}
+  #scoreTitle{font-weight:700;font-size:6.6cqw;line-height:1.1;text-align:center;color:#00e5ff;
+    text-shadow:0 0 3cqw currentColor}
+  #scoreList{display:flex;flex-direction:column;gap:1.6cqw;width:100%;max-width:80cqw}
+  .scoreRow{display:flex;align-items:center;gap:3cqw;padding:2.4cqw 3.4cqw;border-radius:2.2cqw;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)}
+  .scoreRow .sr{font-weight:600;font-size:2.8cqw;letter-spacing:.2em;color:rgba(255,255,255,.4);
+    text-transform:uppercase;flex:1}
+  .scoreRow .sc{font-weight:700;font-size:5cqw;color:#ffd700;width:10cqw;text-align:right}
+  #scoreFoot{font-size:2.8cqw;letter-spacing:.2em;color:rgba(255,255,255,.42);
+    text-transform:uppercase;text-align:center}
+
+  /* the 3-2-1 lock-in countdown — centred on the arena (canvas-space 540,1100
+     of the 1080x1920 authoring frame == 50cqw,57.3cqh here, since #stage's
+     9:16 box makes cqw/cqh map 1:1 to canvas percent). */
+  #countdown{position:absolute;left:50cqw;top:57.3cqh;transform:translate(-50%,-50%);
+    font-weight:700;font-size:20cqw;line-height:1;color:#fff;
+    text-shadow:0 0 4cqw #00e5ff,0 0 11cqw #00e5ff;pointer-events:none;display:none}
+
+  /* preview: run the CSS pop; render: JS reproduces it deterministically */
+  html:not(.rmode):not(.embed) #bigLabel{animation:etPop .3s ease-out}
+  html:not(.rmode):not(.embed) #countdown{animation:etPop .22s ease-out}
+  html:not(.rmode):not(.embed) #scoreTitle{animation:etPop .36s ease-out}
+  html.rmode *, html.rmode *::before, html.rmode *::after{ animation:none !important; transition:none !important; }
+
+  html.rmode{
+    background:#000;
+    --safe-w:72vw;
+    --safe-top:5vh;
+  }
+  html.rmode body{ background:#000; }
+  html.rmode #stage{
+    position:absolute; left:50%; transform:translateX(-50%);
+    top:var(--safe-top); width:var(--safe-w); height:auto; aspect-ratio:9/16;
+    max-width:none; border-radius:0; box-shadow:none;
+  }
+  #subq{ display:none; }
+  html.rmode #subq{
+    display:block; position:absolute; left:0; right:0;
+    top:calc(var(--safe-top) + var(--safe-w) * 16 / 9 + 2.6vh);
+    text-align:center; white-space:nowrap;
+    font:700 3.4vw/1 "Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    letter-spacing:.04em; color:rgba(255,255,255,.9);
+    text-shadow:0 0 2.2vw rgba(0,229,255,.4);
+  }
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+
+  /* ── preview studio — never rendered, hidden when embedded ── */
+  html.rmode #studio, html.embed #studio{ display:none; }
+  html.embed body{ padding:0; overflow:hidden; }
+  html.embed #stage{ height:100dvh; max-width:100vw; }
+  #studio{
+    width:340px; flex:none; align-self:center;
+    max-height:94dvh; overflow-y:auto;
+    background:#0b0c10; border:1px solid #1c2430; border-radius:20px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6);
+    padding:18px; display:flex; flex-direction:column; gap:12px;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  #studio .hd{ font-weight:700; letter-spacing:.28em; font-size:11px; color:#00e5ff; text-transform:uppercase; }
+  #studio button{
+    font-family:inherit; font-weight:700; color:#fff; cursor:pointer;
+    background:#15161c; border:1px solid #262a33; border-radius:10px;
+    padding:9px 12px; font-size:13px; letter-spacing:.06em; transition:none;
+  }
+  #studio button:hover{ border-color:#00e5ff88; background:#1a1c22; }
+  #studio button.big{ padding:14px; font-size:15px; letter-spacing:.1em; }
+  #studio button.big small{ display:block; font-weight:500; font-size:10px; letter-spacing:.14em; opacity:.55; margin-top:2px; }
+  #studio button.primary{ background:rgba(0,229,255,.12); border-color:rgba(0,229,255,.5); color:#00e5ff; }
+  #studio button.primary:hover{ background:rgba(0,229,255,.2); }
+  #studio .row{ display:flex; align-items:center; gap:8px; }
+  #studio .lbl{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.42); width:52px; flex:none; }
+  #studio input[type=text]{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
+    background:#15161c; border:1px solid #262a33; border-radius:9px; padding:8px 10px; font-size:13px; }
+  #studio select{ font-family:inherit; font-weight:700; color:#fff; flex:1;
+    background:#15161c; border:1px solid #262a33; border-radius:9px; padding:8px; font-size:13px; }
+  #studio .seg{ display:flex; gap:4px; flex:1; }
+  #studio .seg button{ flex:1; padding:7px 0; font-size:12px; }
+  #studio .seg button.on{ background:rgba(0,229,255,.14); border-color:rgba(0,229,255,.5); color:#00e5ff; }
+  #studio label.sw{ display:flex; align-items:center; gap:7px; font-size:12px; letter-spacing:.06em; color:rgba(255,255,255,.8); cursor:pointer; }
+  #studio label.sw input{ accent-color:#00e5ff; width:15px; height:15px; }
+  /* the "Reveal Answer" toggle — SPEC §3 — gets its own gold accent, the same
+     colour the reveal itself flashes, so the control visually previews what
+     it does. */
+  #studio label.sw.gold{ color:#ffd700; }
+  #studio label.sw.gold input{ accent-color:#ffd700; }
+  #studio #readout{ background:#15161c; border:1px solid #262a33; border-radius:10px;
+    padding:11px 12px; font-size:13px; line-height:1.5; min-height:56px; font-variant-numeric:tabular-nums; }
+  #studio #readout .dim{ color:rgba(255,255,255,.4); font-size:11px; letter-spacing:.04em; }
+  #studio #toast{ font-size:11px; line-height:1.5; color:#00e5ff; word-break:break-all;
+    font-family:ui-monospace,Menlo,monospace; min-height:0; }
+  #studio .hint{ font-size:10.5px; color:rgba(255,255,255,.35); letter-spacing:.03em; }
+  #studio kbd{ background:#15161c; border:1px solid #262a33; border-radius:4px; padding:0 4px; font-family:inherit; color:#00e5ff; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="720" height="1280"></canvas>
+  <div id="roundPill">ROUND 1 / 3</div>
+  <div id="big"><span id="bigLabel">DYNAMIC VISION TEST: FOCUS ON THE GOLD BALL</span></div>
+  <div id="countdown">3</div>
+  <div id="scoreCard">
+    <span id="scoreTitle">YOUR RESULTS</span>
+    <div id="scoreList"></div>
+    <span id="scoreFoot">Comment your scores 👇</span>
+  </div>
+</div>
+<div id="subq">Eye test 👀 can you actually track it?</div>
+
+<div id="studio">
+  <div class="hd">Eye Test · Preview</div>
+  <button id="btnReplay" class="big primary">↻ REPLAY<small>fresh random seed</small></button>
+  <div class="row">
+    <button id="btnAgain" style="flex:1">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
+    <label class="sw"><input type="checkbox" id="chkAuto"> auto</label>
+  </div>
+  <div class="row">
+    <span class="lbl">Seed</span>
+    <input type="text" id="seedIn" inputmode="numeric" spellcheck="false" />
+    <button id="btnSeed">set</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Balls</span>
+    <input type="text" id="ballsIn" spellcheck="false" placeholder="8,8,8" />
+  </div>
+  <div class="hint" style="margin:-6px 0 0">one number per round, comma-separated — e.g. <code>8,8,6</code> = 3 rounds</div>
+  <div class="row">
+    <span class="lbl">Mix</span>
+    <input type="text" id="shuffleIn" inputmode="numeric" spellcheck="false" style="max-width:64px" />
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">seconds of shuffle, every round</span>
+    <button id="btnPlan">set</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <div class="seg" id="speedSeg">
+      <button data-s="0.5">0.5×</button><button data-s="1" class="on">1×</button>
+      <button data-s="2">2×</button><button data-s="4">4×</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Sound</span>
+    <label class="sw"><input type="checkbox" id="chkSound"> play audio</label>
+  </div>
+  <label class="sw gold"><input type="checkbox" id="chkReveal"> 👁 reveal answer (jump the freeze hold)</label>
+  <div id="readout">…</div>
+  <button id="btnRender" class="big primary">▶ RENDER THIS SEED</button>
+  <div id="toast"></div>
+  <div class="hint">press <kbd>S</kbd> anytime to star the current seed → <code>render-queue.txt</code></div>
+</div>
+
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__ET_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => { window.__ET_ERROR = String((e.reason && e.reason.stack) || e.reason); });
+</script>
+<script src="./game.js"></script>
+
+<script>
+if (!document.documentElement.classList.contains('rmode')
+    && !document.documentElement.classList.contains('embed')) (function () {
+  const ET = window.ET;
+  const $ = (id) => document.getElementById(id);
+  const seedIn = $('seedIn'), ballsIn = $('ballsIn'), shuffleIn = $('shuffleIn'), readout = $('readout'), toast = $('toast');
+  const plan0 = ET.getPlan();
+  ballsIn.value = plan0.balls.join(',');
+  shuffleIn.value = plan0.shuffleSec;
+
+  let toastT = 0;
+  const say = (msg, ms = 3500) => { toast.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => (toast.textContent = ''), ms); };
+
+  $('btnReplay').onclick = () => ET.replay();
+  $('btnAgain').onclick = () => ET.again();
+  $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) ET.replay(v); };
+  seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
+  const applyPlan = () => ET.setPlan(ballsIn.value, shuffleIn.value);
+  $('btnPlan').onclick = applyPlan;
+  ballsIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPlan(); });
+  shuffleIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPlan(); });
+  $('chkAuto').onchange = (e) => ET.setAutoReplay(e.target.checked);
+  $('chkSound').onchange = (e) => ET.setSound(e.target.checked);
+  $('chkReveal').onchange = (e) => { if (e.target.checked) ET.revealNow(); };
+  $('speedSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...$('speedSeg').children].forEach((x) => x.classList.toggle('on', x === b));
+    ET.setSpeed(+b.dataset.s);
+  });
+
+  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  let pollT = 0;
+  $('btnRender').onclick = async () => {
+    const seed = ET.getSeed(), plan = ET.getPlan();
+    const cmd = `node scripts/eyetest/render.mjs --seed ${seed} --balls ${plan.balls.join(',')} --shuffle ${plan.shuffleSec} --mux`;
+    clearInterval(pollT);
+    try {
+      const r = await post('/render', { seed, balls: plan.balls, shuffleSec: plan.shuffleSec });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      say(`rendering ${j.file}…`, 60000);
+      pollT = setInterval(async () => {
+        try {
+          const s = await (await fetch('/render-status?id=' + j.id)).json();
+          const p = s.progress ? ` ${Math.round(s.progress.pct * 100)}% ${s.progress.msg}` : '';
+          if (s.state === 'done') { clearInterval(pollT); say(`✅ ${s.file} → render/eyetest/out/`, 12000); }
+          else if (s.state === 'failed') { clearInterval(pollT); say(`❌ render failed — see terminal`, 8000); }
+          else say(`rendering ${s.file}…${p}`, 60000);
+        } catch { clearInterval(pollT); }
+      }, 700);
+    } catch {
+      try { await navigator.clipboard.writeText(cmd); say('no studio server — copied: ' + cmd, 12000); }
+      catch { say(cmd, 15000); }
+    }
+  };
+
+  window.addEventListener('keydown', async (e) => {
+    if (e.key.toLowerCase() !== 's' || e.metaKey || e.ctrlKey) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    const seed = ET.getSeed(), plan = ET.getPlan();
+    const tag = `${seed} ${plan.balls.join(',')} ${plan.shuffleSec}`;
+    try {
+      const r = await post('/star', { seed, balls: plan.balls, shuffleSec: plan.shuffleSec });
+      if (!r.ok) throw new Error();
+      say(`★ starred ${tag} → render-queue.txt`);
+    } catch {
+      try { await navigator.clipboard.writeText(tag); say(`★ ${tag} (copied — no server)`, 5000); }
+      catch { say(`★ ${tag}`, 5000); }
+    }
+  });
+
+  let lastPhase = '';
+  setInterval(() => {
+    const r = ET.readout();
+    if (document.activeElement !== seedIn) seedIn.value = r.seed;
+    if (document.activeElement !== ballsIn) ballsIn.value = r.ballsPerRound.join(',');
+    if (document.activeElement !== shuffleIn) shuffleIn.value = r.shuffleSec;
+    if (r.phase === 'lockin' && lastPhase !== 'lockin') $('chkReveal').checked = false;
+    lastPhase = r.phase;
+    if (r.done) {
+      readout.innerHTML = `<b style="color:#ffd700">Answers: ${r.answers.join('  ')}</b>`
+        + `<br><span class="dim">${r.rounds} round${r.rounds > 1 ? 's' : ''} · seed ${r.seed} · ${r.shuffleSec}s shuffle</span>`;
+    } else {
+      readout.innerHTML = `Round <b>${r.round}/${r.rounds}</b> · ${r.roundSec.toFixed(1)}s`
+        + `<br><span class="dim">seed ${r.seed} · ${r.ballsPerRound.join(',')} balls · ${r.shuffleSec}s shuffle`
+        + `${r.answers.length ? ' · so far: ' + r.answers.join(' ') : ''}</span>`;
+    }
+  }, 110);
+})();
+</script>
+</body>
+</html>

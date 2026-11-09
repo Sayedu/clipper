@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Laser Nations</title>
+
+<script>
+  // Render mode is decided before first paint so animations never start.
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  // embed mode (web-app studio iframe): the React page provides its own
+  // controls, so hide the built-in restart/mute/vortex row + seed readout.
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* Chakra Petch — bundled locally (served from the repo's assets/fonts) so the
+     headless render never touches the network. Relative paths (not /assets/…)
+     so the page works BOTH from the local dev server (rooted at the repo) and
+     from the worker's /render/lasernations/ proxy under the web app's own
+     origin (an absolute path would resolve against the WRONG origin there). */
+  @font-face{
+    font-family:"Chakra Petch"; font-weight:500; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Medium.ttf") format("truetype");
+  }
+  @font-face{
+    font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype");
+  }
+  @font-face{
+    font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Bold.ttf") format("truetype");
+  }
+
+  :root{
+    --ground:#0b0f19;
+    --void:#06080f;
+    --panel:#10162a;
+    --line:#26304a;
+    --ink:#eef1fb;
+    --ink-dim:#828fb2;
+    --ink-faint:#3c4668;
+    --alarm:#ff2d55;
+    --cyanlight:#9fe8ff;
+    --violet:#b98cff;
+    --font:"Chakra Petch","DIN Alternate","Bebas Neue",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);
+    color:var(--ink);
+    font-family:var(--font);
+    overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* the lone 9:16 stage on a dark void */
+  #stage{
+    position:relative;
+    height:100dvh;
+    aspect-ratio:9/16;
+    max-width:100vw;
+    background:var(--ground);
+    overflow:hidden;
+    box-shadow:0 0 140px -30px rgba(90,120,255,.16), inset 0 0 0 1px rgba(120,140,200,.045);
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:100vw} }
+
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block;will-change:transform}
+
+  /* the whole game lives inside a TikTok-safe inset so nothing hides under the app UI */
+  #ui{position:absolute;left:0;right:0;top:4.2%;bottom:7%;pointer-events:none;
+      display:flex;flex-direction:column;align-items:center;font-feature-settings:"tnum" 1}
+
+  .eyebrow{
+    font-size:clamp(10px,1.35vh,14px);font-weight:700;letter-spacing:.44em;
+    text-transform:uppercase;color:var(--ink-dim);text-indent:.44em;
+  }
+  /* retention hook — swaps message through the match */
+  #hook{
+    font-size:clamp(15px,2.5vh,26px);font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cyanlight);text-align:center;white-space:nowrap;
+    text-shadow:0 0 24px rgba(159,232,255,.55),0 0 6px rgba(159,232,255,.4);
+  }
+  #hook.hot{ color:var(--alarm); text-shadow:0 0 26px rgba(255,45,85,.6),0 0 8px rgba(255,45,85,.45); }
+  #hook.big{
+    font-size:clamp(22px,3.7vh,40px);letter-spacing:.1em;
+    text-shadow:0 0 40px rgba(159,232,255,.7),0 0 12px rgba(159,232,255,.55);
+  }
+  #timer{
+    margin-top:.3vh;
+    font-weight:700;font-size:clamp(44px,8.2vh,90px);line-height:.9;letter-spacing:.015em;
+    font-variant-numeric:tabular-nums;color:var(--ink);
+    text-shadow:0 0 22px rgba(159,232,255,.4), 0 0 58px rgba(159,232,255,.15);
+    transition:color .25s, text-shadow .25s;
+  }
+  #timer.low{
+    color:var(--alarm);
+    text-shadow:0 0 24px rgba(255,45,85,.58), 0 0 68px rgba(255,45,85,.24);
+    animation:pip 1s steps(1,end) infinite;
+  }
+  @keyframes pip{50%{opacity:.5}}
+
+  #speed{margin-top:.8vh;font-size:clamp(14px,2.2vh,22px);font-weight:600;letter-spacing:.22em;
+    color:var(--ink-dim);text-transform:uppercase}
+  #speed b{color:var(--ink);font-weight:700;font-size:1.32em;letter-spacing:.02em;
+    text-shadow:0 0 22px rgba(159,232,255,.5)}
+
+  /* same width as the arena below it (game.js: F0.w = 0.88·W), chips tight together */
+  #board{margin-top:1.6vh;width:88%;max-width:none;display:grid;grid-template-columns:repeat(4,1fr);gap:1%}
+  .chip{
+    display:flex;flex-direction:column;align-items:center;gap:.8vh;
+    padding:1.7vh .2vh 1.8vh;border-radius:16px;
+    background:rgba(16,22,42,.62);border:1px solid var(--line);
+    position:relative;overflow:hidden;
+    transition:opacity .4s, filter .4s, border-color .3s, box-shadow .3s;
+  }
+  .chip::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;
+    background:var(--fac,#556);box-shadow:0 0 16px 1px var(--fac,#556)}
+  .chip .flag{width:clamp(44px,6vh,68px);height:clamp(44px,6vh,68px);border-radius:50%;
+    border:2px solid rgba(255,255,255,.22);overflow:hidden;display:block;
+    box-shadow:0 0 0 3px rgba(11,15,25,.92), 0 5px 16px -3px rgba(0,0,0,.65)}
+  .chip .flag canvas{display:block;width:100%;height:100%}
+  .chip .name{font-size:clamp(10px,1.6vh,15px);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);white-space:nowrap}
+  .chip .lines{font-size:clamp(27px,4.4vh,44px);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1;
+    text-shadow:0 0 20px rgba(159,232,255,.28)}
+  .chip.lead{border-color:var(--fac,#556);box-shadow:0 0 30px -6px var(--fac,#556)}
+  .chip.lead .lines{color:#fff;text-shadow:0 0 22px var(--fac,#9fe8ff)}
+  .chip.out{opacity:.34;filter:grayscale(.85)}
+
+  #banner{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);text-align:center;
+    pointer-events:none;opacity:0;width:98%}
+  /* inline-block so scrollWidth == the text width (fitText measures it) */
+  #banner .big{display:inline-block;font-weight:700;font-size:clamp(34px,min(8.5vh,11vw),88px);
+    letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;color:var(--ink);
+    text-shadow:0 0 40px currentColor,0 0 12px currentColor,0 0 90px currentColor}
+  #banner .sub{margin-top:1.4vh;font-size:clamp(12px,1.9vh,19px);font-weight:600;letter-spacing:.3em;
+    color:var(--ink-dim);text-transform:uppercase}
+  #banner.show{animation:slam 1.05s cubic-bezier(.16,1,.3,1) forwards}
+  #banner.hold{opacity:1;animation:none}
+  @keyframes slam{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(1.26);filter:blur(6px)}
+    11%{opacity:1;filter:blur(0)}
+    68%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1)}
+  }
+
+  #boot{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);
+    font-weight:700;font-size:clamp(56px,12vh,140px);letter-spacing:.06em;color:var(--ink);
+    text-shadow:0 0 38px var(--cyanlight),0 0 12px var(--cyanlight);opacity:0;pointer-events:none}
+
+  #win{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:0 8%;
+    background:radial-gradient(circle at 50% 43%, rgba(9,13,25,.72), rgba(6,8,15,.95) 64%);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  #win.show{display:flex;animation:fade .55s ease-out both}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  #win .wflag{width:clamp(110px,19vh,210px);height:clamp(110px,19vh,210px);border-radius:50%;
+    border:2px solid rgba(255,255,255,.18);overflow:hidden;margin-bottom:2.4vh;
+    box-shadow:0 0 0 5px color-mix(in srgb,var(--wc,#9fe8ff) 18%,transparent),0 0 74px 8px var(--wc,#9fe8ff);
+    animation:pop .75s cubic-bezier(.16,1.5,.3,1) both}
+  #win .wflag canvas{width:100%;height:100%;display:block}
+  @keyframes pop{from{transform:scale(.35);opacity:0}to{transform:scale(1);opacity:1}}
+  #win .wname{font-weight:700;font-size:clamp(34px,8.4vh,96px);line-height:.95;letter-spacing:.02em;
+    text-transform:uppercase;color:var(--wc,#fff);white-space:nowrap;max-width:100%;
+    text-shadow:0 0 42px var(--wc,#fff),0 0 92px var(--wc,#fff)}
+  #win .wtag{margin-top:1.7vh;font-size:clamp(13px,2.2vh,20px);font-weight:700;letter-spacing:.34em;
+    color:var(--ink);text-transform:uppercase}
+  #win .wscore{margin-top:2.4vh;font-weight:700;font-size:clamp(56px,13vh,150px);line-height:.9;
+    letter-spacing:.01em;color:var(--wc,#fff);font-variant-numeric:tabular-nums;white-space:nowrap;
+    text-shadow:0 0 46px var(--wc,#fff),0 0 100px var(--wc,#fff)}
+  #win .wscoreLabel{margin-top:.6vh;font-size:clamp(11px,1.7vh,15px);font-weight:700;letter-spacing:.44em;
+    text-indent:.44em;color:var(--ink-dim);text-transform:uppercase}
+  #win .wstats{margin-top:2.4vh;font-size:clamp(11px,1.7vh,15px);font-weight:500;letter-spacing:.14em;
+    color:var(--ink-dim);text-transform:uppercase;line-height:1.9}
+  #win .wstats b{color:var(--ink);font-weight:700}
+  #win .again{margin-top:2.6vh;font-size:clamp(9px,1.4vh,12px);letter-spacing:.3em;color:var(--ink-dim);
+    text-transform:uppercase;opacity:.7}
+
+  #controls{margin-top:auto;display:flex;align-items:center;gap:11px;pointer-events:auto}
+  button{font-family:var(--font);cursor:pointer;color:inherit}
+  #restart{padding:1.4vh 4.2vh;font-size:clamp(10px,1.55vh,13px);font-weight:700;letter-spacing:.25em;
+    text-transform:uppercase;color:var(--ink);background:rgba(16,22,42,.72);border:1px solid var(--line);
+    border-radius:999px;transition:border-color .2s,box-shadow .2s,background .2s,transform .08s}
+  #restart:hover{border-color:var(--cyanlight);box-shadow:0 0 26px -5px rgba(159,232,255,.5);background:rgba(16,22,42,.92)}
+  #restart:active{transform:translateY(1px)}
+  .icon{width:4.6vh;height:4.6vh;min-width:36px;min-height:36px;display:grid;place-items:center;
+    font-size:clamp(12px,1.9vh,16px);color:var(--ink-dim);background:rgba(16,22,42,.72);
+    border:1px solid var(--line);border-radius:50%;transition:color .2s,border-color .2s,box-shadow .2s}
+  .icon:hover{color:var(--ink)}
+  #mute.off{color:#42506f}
+  #vortex.on{color:var(--violet);border-color:color-mix(in srgb,var(--violet) 55%,var(--line));
+    box-shadow:0 0 20px -4px var(--violet)}
+
+  #seed{position:absolute;left:0;right:0;bottom:-5%;text-align:center;
+    font-size:clamp(8px,1vh,10px);font-weight:500;letter-spacing:.32em;color:var(--ink-faint);
+    text-transform:uppercase;pointer-events:none}
+
+  :focus-visible{outline:2px solid var(--cyanlight);outline-offset:3px}
+
+  @media (prefers-reduced-motion:reduce){
+    #timer.low{animation:none}
+    #banner.show{animation:none;opacity:1;transition:opacity .5s}
+    #win.show,#win .wflag{animation:none}
+  }
+
+  /* headless render: no wall-clock CSS animation/transition — every reveal is
+     driven from sim time by game.js so the frame-stepped capture is exact. */
+  html.rmode #controls, html.rmode #seed{ display:none !important; }
+  html.embed #controls, html.embed #seed{ display:none !important; }
+  html.rmode *, html.rmode *::before, html.rmode *::after{
+    animation:none !important; transition:none !important;
+  }
+  /* render mode drives the banner's opacity + scale from sim time (see game.js) */
+  html.rmode #banner.hold{ will-change:opacity, transform; }
+  html.rmode #win.show{ display:flex; opacity:1; }
+
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <div id="hook">Watch till the end</div>
+    <div id="timer">1:05</div>
+    <div id="speed">SPEED <b>&times;1.0</b></div>
+    <div id="board"></div>
+    <div id="banner"><div class="big"></div><div class="sub"></div></div>
+    <div id="controls">
+      <button id="mute" class="icon" aria-label="Mute sound" title="Sound (M)">&#9834;</button>
+      <button id="restart" aria-label="Run a new simulation">New Simulation</button>
+      <button id="vortex" class="icon" aria-label="Black-hole finish: off" title="Black-hole finish (V)">&#9711;</button>
+    </div>
+  </div>
+  <div id="boot"></div>
+  <div id="win">
+    <div class="wflag" id="winFlag"></div>
+    <div class="wname" id="winName">Nation</div>
+    <div class="wtag" id="winTag">Highest score</div>
+    <div class="wscore" id="winScore">0</div>
+    <div class="wscoreLabel" id="winScoreLabel">Final score</div>
+    <div class="wstats" id="winStats"></div>
+  </div>
+  <div id="seed"></div>
+</div>
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__LN_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    window.__LN_ERROR = String((e.reason && e.reason.stack) || e.reason);
+  });
+</script>
+<script src="./game.js"></script>
+</body>
+</html>

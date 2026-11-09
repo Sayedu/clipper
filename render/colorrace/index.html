@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marble Rush</title>
+
+<script>
+  if (new URLSearchParams(location.search).get('render') === '1') {
+    document.documentElement.classList.add('rmode');
+  }
+</script>
+
+<style>
+  @font-face{ font-family:"Chakra Petch"; font-weight:500; font-display:block;
+    src:url("/assets/fonts/ChakraPetch-Medium.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("/assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("/assets/fonts/ChakraPetch-Bold.ttf") format("truetype"); }
+
+  :root{
+    --bg:#06060c; --panel:rgba(10,10,22,.62); --line:rgba(255,255,255,.12);
+    --ink:#ffffff; --ink-dim:rgba(255,255,255,.55); --ink-faint:rgba(255,255,255,.38);
+    --cyan:#00e7ff; --pink:#ff3d71;
+    --font:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--font);
+    overflow:hidden; display:flex; align-items:center; justify-content:center;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+
+  /* stage is deliberately smaller than the frame — TikTok's own UI chrome and
+     device-crop letterboxing eat into the true edges of a full-bleed 9:16
+     video, so this leaves a safe margin (rendered in the body's near-black
+     background) rather than letting game content bleed to the edge */
+  #stage{
+    position:relative; height:91dvh; aspect-ratio:9/16; max-width:91vw;
+    background:#05050b; overflow:hidden; container-type:inline-size;
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:91vw} }
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* HUD — sized in cqw (1% of the 9:16 stage width), matching the design 1:1 */
+  #hud{position:absolute;left:0;right:0;top:0;pointer-events:none;
+    display:flex;flex-direction:column;gap:2.2cqw;padding:3cqw 3cqw 0}
+
+  #topline{display:flex;justify-content:space-between;align-items:center;gap:2cqw}
+  #badge{display:flex;align-items:center;gap:1.6cqw;padding:1.4cqw 2.4cqw;border-radius:999px;
+    background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px)}
+  #badge .dot{width:1.4cqw;height:1.4cqw;border-radius:50%;background:var(--pink);
+    box-shadow:0 0 2cqw var(--pink)}
+  #badge .name{font-weight:700;font-size:2.6cqw;letter-spacing:.14em;
+    text-transform:uppercase;white-space:nowrap}
+  #maptag{font-size:1.9cqw;letter-spacing:.14em;color:var(--ink-faint);
+    text-transform:uppercase;text-align:right;max-width:42%}
+
+  #hookline{position:absolute;left:0;right:0;top:11cqw;font-weight:700;font-size:2.7cqw;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--cyan);text-align:center;white-space:nowrap;pointer-events:none;
+    text-shadow:0 0 3cqw rgba(0,231,255,.55),0 0 .8cqw rgba(0,231,255,.4)}
+  #hookline.hot{color:var(--pink);text-shadow:0 0 3cqw rgba(255,61,113,.6)}
+  #hookline.big{font-size:3.8cqw}
+
+  /* one slim bar — how far the LEADING colour is from the finish, not a
+     per-marble leaderboard */
+  #progress{position:absolute;left:8cqw;right:8cqw;top:16.6cqw;height:1.15cqw;border-radius:99px;
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);
+    overflow:hidden;pointer-events:none}
+  #progress .fill{height:100%;width:0%;border-radius:99px;
+    background:var(--pc,var(--cyan));box-shadow:0 0 1.8cqw var(--pc,var(--cyan))}
+
+  #count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #count span{font-weight:700;font-size:17cqw;letter-spacing:.02em;color:#fff;
+    text-shadow:0 0 4cqw rgba(0,231,255,.8),0 0 9cqw rgba(255,45,149,.5)}
+
+  #photo{position:absolute;left:50%;transform:translateX(-50%);bottom:12cqw;
+    padding:1.4cqw 3.2cqw;border-radius:999px;background:rgba(255,61,113,.92);
+    font-weight:700;font-size:2.6cqw;letter-spacing:.22em;text-transform:uppercase;
+    display:none}
+  #photo.show{display:block}
+
+  /* winner — centred over the frozen course */
+  #win{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:3cqw;text-align:center;
+    background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(5,5,12,.78) 0%,rgba(5,5,12,.94) 100%)}
+  #win.show{display:flex}
+  #win .wlabel{font-size:3cqw;letter-spacing:.44em;color:var(--ink-dim);text-transform:uppercase}
+  #win .wname{font-weight:700;font-size:15cqw;line-height:.9;white-space:nowrap;
+    color:var(--wc,#fff);text-shadow:0 0 7cqw var(--wc,#fff),0 0 2.2cqw var(--wc,#fff);
+    will-change:transform}
+  #win .wbar{width:22cqw;height:1cqw;border-radius:99px;background:var(--wc,#fff);
+    box-shadow:0 0 4cqw var(--wc,#fff)}
+  #win .wsub{font-size:2.6cqw;letter-spacing:.24em;color:var(--ink-dim);text-transform:uppercase}
+
+  html.rmode *, html.rmode *::before, html.rmode *::after{ animation:none !important; transition:none !important; }
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div id="topline">
+      <div id="badge"><span class="dot"></span><span class="name" id="mapName">Marble Rush</span></div>
+      <div id="maptag"></div>
+    </div>
+  </div>
+  <div id="hookline">Watch till the end</div>
+  <div id="progress"><div class="fill" id="progressFill"></div></div>
+  <div id="count"><span id="countN">3</span></div>
+  <div id="photo">Photo finish</div>
+  <div id="win">
+    <div class="wlabel">Winner</div>
+    <div class="wname" id="winName">CYAN</div>
+    <div class="wbar"></div>
+    <div class="wsub">first to the finish</div>
+  </div>
+</div>
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__CR_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => { window.__CR_ERROR = String((e.reason && e.reason.stack) || e.reason); });
+</script>
+<script src="/render/colorrace/game.js"></script>
+</body>
+</html>

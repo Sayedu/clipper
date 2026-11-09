@@ -1,0 +1,29 @@
+[project]
+name = "clipping-ml"
+version = "1.0.0"
+description = "Local ML helpers for the auto-clipper: transcription, scene detection, subject-tracked reframe."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "faster-whisper>=1.1.0",
+    "scenedetect>=0.6.4",
+    "opencv-python>=4.10",
+    "mediapipe>=0.10.14",
+    "numpy>=1.26",
+    # Phase 2 — content filter
+    "torch>=2.2",
+    "torchaudio>=2.2",
+    "demucs>=4.0",          # music stem separation
+    "insightface>=0.7",     # face detection + gender/age
+    "open_clip_torch>=2.24", # configurable zero-shot visual concepts
+    "onnxruntime>=1.17",
+    # Storyteller mode — narration
+    "kokoro-onnx>=0.4",     # Kokoro-82M TTS (Apache-2.0, CPU); bundles espeak-ng via espeakng-loader
+    "soundfile>=0.12",      # write the narration WAV
+]
+
+# These scripts are invoked directly by the worker via the venv interpreter:
+#   python/.venv/bin/python python/transcribe.py ...
+# uv is used only to create the venv and install the deps above (see scripts/setup.sh).
+
+[tool.uv]
+package = false

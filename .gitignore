@@ -1,0 +1,54 @@
+# deps / build
+node_modules/
+web/.next/
+web/out/
+*.tsbuildinfo
+
+# python
+python/.venv/
+python/__pycache__/
+**/__pycache__/
+*.pyc
+
+# runtime data — clips, scratch, the SQLite db (never commit)
+data/
+!data/.gitkeep
+
+# marble-race renderer scratch output
+render/marblerace/_*
+
+# secrets — API keys, exported cookies
+.env
+secrets/
+
+# models / big assets fetched by setup (regenerated, not source)
+assets/fonts/*.ttf
+assets/fonts/*.otf
+assets/models/*.onnx
+assets/sfx/*/*.wav
+# Kokoro TTS voice model (310MB — over GitHub's 100MB hard limit anyway) — only
+# used by the unused 'storyteller' content type, not by anything we're deploying.
+assets/kokoro/*.onnx
+assets/kokoro/*.bin
+
+# demo/sample files — not needed to run or deploy anything
+sample-output/
+
+# colorwar / followball / lasernations preview studio — working files
+render-queue.txt
+render/colorwar/out/
+render/colorwar/_frames/
+render/colorwar/_result.json
+render/followball/out/
+render/followball/_frames/
+render/followball/_result.json
+render/lasernations/out/
+render/lasernations/_frames/
+render/lasernations/_result.json
+render/quotes/out/
+render/quotes/_frames/
+render/quotes/_result.json
+
+# os / editor
+.DS_Store
+*.log

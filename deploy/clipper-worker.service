@@ -1,0 +1,21 @@
+[Unit]
+Description=Clipper — pipeline worker (HTTP + SSE on 127.0.0.1:8787)
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO__
+# tsx runs the TS worker directly; no build step needed
+ExecStart=/usr/bin/env npm run start --silent --workspace worker
+Restart=always
+RestartSec=3
+# generous limits — Whisper / Demucs / ffmpeg are hungry
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=clipper-worker
+
+[Install]
+WantedBy=multi-user.target

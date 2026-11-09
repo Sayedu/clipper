@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marble Race</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0b1020; overflow: hidden; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  #err {
+    position: fixed; inset: 0; color: #ff8080; background: #140808;
+    font: 13px/1.5 ui-monospace, Menlo, monospace; padding: 16px; white-space: pre-wrap;
+    display: none;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/",
+    "rapier": "/node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<pre id="err"></pre>
+<script type="module">
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    el.style.display = 'block';
+    el.textContent += (e.error && e.error.stack || e.message) + '\n';
+    window.__MR_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const el = document.getElementById('err');
+    el.style.display = 'block';
+    el.textContent += 'unhandled: ' + (e.reason && e.reason.stack || e.reason) + '\n';
+    window.__MR_ERROR = String(e.reason && e.reason.stack || e.reason);
+  });
+</script>
+<script type="module" src="/render/marblerace/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Color War</title>
+
+<script>
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  // embed mode (web-app studio iframe): the React page provides the controls,
+  // so hide the built-in #studio panel and let the stage fill the frame.
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* relative paths so the page works BOTH from the render server (rooted at the
+     repo) and from the worker's /render/colorwar/ + /assets/fonts/ routes. */
+  @font-face{ font-family:"Chakra Petch"; font-weight:500; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Medium.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Bold.ttf") format("truetype"); }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    margin:0; background:#06060c; color:#fff;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    overflow:hidden; display:flex; align-items:center; justify-content:center; gap:22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* preview mode leaves room for the studio panel beside the stage */
+  html:not(.rmode) body{ overflow:auto; padding:16px; }
+  html:not(.rmode) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
+  @media (max-width:760px){
+    html:not(.rmode) body{ flex-direction:column; }
+    html:not(.rmode) #stage{ height:auto; width:min(94vw, 52dvh); }
+    #studio{ width:min(94vw, 420px) !important; }
+  }
+  @keyframes cwPop{0%{transform:scale(.55);opacity:0}62%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:1}}
+  @keyframes cwPulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* the game frame — exactly the design's: aspect-locked, container-type:size
+     (needed for cqh/cqw), rounded, the same soft blue bloom. Fills the render
+     viewport with just a hair of margin so nothing bleeds off a phone edge. */
+  #stage{
+    position:relative; container-type:size;
+    aspect-ratio:9/16; height:98dvh; max-width:98vw;
+    border-radius:26px; overflow:hidden; background:#05050b;
+    box-shadow:0 0 0 1px #1d2b4a, 0 0 60px rgba(0,140,255,.14), 0 30px 90px rgba(0,0,0,.7);
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:98vw} }
+  #c{display:block;width:100%;height:100%}
+
+  /* HUD — the design's top band, minus the "COLOR WAR" caption line */
+  #hud{position:absolute;left:0;right:0;top:0;height:17.19cqh;
+    display:flex;flex-direction:column;justify-content:flex-end;gap:1.4cqw;
+    padding:0 3cqw .6cqw;box-sizing:border-box;pointer-events:none}
+  /* season renders only get a taller HUD box (so the persistent label below
+     has room without pushing #bar/#chips down) — plain renders never get the
+     .season class, so this never touches them. */
+  html.season #hud{height:22cqh}
+
+  #seasonLabel{display:none;font-weight:700;font-size:2.5cqw;letter-spacing:.09em;
+    text-transform:uppercase;color:rgba(255,255,255,.88);
+    text-shadow:0 0 1.2cqw rgba(0,231,255,.55)}
+
+  #bar{display:flex;height:2.6cqw;border-radius:99px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.14)}
+  /* bar-width easing is done in game.js (hud() lerp) so it stays deterministic
+     under frame-stepping — no CSS transition. */
+
+  #chips{display:grid;grid-template-columns:repeat(4,1fr);gap:1cqw}
+  #chips > div{display:flex;align-items:center;justify-content:center;gap:1.2cqw;
+    padding:1.3cqw 1.4cqw;border-radius:1.6cqw;background:rgba(8,8,18,.5);
+    border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(8px)}
+  #chips .dot{width:2.4cqw;height:2.4cqw;border-radius:.5cqw;
+    box-shadow:0 0 1.6cqw currentColor;flex:none}
+  #chips .cv{font-weight:700;font-size:3.4cqw;color:#fff}
+
+  #count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    pointer-events:none}
+  #count span{font-weight:700;font-size:17cqw;color:#fff;
+    text-shadow:0 0 4cqw rgba(0,231,255,.85),0 0 9cqw rgba(255,45,149,.5)}
+
+  #flash{position:absolute;left:50%;transform:translateX(-50%);bottom:13cqw;
+    padding:1.4cqw 3.4cqw;border-radius:999px;font-weight:700;font-size:2.7cqw;
+    letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;
+    display:none}
+
+  #win{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    pointer-events:none}
+  #win span{font-weight:700;font-size:16cqw;line-height:.9;text-align:center;
+    color:var(--wc,#fff);
+    text-shadow:0 0 3cqw currentColor,0 0 9cqw currentColor,0 0 18cqw currentColor}
+
+  /* ── Season Mode overlays — inert (display:none) unless game.js's
+     seasonOverlay() turns them on; a plain (non-season) render never touches
+     these. All motion is written per-frame from sim time, not CSS. ── */
+  #seasonCard{position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:1.6cqh;pointer-events:none;
+    background:#05050b;z-index:5}
+  #seasonCard div{font-weight:700;text-align:center;letter-spacing:.06em;text-transform:uppercase}
+  #seasonBig{font-size:11cqw;color:#fff;
+    text-shadow:0 0 3cqw rgba(0,231,255,.75),0 0 7cqw rgba(255,45,149,.45)}
+  #seasonSmall{font-size:4.6cqw;color:rgba(255,255,255,.78)}
+  #snapPanels{position:absolute;inset:0;display:none;pointer-events:none;z-index:4}
+  #snapPanels .p{position:absolute;width:50%;height:50%}
+  #snapPanels .p:nth-child(1){left:0;top:0}
+  #snapPanels .p:nth-child(2){left:50%;top:0}
+  #snapPanels .p:nth-child(3){left:0;top:50%}
+  #snapPanels .p:nth-child(4){left:50%;top:50%}
+  #epBadge{position:absolute;left:50%;bottom:20cqw;transform:translateX(-50%);
+    display:none;padding:1.3cqw 3.2cqw;border-radius:999px;font-weight:700;
+    font-size:2.6cqw;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;
+    color:#05050b;pointer-events:none;z-index:6}
+
+  html.rmode *, html.rmode *::before, html.rmode *::after{ animation:none !important; transition:none !important; }
+  /* render mode: sit the game in a condensed, centred "safe box" with pure black
+     all around it. TikTok lays its caption (bottom-left) and action rail (right
+     edge) directly over the video, so the whole game is scaled down and pulled
+     in. Everything inside scales with #stage (cq units + % canvas), so the
+     layout is unchanged, just smaller. The bottom margin is whatever's left
+     after --safe-top + the aspect-locked height, so a smaller --safe-w (more
+     side margin) also buys more bottom margin. */
+  html.rmode{
+    background:#000;
+    --safe-w:75vw;    /* game width vs the 1080 frame — smaller = more black on the sides + bottom */
+    --safe-top:4vh;   /* black margin above the game */
+  }
+  html.rmode body{ background:#000; }
+  html.rmode #stage{
+    position:absolute; left:50%; transform:translateX(-50%);
+    top:var(--safe-top); width:var(--safe-w); height:auto; aspect-ratio:9/16;
+    max-width:none; border-radius:0; box-shadow:none;
+  }
+  /* hook lines in the black band just below the map (render only): a bright
+     "WATCH TILL THE END" retention hook over the "who wins?" comment prompt */
+  #subq{ display:none; }
+  html.rmode #subq{
+    display:flex; flex-direction:column; align-items:center; gap:1.5vh;
+    position:absolute; left:0; right:0;
+    top:calc(var(--safe-top) + var(--safe-w) * 16 / 9 + 2.9vh);
+    text-align:center; white-space:nowrap;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  html.rmode #subq b{
+    font-weight:700; font-size:4.6vw; letter-spacing:.06em; text-transform:uppercase;
+    color:#fff; text-shadow:0 0 2vw rgba(255,45,61,.55), 0 0 4.4vw rgba(255,45,61,.32);
+  }
+  html.rmode #subq span{
+    font-weight:700; font-size:3.4vw; letter-spacing:.03em;
+    color:rgba(255,255,255,.88); text-shadow:0 0 2.4vw rgba(0,231,255,.32);
+  }
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+
+  /* ── preview studio — never rendered, and hidden when embedded in the web app
+     (the React page provides the controls). ── */
+  html.rmode #studio, html.embed #studio{ display:none; }
+  html.embed body{ padding:0; overflow:hidden; }
+  html.embed #stage{ height:100dvh; max-width:100vw; }
+  #studio{
+    width:340px; flex:none; align-self:center;
+    max-height:94dvh; overflow-y:auto;
+    background:#0b0b14; border:1px solid #1d2b4a; border-radius:20px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6);
+    padding:18px; display:flex; flex-direction:column; gap:12px;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  #studio .hd{ font-weight:700; letter-spacing:.28em; font-size:11px; color:#00e7ff;
+    text-transform:uppercase; }
+  #studio button{
+    font-family:inherit; font-weight:700; color:#fff; cursor:pointer;
+    background:#141422; border:1px solid #2a2a3e; border-radius:10px;
+    padding:9px 12px; font-size:13px; letter-spacing:.06em; transition:none;
+  }
+  #studio button:hover{ border-color:#00e7ff88; background:#191926; }
+  #studio button.big{ padding:14px; font-size:15px; letter-spacing:.1em; }
+  #studio button.big small{ display:block; font-weight:500; font-size:10px;
+    letter-spacing:.14em; opacity:.55; margin-top:2px; }
+  #studio button.primary{ background:rgba(0,231,255,.12); border-color:rgba(0,231,255,.5);
+    color:#00e7ff; }
+  #studio button.primary:hover{ background:rgba(0,231,255,.2); }
+  #studio .row{ display:flex; align-items:center; gap:8px; }
+  #studio .lbl{ font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:rgba(255,255,255,.42); width:52px; flex:none; }
+  #studio input[type=text]{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
+    background:#141422; border:1px solid #2a2a3e; border-radius:9px; padding:8px 10px; font-size:13px; }
+  #studio select{ font-family:inherit; font-weight:700; color:#fff; flex:1;
+    background:#141422; border:1px solid #2a2a3e; border-radius:9px; padding:8px; font-size:13px; }
+  #studio .seg{ display:flex; gap:4px; flex:1; }
+  #studio .seg button{ flex:1; padding:7px 0; font-size:12px; }
+  #studio .seg button.on{ background:rgba(0,231,255,.14); border-color:rgba(0,231,255,.5); color:#00e7ff; }
+  #studio label.sw{ display:flex; align-items:center; gap:7px; font-size:12px;
+    letter-spacing:.06em; color:rgba(255,255,255,.8); cursor:pointer; }
+  #studio label.sw input{ accent-color:#00e7ff; width:15px; height:15px; }
+  #studio #readout{ background:#141422; border:1px solid #2a2a3e; border-radius:10px;
+    padding:11px 12px; font-size:13px; line-height:1.5; min-height:56px;
+    font-variant-numeric:tabular-nums; }
+  #studio #readout .dim{ color:rgba(255,255,255,.4); font-size:11px; letter-spacing:.04em; }
+  #studio #toast{ font-size:11px; line-height:1.5; color:#00e7ff; word-break:break-all;
+    font-family:ui-monospace,Menlo,monospace; min-height:0; }
+  #studio .hint{ font-size:10.5px; color:rgba(255,255,255,.35); letter-spacing:.03em; }
+  #studio kbd{ background:#141422; border:1px solid #2a2a3e; border-radius:4px;
+    padding:0 4px; font-family:inherit; color:#00e7ff; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="720" height="1280"></canvas>
+  <div id="hud">
+    <div id="seasonLabel"></div>
+    <div id="bar"><div></div><div></div><div></div><div></div></div>
+    <div id="chips">
+      <div><span class="dot"></span><span class="cv">25%</span></div>
+      <div><span class="dot"></span><span class="cv">25%</span></div>
+      <div><span class="dot"></span><span class="cv">25%</span></div>
+      <div><span class="dot"></span><span class="cv">25%</span></div>
+    </div>
+  </div>
+  <div id="count"><span id="countN">3</span></div>
+  <div id="flash"></div>
+  <div id="win"><span id="winLine">BLUE WON</span></div>
+  <div id="seasonCard"><div id="seasonBig">SEASON 1</div><div id="seasonSmall">EPISODE 1 OF 1</div></div>
+  <div id="snapPanels"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></div>
+  <div id="epBadge">COMEBACK!</div>
+</div>
+<div id="subq"><b>Watch till the end</b><span>Who will win? 👇 comment your colour</span></div>
+
+<div id="studio">
+  <div class="hd">Color War · Preview</div>
+  <button id="btnReplay" class="big primary">↻ REPLAY<small>fresh random seed</small></button>
+  <div class="row">
+    <button id="btnAgain" style="flex:1">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
+    <label class="sw"><input type="checkbox" id="chkAuto"> auto</label>
+  </div>
+  <div class="row">
+    <span class="lbl">Seed</span>
+    <input type="text" id="seedIn" inputmode="numeric" spellcheck="false" />
+    <button id="btnSeed">set</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Board</span>
+    <select id="modeIn"></select>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <div class="seg" id="speedSeg">
+      <button data-s="0.5">0.5×</button><button data-s="1" class="on">1×</button>
+      <button data-s="2">2×</button><button data-s="4">4×</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Sound</span>
+    <label class="sw"><input type="checkbox" id="chkSound"> play audio</label>
+  </div>
+  <div id="readout">…</div>
+  <button id="btnRender" class="big primary">▶ RENDER THIS SEED</button>
+  <div id="toast"></div>
+  <div class="hint">press <kbd>S</kbd> anytime to star the current seed → <code>render-queue.txt</code></div>
+</div>
+
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__CW_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => { window.__CW_ERROR = String((e.reason && e.reason.stack) || e.reason); });
+</script>
+<script src="./game.js"></script>
+
+<script>
+/* ── preview studio wiring — only for the standalone preview page (not render,
+   not the web-app iframe, which drives window.CW itself) ── */
+if (!document.documentElement.classList.contains('rmode')
+    && !document.documentElement.classList.contains('embed')) (function () {
+  const CW = window.CW;
+  const $ = (id) => document.getElementById(id);
+  const seedIn = $('seedIn'), modeIn = $('modeIn'), readout = $('readout'), toast = $('toast');
+  const MODES = ['sprint', 'classic', 'bigtiles', 'finegrain', 'stripes', 'random'];
+  const LABELS = { sprint: 'Sprint (~16s)', classic: 'Classic (~42s)', bigtiles: 'Big Tiles (~41s)',
+    finegrain: 'Fine Grain (~43s)', stripes: 'Stripes (~42s)', random: 'Surprise me (~42s)' };
+  modeIn.innerHTML = MODES.map((m) => `<option value="${m}">${LABELS[m]}</option>`).join('');
+  modeIn.value = CW.getMode();
+
+  let toastT = 0;
+  const say = (msg, ms = 3500) => { toast.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => (toast.textContent = ''), ms); };
+
+  $('btnReplay').onclick = () => CW.replay();
+  $('btnAgain').onclick = () => CW.again();
+  $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) CW.replay(v); };
+  seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
+  modeIn.onchange = () => CW.setMode(modeIn.value);
+  $('chkAuto').onchange = (e) => CW.setAutoReplay(e.target.checked);
+  $('chkSound').onchange = (e) => CW.setSound(e.target.checked);
+  $('speedSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...$('speedSeg').children].forEach((x) => x.classList.toggle('on', x === b));
+    CW.setSpeed(+b.dataset.s);
+  });
+
+  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  let pollT = 0;
+  $('btnRender').onclick = async () => {
+    const seed = CW.getSeed(), mode = CW.getMode();
+    const cmd = `node scripts/colorwar/render.mjs --seed ${seed} --mode ${mode} --mux`;
+    clearInterval(pollT);
+    try {
+      const r = await post('/render', { seed, mode });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      say(`rendering ${j.file}…`, 60000);
+      pollT = setInterval(async () => {
+        try {
+          const s = await (await fetch('/render-status?id=' + j.id)).json();
+          const p = s.progress ? ` ${Math.round(s.progress.pct * 100)}% ${s.progress.msg}` : '';
+          if (s.state === 'done') { clearInterval(pollT); say(`✅ ${s.file} → render/colorwar/out/`, 12000); }
+          else if (s.state === 'failed') { clearInterval(pollT); say(`❌ render failed — see terminal`, 8000); }
+          else say(`rendering ${s.file}…${p}`, 60000);
+        } catch { clearInterval(pollT); }
+      }, 700);
+    } catch {
+      try { await navigator.clipboard.writeText(cmd); say('no studio server — copied: ' + cmd, 12000); }
+      catch { say(cmd, 15000); }
+    }
+  };
+
+  // S = star the current seed to the render queue, without interrupting playback
+  window.addEventListener('keydown', async (e) => {
+    if (e.key.toLowerCase() !== 's' || e.metaKey || e.ctrlKey) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    const seed = CW.getSeed(), mode = CW.getMode();
+    try {
+      const r = await post('/star', { seed, mode });
+      if (!r.ok) throw new Error();
+      say(`★ starred ${mode} ${seed} → render-queue.txt`);
+    } catch {
+      try { await navigator.clipboard.writeText(`${seed} ${mode}`); say(`★ ${seed} ${mode} (copied — no server)`, 5000); }
+      catch { say(`★ ${seed} ${mode}`, 5000); }
+    }
+  });
+
+  // readout, and keep the seed field in sync unless it's being edited
+  setInterval(() => {
+    const r = CW.readout();
+    if (document.activeElement !== seedIn) seedIn.value = r.seed;
+    if (modeIn.value !== r.mode) modeIn.value = r.mode;
+    if (r.winner) {
+      readout.innerHTML = `<b style="color:#00e7ff">${r.winner} WON</b> · final ${r.finalSec.toFixed(2)}s`
+        + `<br><span class="dim">${r.modeName} · seed ${r.seed} · out: ${r.elimOrder.join(' → ') || '—'}</span>`;
+    } else {
+      readout.innerHTML = `${r.roundSec.toFixed(1)}s · alive: <b>${r.alive.join('  ') || '—'}</b>`
+        + `<br><span class="dim">${r.modeName} · seed ${r.seed}${r.elimOrder.length ? ' · out: ' + r.elimOrder.join(' → ') : ''}</span>`;
+    }
+  }, 110);
+})();
+</script>
+</body>
+</html>
