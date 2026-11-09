@@ -20,8 +20,28 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { createJob, getJob } from '../../worker/src/db.ts';
 import { runPipeline } from '../../worker/src/pipeline/run.ts';
+import type { Broadcaster } from '../../worker/src/pipeline/context.ts';
 import { jobCandidateFile } from '../../worker/src/library.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../../worker/src/types.ts';
+
+// the HTTP API streams these to the dashboard's progress bar; here they're the
+// only visibility a CI log has into a multi-minute render, so just print them —
+// a silent multi-minute step is indistinguishable from a hung one otherwise.
+let lastLoggedPct = -1;
+const logProgress: Broadcaster = (_jobId, _eventId, event) => {
+  if (event.type === 'step:status') {
+    console.log(`[${event.step}] ${event.status}${event.detail ? ` — ${event.detail}` : ''}${event.error ? ` — ${event.error}` : ''}`);
+    lastLoggedPct = -1;
+  } else if (event.type === 'step:progress') {
+    const pct = Math.round(event.pct * 100);
+    if (pct >= lastLoggedPct + 10) {
+      console.log(`[${event.step}] ${pct}%${event.detail ? ` — ${event.detail}` : ''}`);
+      lastLoggedPct = pct;
+    }
+  } else if (event.type === 'job:error') {
+    console.error(`[${event.step}] ERROR — ${event.message}`);
+  }
+};
 
 function need(name: string): string {
   const v = process.env[name];
@@ -58,7 +78,7 @@ async function main() {
   console.log(`today's pick: ${pick}`);
 
   const job = createJob({ settings: settingsFor(pick) });
-  await runPipeline({ jobId: job.id, signal: new AbortController().signal });
+  await runPipeline({ jobId: job.id, signal: new AbortController().signal, broadcast: logProgress });
 
   const finished = getJob(job.id);
   if (!finished || finished.status !== 'awaiting_review' || !finished.draftText) {
