@@ -621,12 +621,12 @@ async function runLaserDuelPost(ctx: StepContext, jobId: string): Promise<RunOut
     ? `${duel.winner} lands the knockout`
     : `${duel.winner} wins on health when the clock runs out`;
   const draft: DraftText = {
-    hook: `${duel.nationA} 🆚 ${duel.nationB} — who wins this fight?`,
+    hook: `WATCH TILL THE END 👀 ${duel.nationA} vs ${duel.nationB} — this fight swings back and forth`,
     overlays: [`${duel.nationA} vs ${duel.nationB}`],
     caption:
-      `${duel.nationA} 🆚 ${duel.nationB} — who wins this fight? 👀\n\n` +
-      `Real health bars, real hits, and power-ups either fighter can grab. ${koLine}. ` +
-      `Watch till the end — this one swings back and forth.\n\n` +
+      `WATCH TILL THE END 👀 ${duel.nationA} vs ${duel.nationB} — this one swings back and forth.\n\n` +
+      `Real health bars, direct hits, and power-ups either fighter can steal — heals, shields, ` +
+      `rage, speed. Down to almost nothing, either one can still turn it around. ${koLine}.\n\n` +
       `Comment who you had winning 👇`,
     hashtags: ['laserduel', 'countryballs', 'versus', 'watchtillend', 'fyp'],
   };
