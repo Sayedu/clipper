@@ -264,15 +264,31 @@ class OutputRepo {
    *  normal job, so this polls that workflow's run for OUR commit instead. */
   private async waitForPagesDeploy(sha: string): Promise<void> {
     const start = Date.now();
+    let retried = false;
     while (Date.now() - start < 180_000) {
       const runs = (await fetch(
         `https://api.github.com/repos/${this.owner}/${this.repo}/actions/runs?event=push&head_sha=${sha}`,
         { headers: { Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`, Accept: 'application/vnd.github+json' } },
-      ).then((r) => r.json())) as { workflow_runs: Array<{ status: string; conclusion: string | null; html_url: string }> };
+      ).then((r) => r.json())) as { workflow_runs: Array<{ id: number; status: string; conclusion: string | null; html_url: string }> };
       const match = runs.workflow_runs[0];
       if (match?.status === 'completed') {
         if (match.conclusion === 'success') return;
-        throw new Error(`Pages deploy failed for ${sha}: ${match.html_url}`);
+        if (!retried) {
+          // Observed once in production: upload-pages-artifact finalizes the
+          // artifact, then deploy-pages queries for it under a second later
+          // and gets "Found 0 artifact(s)" -- a GitHub-side indexing race,
+          // not a config problem (GitHub's own error text for it literally
+          // says "re-run the deployment at a later time"). Do that once
+          // automatically rather than losing a post to a one-off platform hiccup.
+          retried = true;
+          await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/actions/runs/${match.id}/rerun`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${OUTPUT_REPO_TOKEN}`, Accept: 'application/vnd.github+json' },
+          });
+          await new Promise((r) => setTimeout(r, 5_000));
+          continue;
+        }
+        throw new Error(`Pages deploy failed for ${sha} (retried once): ${match.html_url}`);
       }
       await new Promise((r) => setTimeout(r, 5_000));
     }
