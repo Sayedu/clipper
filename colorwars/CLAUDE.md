@@ -47,6 +47,11 @@ each have theirs, but that wiring happens in a later phase, not now.
 - Determinism scope: same machine / same code reproducing identically — not
   claiming bit-identical output across different machines (float
   non-associativity would make that a much harder, likely unnecessary bar).
+- Overlap with existing games elsewhere in this app (e.g. Shell Shuffle vs.
+  the existing "Follow The Ball" shell game, Turf War vs. "Color War"): build
+  it fresh in Python inside colorwars regardless — a different version, not
+  a reuse or port of the existing JS/Canvas implementation. They can share a
+  theme without sharing code.
 
 ## Status
 
