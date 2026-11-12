@@ -26,6 +26,7 @@ EVENT_HASHTAGS = {
     "disaster_drop": ["disasterdrop", "marblerace"],
     "turf_war": ["turfwar", "territory"],
     "great_escape": ["greatescape", "ringbreak"],
+    "champion_duel": ["championduel", "1v1"],
 }
 
 
@@ -141,10 +142,12 @@ def run_render(
     # the actual SimRecord rather than event_cfg, since that count is a
     # different shape per event (Ring of Doom: 4 physics balls per team;
     # Shell Shuffle: 1 cup-ball per team) and record.balls is always right.
+    # Defaults to 0, not 1: Champion Duel is 1v1, so the two teams NOT in
+    # record.balls this episode genuinely used zero names, not one.
     per_team_counts: dict[str, int] = {}
     for b in record.balls:
         per_team_counts[b.team_id] = per_team_counts.get(b.team_id, 0) + 1
-    names_used = {t.name: peek_names(t.name, per_team_counts.get(t.id, 1), settings.names_path, settings.blocklist_path)
+    names_used = {t.name: peek_names(t.name, per_team_counts.get(t.id, 0), settings.names_path, settings.blocklist_path)
                   for t in teams}
 
     meta = {

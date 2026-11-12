@@ -23,6 +23,7 @@ from colorwars.engine.config import REPO_ROOT, Settings, load_episode, load_even
 from colorwars.events.disaster_drop.event import DisasterDropEvent
 from colorwars.events.ring_of_doom.event import RingOfDoomEvent
 from colorwars.events.shell_shuffle.event import ShellShuffleEvent
+from colorwars.events.champion_duel.event import ChampionDuelEvent
 from colorwars.events.great_escape.event import GreatEscapeEvent
 from colorwars.events.turf_war.event import TurfWarEvent
 
@@ -31,6 +32,7 @@ SHELL_SHUFFLE_SEED = 1  # every seed is valid by construction (scripted, not sim
 DISASTER_DROP_SEED = 1  # checked once via `find-seed --event disaster_drop`
 TURF_WAR_SEED = 1  # checked once via `find-seed --event turf_war`
 GREAT_ESCAPE_SEED = 1  # checked once via `find-seed --event great_escape`
+CHAMPION_DUEL_SEED = 1  # checked once via `find-seed --event champion_duel`
 
 
 def _load(event_id: str = "ring_of_doom"):
@@ -338,3 +340,66 @@ def test_great_escape_all_rings_eventually_shatter():
     escapes = [e for e in record.events if e.kind == "escape"]
     assert len(shatters) == 6
     assert len(escapes) == 4
+
+
+def test_champion_duel_simulate_is_deterministic():
+    settings, teams, cfg, episode = _load("champion_duel")
+    event = ChampionDuelEvent()
+
+    r1 = event.simulate(CHAMPION_DUEL_SEED, settings, cfg, teams, episode)
+    r2 = event.simulate(CHAMPION_DUEL_SEED, settings, cfg, teams, episode)
+
+    assert len(r1.steps) == len(r2.steps)
+    assert r1.placements == r2.placements
+    assert r1.winner_team_id == r2.winner_team_id
+    assert r1.mvp_name == r2.mvp_name
+    assert len(r1.events) == len(r2.events)
+    for s1, s2 in zip(r1.steps, r2.steps):
+        for b1, b2 in zip(s1.balls, s2.balls):
+            assert b1.x == b2.x and b1.y == b2.y and b1.vx == b2.vx and b1.alive == b2.alive
+
+
+def test_champion_duel_render_three_seconds_twice_matches_by_hash():
+    settings, teams, cfg, episode = _load("champion_duel")
+    event = ChampionDuelEvent()
+
+    record = event.simulate(CHAMPION_DUEL_SEED, settings, cfg, teams, episode)
+    assert event.is_valid(record)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+
+    n_frames = min(settings.preview_fps * 3, timeline.total_frames)
+
+    def render_hashes() -> list[str]:
+        event.init_render(settings)
+        surface = skia.Surface(settings.preview_width, settings.preview_height)
+        hashes = []
+        for frame_idx in range(n_frames):
+            with surface as canvas:
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+            img = surface.makeImageSnapshot()
+            hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
+        return hashes
+
+    hashes_a = render_hashes()
+    hashes_b = render_hashes()
+
+    assert len(hashes_a) == n_frames
+    assert hashes_a == hashes_b
+
+
+def test_champion_duel_replay_reaches_the_actual_finishing_instant():
+    """Found directly: the sim stops the instant a champion's HP hits
+    zero, so a replay window centered on the finishing hit and clamped to
+    sim_total got cut short and never actually showed HP reaching zero.
+    Checked here instead of just trusting the fix."""
+    settings, teams, cfg, episode = _load("champion_duel")
+    event = ChampionDuelEvent()
+    record = event.simulate(CHAMPION_DUEL_SEED, settings, cfg, teams, episode)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+    replay = next((o for o in timeline.overlays if o.kind == "replay"), None)
+    assert replay is not None
+    last_sim_t = timeline.frame_sim_time[replay.end_frame - 1]
+    assert abs(last_sim_t - record.sim_duration_sec()) < 1e-6
+    loser_idx = next(i for i, b in enumerate(record.balls[:2]) if b.team_id != record.winner_team_id)
+    idx = round(last_sim_t * record.physics_hz)
+    assert record.steps[min(idx, len(record.steps) - 1)].balls[loser_idx].vx <= 0.0

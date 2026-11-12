@@ -7,18 +7,21 @@ teams:
     personality: "Heavy hitters -- hard to knock off course."
     traits:
       mass_mult: 1.15
+      duel_power: 1.889    # Champion Duel: px of spike reach gained per hit landed -- tuned by `colorwars balance`
   - id: blue
     name: Blue
     color: "#3DA5FF"
     personality: "Bouncy and a little unpredictable."
     traits:
       elasticity_add: 0.08
+      duel_power: 12.68    # Champion Duel: degrees of shield arc gained per hit landed -- tuned by `colorwars balance`
   - id: green
     name: Green
     color: "#3DDC84"
     personality: "Small and slippery."
     traits:
       radius_mult: 0.9
+      duel_power: 0.7785    # Champion Duel: damage per mini-twin hit -- tuned by `colorwars balance`
   - id: yellow
     name: Yellow
     color: "#FFD23F"
@@ -27,3 +30,4 @@ teams:
       burst_impulse: true
       burst_interval_min_sec: 4
       burst_interval_max_sec: 7
+      duel_power: 0.07287   # Champion Duel: speed fraction gained per hit landed -- tuned by `colorwars balance`

@@ -19,7 +19,7 @@ each have theirs, but that wiring happens in a later phase, not now.
 2. League layer (standings, crown, storylines, a viewer name queue) and a story director that simulates hundreds of seeds headless and picks the most dramatic real run. (done)
 3. **Shell Shuffle**: a cup shuffle game where viewers track their team's ball. (done)
 4. **Disaster Drop**: a vertical obstacle race with disasters and a crusher chasing the pack. (done)
-5. **Turf War**, **Great Escape** and **Champion Duel**.
+5. **Turf War**, **Great Escape** and **Champion Duel** (events batch 2). (done)
 
 ## Rules for the whole project
 
@@ -56,17 +56,21 @@ each have theirs, but that wiring happens in a later phase, not now.
 ## Status
 
 **Phase 1: done.** **Phase 2: done.** **Phase 3 (Shell Shuffle): done.**
-**Phase 4 (Disaster Drop): done.** The league layer, storylines, the names
+**Phase 4 (Disaster Drop): done.** **Events batch 2 (Turf War, Great
+Escape, Champion Duel): done.** The league layer, storylines, the names
 queue and the story director (`mine`) are all in. `render` and `find-seed`
 build the episode from `league/season.json` automatically; `colorwars
-commit <episode_id>` is the only thing that writes it. Three full events
-now share the one render/audio/league/packaging pipeline -- Ring of Doom
-(real physics, speed-stretched to fit the 61-70s window), Shell Shuffle
-(pure choreography, no physics), Disaster Drop (real physics, course
-*length* is the duration knob instead of a speed stretch). See
+commit <episode_id>` is the only thing that writes it. Six full events now
+share the one render/audio/league/packaging pipeline -- Ring of Doom (real
+physics, speed-stretched to fit the 61-70s window), Shell Shuffle (pure
+choreography, no physics), Disaster Drop (real physics, course *length*
+is the duration knob instead of a speed stretch), Turf War (no physics,
+constant-speed grid bouncing), Great Escape (real physics, adaptive speed
+like Ring of Doom, plus a season-wide theme song), Champion Duel (1v1, no
+physics, its own `balance` auto-tuner and 3-episode `bracket` mode). See
 `README.md` for every command, `docs/phase-1.md` / `docs/phase-2.md` /
-`docs/event-shell-shuffle.md` / `docs/event-disaster-drop.md` for the full
-briefs.
+`docs/event-shell-shuffle.md` / `docs/event-disaster-drop.md` /
+`docs/events-batch-2.md` for the full briefs.
 
 Real numbers on this machine, Phase 1: `find-seed` found seed 2 valid on
 the 2nd try. Full render: 127s. `--preview` render: 28s.
@@ -101,7 +105,119 @@ score 54.5, winner blue) → `commit ep001` → `render` again for ep002,
 which correctly showed the post-ep001 standings and a crown-pressure
 storyline. Test state reset afterward.
 
+Real numbers, events batch 2: all three events found **300/300 (or
+500/500) valid seeds** in mining (Turf War ~2s, Great Escape ~10s,
+Champion Duel <1s -- none of the three needed pymunk except Great
+Escape's rotating rings, so most of this batch mines even faster than
+Phase 3). Full `mine` → `render --best` → `commit` → `render` validation
+loop run for real on all three, including confirming `league/theme.json`
+(Great Escape's season melody) persists correctly across two separate
+renders in the same season. `bracket` verified for real: a 3-episode run
+produced the right semifinal pairings, correctly derived the final's
+matchup from each semifinal's own meta.json (not from any premature
+season.json write), and correctly bracket-specific hook lines
+("SEMIFINAL 1: RED VS YELLOW", "THE FINAL: RED VS GREEN"). `balance` was
+run for real at increasing scale (100 → 200 → 150 runs/matchup, up to 20
+rounds) across several rounds of actual mechanical fixes -- see the
+decisions log for the full story, including the one it didn't fully
+solve.
+
 ## Decisions log
+
+### Events batch 2 (Turf War, Great Escape, Champion Duel)
+
+- **Turf War and Champion Duel need no physics engine at all** -- both
+  are constant-speed, direction-only simulations (bouncing off cells /
+  steering toward an opponent), the same style Shell Shuffle established.
+  Great Escape does need pymunk (gravity, real ball-wall collision
+  response against the rotating rings), closer to Ring of Doom/Disaster
+  Drop. Deciding per event rather than defaulting to pymunk everywhere
+  kept two of these three noticeably simpler to build and faster to mine.
+- **A ring's gap needs no per-step tracking at all.** Great Escape's gap
+  is fixed at local angle 0 in the ring's own kinematic body frame; the
+  body's own rotation sweeps that gap through every world angle once per
+  revolution for free. "Did a ball escape through the gap" is then just a
+  before/after radial-distance comparison -- if there were no gap there,
+  pymunk's own collision response would already have stopped the ball
+  from crossing, so no angle-alignment math is needed to detect it.
+  Verified directly that this also means no ball can be permanently
+  trapped (the gap always eventually reaches any position), so unlike
+  Disaster Drop this event needed no anti-trap hard reject.
+- **`Timeline` frames don't have to be monotonic, and Champion Duel's
+  literal instant replay leans on that directly.** The sim stops the
+  instant a champion's HP hits zero, so a first attempt at the replay
+  (a window centered on the finishing hit, clamped to sim_total) got cut
+  short on the right and barely reached the actual impact -- confirmed by
+  tracing the replay's own sampled HP values, which never reached zero.
+  Fixed by anchoring the window's END at the real last instant and holding
+  there briefly, which only worked because nothing in the shared render or
+  audio-mixing code assumes frame_sim_time is non-decreasing -- a "go back
+  and show that again" replay is just more frames with earlier sim times.
+- **`league/theme.json` is new shared infrastructure, not Great-Escape-
+  only.** `build_episode_from_season()` generates/loads it alongside
+  crown_team and standings since "a season-wide thing every episode reads"
+  is exactly what it already does for those -- even though only Great
+  Escape's sound.py consumes it so far. Seeded off the season number
+  (`9000 + season_number`) so a new season gets a new melody automatically
+  without needing a separate command.
+- **`peek_names()` had a real bug, exposed (not introduced) by Champion
+  Duel's 1v1 format:** called with `count=0` (the two teams NOT fighting
+  this episode), the function still appended one name before its own
+  `len(picked) >= count` check ever ran, since that check fires after the
+  append. Champion Duel is the first event where a team can legitimately
+  need zero names in an episode, which is what surfaced it. Fixed with an
+  early return; `pipeline.py`'s per-team name count also had to stop
+  defaulting missing teams to 1 (now 0) for the same reason.
+- **Champion Duel's `drama_stats()` is a full override, like Shell
+  Shuffle, not an addition like Disaster Drop/Turf War/Great Escape.** A
+  1v1 HP race has no "team count alive across a field" concept for
+  `analyze_drama`'s wipeout/lead-change vocabulary to attach to.
+- **`colorwars balance` is a real, working tool that honestly reports it
+  didn't fully converge -- this was not treated as good enough to leave
+  alone, but also not chased to a result that doesn't actually exist.**
+  Two real mechanical bugs were found and fixed by actually running it,
+  not by reasoning about the numbers on paper:
+  - Red's spike damage was a fixed config constant (10) that `duel_power`
+    (which only moved spike *reach*) couldn't meaningfully touch -- Red
+    stayed at 95-100% win rate across 3 full rounds regardless of how far
+    its power was pushed. Fixed by making spike damage scale with current
+    reach, so the one tunable number now moves both.
+  - Yellow (pure speed, no damage or defense of its own) lost ~98-100% of
+    logged runs against Red's ranged poke specifically, with no amount of
+    power adjustment moving that number -- a fast target has no answer to
+    an attack it never needs to be close for. A first fix (reduce ALL
+    non-contact damage taken by a faster Yellow) overcorrected and made
+    Yellow nearly immune to Green's twins instead, flipping that matchup
+    to 90%+ the other way (found by re-running balance again, not
+    assumed safe) -- narrowed to Red's spikes specifically, which helped
+    that one matchup without visibly breaking the Green one.
+  - The fixed 5%-per-round adjustment step oscillated rather than
+    converging (one real run had Red-vs-Yellow at 98% in round 9 and 72%
+    in round 17, swinging back toward 84% by round 20) -- added a decaying
+    step size and made `tune()` return the least-imbalanced round actually
+    seen across the whole run, not just whatever the last round happened
+    to land on, both standard fixes for this exact oscillation pattern.
+  - **Still not fully converged after these fixes, reported honestly, not
+    hidden:** a real 20-round, 150-runs/round pass left Red-vs-Yellow and
+    Green-vs-Yellow both still outside 60% at a stable (non-oscillating)
+    equilibrium. This reads as a property of a 2-teams-pull-Yellow's-one-
+    power-number-in-opposite-directions situation that a single scalar
+    per team may not be able to fully resolve, not a tuning failure --
+    `balance` prints exactly which matchups remain unbalanced and exits
+    with status 1 rather than claiming success, which is the honest
+    contract this tool should keep regardless of whether a future pass
+    adds a real second lever (e.g. a defensive stat Yellow actually has)
+    to try to finish the job.
+- **Known limitation, not fixed this phase:** the tuned `duel_power`
+  values that ship with the repo come from a real best-effort `balance`
+  run, not hand-picked defaults, which means Red's reach-growth (and so
+  its damage) ended up tuned noticeably down and rarely crosses the
+  8-damage slow-mo threshold anymore -- the "big hit" slow-mo moment and
+  the final-blow replay still work correctly, they just trigger less
+  often post-tuning than they did with the original untuned numbers. A
+  real tension between "balanced" and "consistently spectacular" that a
+  future pass could address with a drama-aware constraint inside
+  `balance` itself, not attempted here.
 
 ### Phase 4
 

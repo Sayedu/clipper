@@ -13,6 +13,8 @@ import sys
 import time
 from pathlib import Path
 
+from .engine.balance import save_tuned_power, tune as run_tune
+from .engine.bracket import run_bracket
 from .engine.config import REPO_ROOT, Settings, load_teams
 from .engine.mining import MineFilters, mine as run_mine
 from .engine.pipeline import build_episode_from_season, commit_episode, find_seed, run_render
@@ -73,6 +75,15 @@ def main(argv: list[str] | None = None) -> int:
     p_commit = sub.add_parser("commit", help="apply a rendered episode's results to league/season.json (run after posting)")
     p_commit.add_argument("episode_id")
     p_commit.add_argument("--event", default="ring_of_doom")
+
+    p_balance = sub.add_parser("balance", help="tune Champion Duel's teams.yaml power numbers so no matchup wins more than 60%%")
+    p_balance.add_argument("--runs", type=int, default=2000, help="simulations per matchup per round")
+    p_balance.add_argument("--max-rounds", type=int, default=20)
+    p_balance.add_argument("--processes", type=int, default=None)
+
+    p_bracket = sub.add_parser("bracket", help="render a 3-episode Champion Duel bracket (two semifinals + a final)")
+    p_bracket.add_argument("--preview", action="store_true")
+    p_bracket.add_argument("--max-tries", type=int, default=500)
 
     args = parser.parse_args(argv)
 
@@ -142,6 +153,37 @@ def main(argv: list[str] | None = None) -> int:
         for tid, row in sorted(season["standings"].items(), key=lambda kv: -kv[1]["points"]):
             print(f"  {tid:<8} {row['points']:>3} pts  {row['wins']} wins  "
                   f"{row['streak_type'] or '-'} streak x{row['streak_count']}")
+        return 0
+
+    if args.command == "balance":
+        settings = Settings.load(REPO_ROOT)
+
+        def on_round(round_i, power, results):
+            status = "balanced" if all(r.balanced for r in results) else "adjusting"
+            print(f"round {round_i} ({status}):")
+            for r in results:
+                flag = "" if r.balanced else "  <-- over 60%"
+                print(f"  {r.team_a:<8} {r.rate_a:>5.1%}  vs  {r.team_b:<8} {r.rate_b:>5.1%}{flag}")
+
+        t0 = time.time()
+        power, results, rounds_used = run_tune(args.runs, max_rounds=args.max_rounds, processes=args.processes,
+                                                on_round=on_round)
+        dt = time.time() - t0
+        balanced = all(r.balanced for r in results)
+        print(f"{'balanced' if balanced else 'NOT fully balanced'} after {rounds_used} round(s) in {dt:.1f}s")
+        for tid, p in power.items():
+            print(f"  {tid:<8} duel_power = {p:.4g}")
+        save_tuned_power(settings.teams_path, power)
+        print(f"wrote tuned duel_power values to {settings.teams_path}")
+        return 0 if balanced else 1
+
+    if args.command == "bracket":
+        metas = run_bracket(preview=args.preview, find_seed_max_tries=args.max_tries)
+        labels = ["semifinal 1", "semifinal 2", "final"]
+        for label, meta in zip(labels, metas):
+            print(f"{label}: episode {meta['episode_id']}  winner {meta['winner']}  mvp {meta['mvp']}  "
+                  f"duration {meta['duration_sec']:.1f}s")
+        print(f"champion: {metas[-1]['winner']}")
         return 0
 
     return 1

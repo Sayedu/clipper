@@ -1,0 +1,64 @@
+event:
+  id: champion_duel
+  name: "Champion Duel"
+
+arena:
+  origin: [120, 300]   # top-left of the 840x840 square, same convention as turf_war
+  size: 840
+
+champion:
+  radius: 60
+  hp: 100
+  base_speed: 180
+  contact_damage: 5
+  contact_cooldown_sec: 0.4
+  turn_rate: 3.2              # max heading change, rad/s
+  weave_amplitude_deg: 35
+  weave_freq_min: 0.3
+  weave_freq_max: 0.8
+  knockback_push: 140
+  knockback_sec: 0.25
+
+# structural numbers for each signature power -- the single tunable
+# strength knob per team (teams.yaml traits.duel_power) is layered on top
+# of these, not instead of them. Higher duel_power always means stronger,
+# whichever way that cashes out mechanically for that team.
+powers:
+  red_spike_count: 3
+  red_spike_base_reach: 25
+  red_spike_max_reach: 150
+  # damage scales WITH current reach (both driven by the same duel_power),
+  # not a fixed number -- a fixed 10 regardless of reach meant nerfing
+  # duel_power (which only moved reach) barely touched Red's actual damage
+  # output, so `colorwars balance` had no real lever on Red at all (found
+  # by actually running balance: Red stayed ~95-100% across every matchup
+  # for 3 straight rounds despite its power being adjusted each round).
+  red_spike_base_damage: 4
+  red_spike_damage_per_reach_px: 0.08
+  red_spike_cooldown_sec: 0.5
+  red_spike_rotation_speed: 2.0
+  red_spike_tip_radius: 8
+
+  blue_shield_base_deg: 50
+  blue_shield_max_deg: 180
+  blue_shield_rotation_speed: 1.4
+  blue_shield_radius_offset: 6
+
+  green_twin_max: 4
+  green_twin_hits_per_spawn: 2
+  green_twin_radius: 15
+  green_twin_cooldown_sec: 0.5
+  green_twin_speed_frac: 1.0   # of base_speed
+
+  yellow_speed_growth_scale: 1.0  # multiplies traits.duel_power directly (already a fraction)
+
+timing:
+  sim_deadline_sec: 50.0
+  video_min_sec: 61.0
+  video_max_sec: 70.0
+
+replay:
+  big_hit_threshold: 8
+  slowmo_speed: 0.35
+  slowmo_window_sec: 1.2
+  final_replay_sec: 2.5
