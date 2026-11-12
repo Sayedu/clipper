@@ -88,7 +88,19 @@ type Rotation = (typeof ROTATION)[number];
 
 function settingsFor(kind: Rotation): Settings {
   const base: Settings = { ...DEFAULT_SETTINGS, clipsPerRun: 1 };
-  if (kind === 'colorwar') return { ...base, contentType: 'colorwar', colorWarMode: 'bigtiles' };
+  if (kind === 'colorwar') {
+    // 'random' picks one of the four ~41-44s wild-duel boards (never SPRINT's
+    // short cold-open) — see render/colorwar/game.js's pickMode(). Shape and
+    // flip-sound are cosmetic design tweaks, randomized here too so the same
+    // board layout doesn't look identical to a prior day's render.
+    return {
+      ...base,
+      contentType: 'colorwar',
+      colorWarMode: 'random',
+      colorWarShape: randomInt(0, 2) === 0 ? 'circle' : 'square',
+      colorWarFlipSound: randomInt(0, 2) === 0 ? 'pluck' : 'bubble',
+    };
+  }
   if (kind === 'followball') return { ...base, contentType: 'followball', followBallMode: 'random' };
   if (kind === 'eyetest') {
     return { ...base, contentType: 'eyetest', eyeTestBallsPerRound: [5, 6, 8], eyeTestShuffleSec: 6 };
