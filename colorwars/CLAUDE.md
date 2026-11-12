@@ -55,17 +55,83 @@ each have theirs, but that wiring happens in a later phase, not now.
 
 ## Status
 
-**Phase 1: done.** `python -m colorwars render --event ring_of_doom --seed 2`
-produces a 1080x1920/60fps/65.5s `final.mp4` with synthesized sound;
-`find-seed` and `--preview` both work; both tests pass (`simulate()`
-determinism and render-hash determinism). See `README.md` for every
-command. Full brief in `docs/phase-1.md`.
+**Phase 1: done.** **Phase 2: done.** The league layer, storylines, the
+names queue and the story director (`mine`) are all in. `render` and
+`find-seed` now build the episode from `league/season.json` automatically;
+`colorwars commit <episode_id>` is the only thing that writes it. See
+`README.md` for every command, `docs/phase-1.md` / `docs/phase-2.md` for
+the full briefs.
 
-Real numbers on this machine: `find-seed` found seed 2 valid on the 2nd
-try. Full render: 127s. `--preview` render: 28s. Output: `out/ep001/`
-(gitignored) — `final.mp4`, `cover.png`, `meta.json`.
+Real numbers on this machine, Phase 1: `find-seed` found seed 2 valid on
+the 2nd try. Full render: 127s. `--preview` render: 28s.
+
+Real numbers, Phase 2: `mine --runs 500` finished in **30.4s** (876% CPU,
+~9 cores) and found **406 valid seeds** — the done-when bar was 5 in under
+5 minutes. Full validation loop run for real: `mine` → `render --best`
+(seed 194, score 38.4) → `commit ep001` → `render` again for ep002, which
+correctly showed the real post-ep001 standings, crown (blue, the actual
+winner), and a freshly generated storyline ("BLUE holds the crown by just
+4 points.") instead of the Phase 1 placeholder text. Test episodes/season
+state were reset afterward — the repo ships with a fresh, empty
+`league/season.json` (real schema, zero episodes) rather than my test run's
+results.
 
 ## Decisions log
+
+### Phase 2
+
+- **Shield mechanic, concretely:** the last-place team's one-time shield is
+  per-episode state (not persisted in season.json — it's just "fresh every
+  render," derived from *who's* currently last place when the episode is
+  built). For lightning (a direct, code-applied impulse) the shield fully
+  cancels it. For center-bumper/spinner (continuous pymunk collision
+  response, already resolved by the time `post_solve` fires — there's no
+  clean pre-solve veto point here) it's approximated by damping the ball's
+  post-collision velocity by 60%. Both consume the same one shield and log
+  a `shield` SimEvent either way.
+- **Names queue replaced the Phase 1 random pool entirely** — `peek_names()`
+  (read-only, used by `render`, so re-rendering the same seed stays
+  idempotent) walks names.txt in file order with no RNG involved at all;
+  only `consume_names()` (called solely by `commit`) actually removes
+  entries and logs them to `names_used.txt`. This changed sim.py's RNG
+  consumption versus Phase 1, so Phase 1's "seed 2 is valid" no longer
+  reliably holds under the new code — re-ran `find-seed` fresh rather than
+  assuming it still did. (It happened to still work for the determinism
+  test's hardcoded seed 2, but that's coincidence, not a guarantee.)
+- **`episode.yaml` is now a bootstrap fallback, not the default.** Phase 2's
+  `build_episode_from_season()` is what `render`/`find-seed`/`mine` use
+  unless `--legacy-episode` is passed. On a brand-new season (no episodes
+  yet) there's no real crown/last-place/storyline history to draw from, so
+  it falls back to a generic "A brand new season begins" hook — verified
+  this directly rather than assuming it wouldn't crash on an empty season.
+- **"Finale" is a manual flag (`--finale` on render), not auto-detected.**
+  The brief never said how a finale episode is identified, and a real
+  creator filming the season almost certainly knows when they're shooting
+  the finale better than any heuristic would guess.
+- **Rivalry storyline scoring:** scored by total games played between the
+  pair (more shared history = more worth bringing up), not by how lopsided
+  the record is — a judgment call where the brief's own example ("7-6 all
+  time") reads as a close, long rivalry rather than a dominant one.
+- **Mining's duration constraint is real, not assumed trivially satisfied.**
+  `direct()`'s adaptive base-speed algorithm (Phase 1) usually lands in
+  61-70s regardless of raw sim length, but `mine()` still calls `direct()`
+  and checks the actual achieved duration per candidate seed rather than
+  trusting that by construction — a seed where the adaptive speed got
+  clamped at the sane-range edges could in principle fall outside the
+  window.
+- **Real bug found and fixed during validation, not left to luck:**
+  `longest_losing_streak` tracking captured a reference to the *old*
+  records dict before the update loop, then kept comparing against that
+  stale snapshot instead of the just-written value — so on a tie, the
+  *last* team checked always won instead of the first. Caught by actually
+  running `commit` on three teams tied at a 1-loss streak and checking
+  which one got picked, not by reading the code and assuming it was right.
+- **Real bug found and fixed during the Phase 2 safe-area check:** the
+  dynamically generated teaser/storyline text could now run longer than
+  Phase 1's hand-written placeholder strings, and the old rendering used a
+  fixed character-count truncation (`text[:36]`) that cut sentences off
+  mid-word ("...the crown is still up for" instead of "...up for grabs.").
+  Replaced with real word-wrap by measured text width in `draw.py`.
 
 ### Phase 1
 

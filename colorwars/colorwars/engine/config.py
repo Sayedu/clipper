@@ -52,6 +52,8 @@ class Settings:
     names_path: Path
     blocklist_path: Path
     episode_path: Path
+    season_path: Path
+    names_used_path: Path
 
     @staticmethod
     def load(repo_root: Path = REPO_ROOT) -> "Settings":
@@ -87,6 +89,8 @@ class Settings:
             names_path=repo_root / paths["names"],
             blocklist_path=repo_root / paths["blocklist"],
             episode_path=repo_root / paths["episode"],
+            season_path=repo_root / paths["season"],
+            names_used_path=repo_root / paths["names_used"],
         )
 
 

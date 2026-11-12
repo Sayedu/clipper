@@ -137,8 +137,9 @@ class _Ball:
         self.body_pos_fallback = None
 
 
-def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episode: dict, name_pool: dict) -> SimRecord:
-    from ...names import assign_names  # local import avoids a cycle with engine.event
+def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episode: dict,
+             last_place_team_id: str | None = None) -> SimRecord:
+    from ...league.names_queue import peek_names  # local import avoids a cycle with engine.event
 
     rng = Rng(seed)
     hz = int(cfg["physics"]["step_hz"])
@@ -156,6 +157,10 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
     space.gravity = (0, gravity)
     space.collision_bias = 0.0  # no bias-based position correction (keeps it fully deterministic by impulse only)
 
+    # last-place team's one-time shield, fresh every episode (not season.json
+    # state) -- absorbs their first hazard hit, whichever hazard type it is.
+    shield_state = {"team_id": last_place_team_id, "available": last_place_team_id is not None}
+
     ring = _Ring(cfg, space)
     cx, cy = ring.center
 
@@ -167,7 +172,10 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
     ball_infos: list[BallInfo] = []
     per_team = int(cfg["balls"]["per_team"])
     slot = 0
-    team_names = {t.id: assign_names(t.name, per_team, name_pool, rng) for t in teams}
+    # queue-based, not random: the same names.txt state always assigns the
+    # same names for the same team, in file order -- no RNG involved, so
+    # commenters' names never depend on the seed.
+    team_names = {t.id: peek_names(t.name, per_team, settings.names_path, settings.blocklist_path) for t in teams}
     for round_i in range(per_team):
         for team in teams:
             x, y = spawn_pts[slot]
@@ -224,6 +232,17 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
             return
         a, b = arbiter.shapes
         ball_shape = a if a.collision_type == CT_BALL else b
+        ball = ball_shape.ball_ref
+        if shield_state["available"] and ball.info.team_id == shield_state["team_id"]:
+            # the physical bounce already resolved by the time post_solve fires
+            # (this isn't a pre-solve veto point) -- approximate "absorbed" by
+            # damping the ball's resulting velocity, rather than leaving the
+            # full hazard impact in place.
+            ball_shape.body.velocity = ball_shape.body.velocity * 0.4
+            shield_state["available"] = False
+            events.append(SimEvent(step_counter["i"], step_counter["i"] / hz, "shield",
+                                    {"ball_id": ball.info.id, "team_id": ball.info.team_id}))
+            return
         events.append(SimEvent(step_counter["i"], step_counter["i"] / hz, "collision",
                                 {"x": ball_shape.body.position.x, "y": ball_shape.body.position.y,
                                  "impulse": impulse, "kind": "ball_hazard"}))
@@ -316,10 +335,14 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
                             if r <= acc:
                                 target = b
                                 break
-                        ang = rng.uniform(0, TAU)
-                        mag = 1800.0
-                        target.body.apply_impulse_at_local_point((mag * math.cos(ang), mag * math.sin(ang)))
-                        events.append(SimEvent(i, t, "hazard", {"kind": "lightning", "ball_id": target.info.id}))
+                        if shield_state["available"] and target.info.team_id == shield_state["team_id"]:
+                            shield_state["available"] = False
+                            events.append(SimEvent(i, t, "shield", {"ball_id": target.info.id, "team_id": target.info.team_id}))
+                        else:
+                            ang = rng.uniform(0, TAU)
+                            mag = 1800.0
+                            target.body.apply_impulse_at_local_point((mag * math.cos(ang), mag * math.sin(ang)))
+                            events.append(SimEvent(i, t, "hazard", {"kind": "lightning", "ball_id": target.info.id}))
                 elif kind == "center_bumper":
                     hb = pymunk.Body(body_type=pymunk.Body.STATIC)
                     hb.position = (cx, cy)

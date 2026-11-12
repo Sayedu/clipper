@@ -1,0 +1,68 @@
+{
+  "season_number": 1,
+  "episodes": [],
+  "standings": {
+    "red": {
+      "points": 0,
+      "wins": 0,
+      "podiums": 0,
+      "streak_type": null,
+      "streak_count": 0
+    },
+    "blue": {
+      "points": 0,
+      "wins": 0,
+      "podiums": 0,
+      "streak_type": null,
+      "streak_count": 0
+    },
+    "green": {
+      "points": 0,
+      "wins": 0,
+      "podiums": 0,
+      "streak_type": null,
+      "streak_count": 0
+    },
+    "yellow": {
+      "points": 0,
+      "wins": 0,
+      "podiums": 0,
+      "streak_type": null,
+      "streak_count": 0
+    }
+  },
+  "records": {
+    "fastest_win": null,
+    "biggest_comeback": null,
+    "longest_losing_streak": {
+      "team": null,
+      "count": 0
+    }
+  },
+  "head_to_head": {
+    "blue|red": {
+      "red": 0,
+      "blue": 0
+    },
+    "green|red": {
+      "red": 0,
+      "green": 0
+    },
+    "red|yellow": {
+      "red": 0,
+      "yellow": 0
+    },
+    "blue|green": {
+      "blue": 0,
+      "green": 0
+    },
+    "blue|yellow": {
+      "blue": 0,
+      "yellow": 0
+    },
+    "green|yellow": {
+      "green": 0,
+      "yellow": 0
+    }
+  }
+}

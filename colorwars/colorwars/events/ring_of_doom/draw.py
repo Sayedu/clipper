@@ -324,6 +324,38 @@ def _draw_hud(canvas, settings: Settings, record: SimRecord, episode_overlays, o
         _draw_overlay(canvas, o, heavy_big, heavy_mid, heavy_small, settings)
 
 
+def _wrap_text(text: str, font: skia.Font, max_width: float) -> list[str]:
+    """Greedy word wrap by MEASURED width, not a guessed character count --
+    storyline/teaser text is generated dynamically now (Phase 2) and varies
+    in length, so a fixed character cutoff was truncating mid sentence."""
+    words = text.split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    cur = words[0]
+    for word in words[1:]:
+        trial = cur + " " + word
+        if font.measureText(trial) <= max_width:
+            cur = trial
+        else:
+            lines.append(cur)
+            cur = word
+    lines.append(cur)
+    return lines
+
+
+def _draw_wrapped_centered(canvas, text: str, font: skia.Font, paint, center_x: float,
+                            start_y: float, max_width: float, line_height: float) -> float:
+    """Draws `text` word-wrapped and centered, returns the y just below the
+    last line (so callers can stack more content under it)."""
+    y = start_y
+    for line in _wrap_text(text, font, max_width):
+        tw = font.measureText(line)
+        canvas.drawString(line, center_x - tw / 2, y, font, paint)
+        y += line_height
+    return y
+
+
 def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: Settings) -> None:
     w = settings.width
     white = skia.Paint(AntiAlias=True, Color=skia.ColorWHITE)
@@ -340,8 +372,8 @@ def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: 
 
     elif overlay.kind == "storyline":
         text = overlay.data["text"]
-        tw = heavy_small.measureText(text[:40])
-        canvas.drawString(text[:40], center_x - tw / 2, 400, heavy_small, white)
+        max_w = settings.safe_x_max - settings.safe_x_min - 40
+        _draw_wrapped_centered(canvas, text, heavy_small, white, center_x, 400, max_w, 42)
 
     elif overlay.kind == "toast":
         text = overlay.data["text"]
@@ -375,8 +407,8 @@ def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: 
             canvas.drawString(line, center_x - tw2 / 2, y, heavy_small, white)
             y += 44
         if teaser:
-            tw3 = heavy_small.measureText(teaser[:36])
-            canvas.drawString(teaser[:36], center_x - tw3 / 2, y + 30, heavy_small, white)
+            max_w = settings.safe_x_max - settings.safe_x_min - 40
+            _draw_wrapped_centered(canvas, teaser, heavy_small, white, center_x, y + 30, max_w, 42)
 
 
 def _draw_confetti(canvas, settings: Settings, team_name: str) -> None:

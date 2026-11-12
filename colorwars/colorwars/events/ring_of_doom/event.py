@@ -18,10 +18,11 @@ class RingOfDoomEvent(Event):
     display_name: ClassVar[str] = "Ring of Doom"
 
     def simulate(self, seed: int, settings: Settings, event_cfg: dict, teams: list[Team], episode: dict) -> SimRecord:
-        from ...names import load_name_pool  # local import, avoids a cycle at module load
-
-        pool = load_name_pool(settings.names_path, settings.blocklist_path)
-        return _simulate(seed, settings, event_cfg, teams, episode, pool)
+        # last_place_team_id travels through the generic `episode` dict
+        # (set by league.pipeline's auto-built episode) rather than widening
+        # the shared Event interface for one event's own mechanic.
+        last_place = episode.get("last_place_team_id")
+        return _simulate(seed, settings, event_cfg, teams, episode, last_place_team_id=last_place)
 
     def direct(self, record: SimRecord, settings: Settings, event_cfg: dict, episode: dict, fps: int) -> Timeline:
         return _direct(record, settings, event_cfg, episode, fps)

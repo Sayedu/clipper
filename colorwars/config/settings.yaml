@@ -43,3 +43,5 @@ paths:
   blocklist: config/blocklist.txt
   episode: config/episode.yaml
   out_dir: out
+  season: league/season.json
+  names_used: league/names_used.txt
