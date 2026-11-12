@@ -46,6 +46,9 @@ render/lasernations/_result.json
 render/quotes/out/
 render/quotes/_frames/
 render/quotes/_result.json
+render/pausegame/out/
+render/pausegame/_frames/
+render/pausegame/_result.json
 
 # os / editor
 .DS_Store

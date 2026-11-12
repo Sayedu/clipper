@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pause Game — Screenshot Challenge</title>
+
+<script>
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* relative paths so the page works BOTH from the render server (rooted at the
+     repo) and from the worker's /render/pausegame/ + /assets/fonts/ routes. */
+  @font-face{ font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Bold.ttf") format("truetype"); }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    margin:0; color:#fff; background:#0a0b0f;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    overflow:hidden; display:flex; align-items:center; justify-content:center; gap:22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  html:not(.rmode) body{ overflow:auto; padding:16px; }
+  html:not(.rmode) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
+  @media (max-width:760px){
+    html:not(.rmode) body{ flex-direction:column; }
+    html:not(.rmode) #stage{ height:auto; width:min(94vw, 52dvh); }
+    #studio{ width:min(94vw, 420px) !important; }
+  }
+
+  #stage{
+    position:relative; container-type:size;
+    aspect-ratio:9/16; height:98dvh; max-width:98vw;
+    border-radius:26px; overflow:hidden; background:#0a0b0f;
+    box-shadow:0 0 0 1px #1c2430, 0 0 60px rgba(0,0,0,.4), 0 30px 90px rgba(0,0,0,.7);
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:98vw} }
+  #c{display:block;width:100%;height:100%}
+
+  #title{position:absolute;left:5.5cqw;right:5.5cqw;top:6cqh;
+    font-weight:700;font-size:7cqw;line-height:1.08;pointer-events:none}
+  #subtitle{position:absolute;left:5.5cqw;right:5.5cqw;top:12.5cqh;
+    font-weight:500;font-size:3.4cqw;color:rgba(255,255,255,.55);pointer-events:none}
+
+  #caption{position:absolute;left:5.5cqw;right:5.5cqw;bottom:4cqh;text-align:center;
+    font-weight:500;font-size:3.5cqw;color:rgba(255,255,255,.55);pointer-events:none}
+  #caption b{color:#eef2f6;font-weight:700}
+
+  html.rmode{ background:#000; --safe-w:72vw; --safe-top:5vh; }
+  html.rmode body{ background:#000; }
+  html.rmode #stage{
+    position:absolute; left:50%; transform:translateX(-50%);
+    top:var(--safe-top); width:var(--safe-w); height:auto; aspect-ratio:9/16;
+    max-width:none; border-radius:0; box-shadow:none;
+  }
+  html.rmode *, html.rmode *::before, html.rmode *::after{ animation:none !important; transition:none !important; }
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+
+  /* ── preview studio — never rendered, hidden when embedded ── */
+  html.rmode #studio, html.embed #studio{ display:none; }
+  html.embed body{ padding:0; overflow:hidden; }
+  html.embed #stage{ height:100dvh; max-width:100vw; }
+  #studio{
+    width:320px; flex:none; align-self:center;
+    max-height:94dvh; overflow-y:auto;
+    background:#0b0c10; border:1px solid #1c2430; border-radius:20px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6);
+    padding:18px; display:flex; flex-direction:column; gap:12px;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  #studio .hd{ font-weight:700; letter-spacing:.28em; font-size:11px; color:#00e5ff; text-transform:uppercase; }
+  #studio button{
+    font-family:inherit; font-weight:700; color:#fff; cursor:pointer;
+    background:#15161c; border:1px solid #262a33; border-radius:10px;
+    padding:9px 12px; font-size:13px; letter-spacing:.06em;
+  }
+  #studio button:hover{ border-color:#00e5ff88; background:#1a1c22; }
+  #studio button.big{ padding:14px; font-size:15px; letter-spacing:.1em; }
+  #studio button.big small{ display:block; font-weight:500; font-size:10px; letter-spacing:.14em; opacity:.55; margin-top:2px; }
+  #studio button.primary{ background:rgba(0,229,255,.12); border-color:rgba(0,229,255,.5); color:#00e5ff; }
+  #studio button.primary:hover{ background:rgba(0,229,255,.2); }
+  #studio .row{ display:flex; align-items:center; gap:8px; }
+  #studio .lbl{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.42); width:56px; flex:none; }
+  #studio input[type=text]{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
+    background:#15161c; border:1px solid #262a33; border-radius:9px; padding:8px 10px; font-size:13px; }
+  #studio label.sw{ display:flex; align-items:center; gap:7px; font-size:12px; letter-spacing:.06em; color:rgba(255,255,255,.8); cursor:pointer; }
+  #studio label.sw input{ accent-color:#00e5ff; width:15px; height:15px; }
+  #studio #readout{ background:#15161c; border:1px solid #262a33; border-radius:10px;
+    padding:11px 12px; font-size:13px; line-height:1.5; min-height:48px; font-variant-numeric:tabular-nums; }
+  #studio #readout .dim{ color:rgba(255,255,255,.4); font-size:11px; letter-spacing:.04em; }
+  #studio #toast{ font-size:11px; line-height:1.5; color:#00e5ff; word-break:break-all;
+    font-family:ui-monospace,Menlo,monospace; min-height:0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="720" height="1280"></canvas>
+  <h1 id="title">It's Almost Impossible</h1>
+  <p id="subtitle">Pause it the instant the line turns green.</p>
+  <p id="caption">Comment your <b>reaction time</b> 👇</p>
+</div>
+
+<div id="studio">
+  <div class="hd">Pause Game · Preview</div>
+  <button id="btnReplay" class="big primary">↻ REPLAY<small>fresh random palette</small></button>
+  <button id="btnAgain" style="width:100%">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
+  <div class="row">
+    <span class="lbl">Seed</span>
+    <input type="text" id="seedIn" inputmode="numeric" spellcheck="false" />
+    <button id="btnSeed">set</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Target</span>
+    <input type="text" id="targetIn" inputmode="numeric" spellcheck="false" style="max-width:64px" />
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">degrees — smaller = harder</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="text" id="rotationIn" inputmode="numeric" spellcheck="false" style="max-width:64px" />
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">ms per rotation — smaller = faster</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Laps</span>
+    <input type="text" id="lapsIn" inputmode="numeric" spellcheck="false" style="max-width:64px" />
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">rotations before the seamless loop</span>
+  </div>
+  <button id="btnApply">Apply</button>
+  <label class="sw"><input type="checkbox" id="chkSound"> play audio</label>
+  <div id="readout">…</div>
+  <button id="btnRender" class="big primary">▶ RENDER THIS SEED</button>
+  <div id="toast"></div>
+</div>
+
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__PG_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => { window.__PG_ERROR = String((e.reason && e.reason.stack) || e.reason); });
+</script>
+<script src="./game.js"></script>
+
+<script>
+if (!document.documentElement.classList.contains('rmode')
+    && !document.documentElement.classList.contains('embed')) (function () {
+  const PG = window.PG;
+  const $ = (id) => document.getElementById(id);
+  const seedIn = $('seedIn'), targetIn = $('targetIn'), rotationIn = $('rotationIn'), lapsIn = $('lapsIn'), readout = $('readout'), toast = $('toast');
+  const p0 = PG.getParams();
+  seedIn.value = PG.getSeed();
+  targetIn.value = p0.targetDeg;
+  rotationIn.value = p0.rotationMs;
+  lapsIn.value = p0.laps;
+
+  let toastT = 0;
+  const say = (msg, ms = 3500) => { toast.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => (toast.textContent = ''), ms); };
+
+  $('btnReplay').onclick = () => PG.replay();
+  $('btnAgain').onclick = () => PG.again();
+  $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) PG.replay(v); };
+  seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
+  $('btnApply').onclick = () => PG.setParams(Number(targetIn.value), Number(rotationIn.value), Number(lapsIn.value));
+  $('chkSound').onchange = (e) => PG.setSound(e.target.checked);
+
+  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  $('btnRender').onclick = async () => {
+    const seed = PG.getSeed(), params = PG.getParams();
+    try {
+      const r = await post('/render', { seed, targetDeg: params.targetDeg, rotationMs: params.rotationMs, laps: params.laps });
+      if (!r.ok) throw new Error(await r.text());
+      say('rendering…', 60000);
+    } catch {
+      const cmd = `node scripts/pausegame/render.mjs --seed ${seed} --target ${params.targetDeg} --rotation ${params.rotationMs} --laps ${params.laps} --mux`;
+      try { await navigator.clipboard.writeText(cmd); say('no studio server — copied: ' + cmd, 12000); }
+      catch { say(cmd, 15000); }
+    }
+  };
+
+  setInterval(() => {
+    const r = PG.readout();
+    if (document.activeElement !== seedIn) seedIn.value = r.seed;
+    readout.innerHTML = `Lap <b>${r.lap}/${r.laps}</b> · ${r.elapsedSec.toFixed(1)}s`
+      + `<br><span class="dim">seed ${r.seed} · ${r.targetDeg}° target · ${r.rotationMs}ms/rotation${r.inZone ? ' · <b style=\"color:#00ff66\">IN ZONE</b>' : ''}</span>`;
+  }, 110);
+})();
+</script>
+</body>
+</html>

@@ -47,7 +47,15 @@ export type ClipProvider = 'youtube' | 'twitch';
 export type TranscriptSource = 'auto' | 'youtube' | 'whisper';
 export type ReframeMode = 'auto' | 'always-crop' | 'always-letterbox';
 export type ClipFormat = 'single' | 'top5' | 'auto' | 'question' | 'story';
-export type ContentType = 'colorrace' | 'escaperace' | 'lasernations' | 'colorwar' | 'followball' | 'eyetest' | 'quotes';
+export type ContentType =
+  | 'colorrace'
+  | 'escaperace'
+  | 'lasernations'
+  | 'colorwar'
+  | 'followball'
+  | 'eyetest'
+  | 'pausegame'
+  | 'quotes';
 export type ClipContentStyle = 'any' | 'talking' | 'gaming';
 export type ColorRaceMap = 'random' | 'zigzag' | 'pegstorm' | 'spinner' | 'fork' | 'bumper';
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
@@ -140,6 +148,10 @@ export interface Settings {
   eyeTestBallsPerRound: number[];
   eyeTestShuffleSec: number;
   eyeTestSeed?: number;
+  pauseGameTargetDeg: number;
+  pauseGameRotationMs: number;
+  pauseGameLaps: number;
+  pauseGameSeed?: number;
   quotesSeed?: number;
 }
 

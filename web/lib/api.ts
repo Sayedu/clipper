@@ -47,6 +47,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ seed, ballsPerRound, shuffleSec }),
     }),
+  pausegameRender: (seed: number, targetDeg: number, rotationMs: number, laps: number) =>
+    req<{ jobId: string; seed: number; targetDeg: number; rotationMs: number; laps: number }>('/pausegame/render', {
+      method: 'POST',
+      body: JSON.stringify({ seed, targetDeg, rotationMs, laps }),
+    }),
   quotesRender: (seed: number) =>
     req<{ jobId: string; seed: number }>('/quotes/render', {
       method: 'POST',
@@ -112,6 +117,7 @@ export const colorwarPreviewSrc = (shape: 'circle' | 'square' = 'circle', flipso
   `/worker/render/colorwar/index.html?embed=1&shape=${shape}&flipsound=${flipsound}`;
 export const followballPreviewSrc = '/worker/render/followball/index.html?embed=1';
 export const eyetestPreviewSrc = '/worker/render/eyetest/index.html?embed=1';
+export const pausegamePreviewSrc = '/worker/render/pausegame/index.html?embed=1';
 export const quotesPreviewSrc = '/worker/render/quotes/index.html?embed=1';
 export const laserDuelPreviewSrc = '/worker/render/lasernations/index.html?embed=1&duel=1';
 export const clipVideoUrl = (clipId: string) => `${BASE}/library/${clipId}/video`;

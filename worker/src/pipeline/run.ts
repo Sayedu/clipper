@@ -49,6 +49,7 @@ import { runLaserDuel } from './steps/lasernationsDuel.ts';
 import { runColorWar } from './steps/colorwar.ts';
 import { runFollowBall } from './steps/followball.ts';
 import { runEyeTest } from './steps/eyetest.ts';
+import { runPauseGame } from './steps/pausegame.ts';
 import { runQuotes } from './steps/quotes.ts';
 import { narrate } from '../tts.ts';
 import { pickFootageSlice, populateFootage } from '../footage.ts';
@@ -532,6 +533,28 @@ async function runEyeTestPost(ctx: StepContext, jobId: string): Promise<RunOutco
   });
 }
 
+/** 'pausegame' — a sweeping needle; the viewer pauses TikTok's own player to catch it
+ *  on the green. No source, no LLM. */
+async function runPauseGamePost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
+  skipStepsExcept(ctx, ['render']);
+  const { render, game } = await stage(ctx, 'render', () => runPauseGame(ctx));
+  const draft: DraftText = {
+    hook: 'Screenshot / Pause Game 👀 can you catch the green?',
+    overlays: [`${game.targetDeg}° target`],
+    caption:
+      `Pause it the instant the line turns green 👀\n\n` +
+      `One needle, ${game.targetDeg}° win zone, sweeping every ${(game.rotationMs / 1000).toFixed(1)}s — ` +
+      `pause TikTok right as it hits the mark. Screenshot it if you nail it.\n\n` +
+      `Comment your reaction time 👇`,
+    hashtags: ['pausegame', 'screenshotchallenge', 'reactiontest', 'watchtillend', 'fyp'],
+  };
+  return finishPost(ctx, jobId, render, {
+    hookTitle: `${game.targetDeg}° target · ${game.rotationMs}ms/rotation`,
+    reason: `${game.targetDeg}° target · ${game.rotationMs}ms/rotation · ${game.laps} laps · seed ${game.seed}`,
+    draft,
+  });
+}
+
 /** 'quotes' — a silent 15s "Reminders" card: a curated line of original advice inspired by
  *  broad Quranic/Hadith themes (not literal ayahs/hadith). No source, no LLM. */
 async function runQuotesPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
@@ -687,6 +710,7 @@ export async function runPipeline(opts: RunOptions): Promise<RunOutcome> {
     if (job.settings.contentType === 'colorwar') return await runColorWarPost(ctx, jobId);
     if (job.settings.contentType === 'followball') return await runFollowBallPost(ctx, jobId);
     if (job.settings.contentType === 'eyetest') return await runEyeTestPost(ctx, jobId);
+    if (job.settings.contentType === 'pausegame') return await runPauseGamePost(ctx, jobId);
     if (job.settings.contentType === 'quotes') return await runQuotesPost(ctx, jobId);
     // ContentType is exactly the 5 above — 'clip'/'storyteller'/'marblerace' were removed as
     // selectable content types 2026-09-04 (their pipeline code is left in this file, unused,

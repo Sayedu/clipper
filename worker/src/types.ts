@@ -86,6 +86,14 @@ export type ClipContentStyle = 'any' | 'talking' | 'gaming';
  *   re-flashes gold for the reveal. User-authored round plan (how many rounds, how many
  *   balls each, how long each shuffle runs) — a score card lists every round's answer
  *   at the end (2D Canvas, headless).
+ * 'pausegame' = "Pause Game" — a single neon needle sweeps a dial forever at a fixed
+ *   speed; a thin green win-margin sits fixed at 12 o'clock. The needle's own color IS
+ *   the feedback — it snaps to green the instant it's inside the zone, everywhere else
+ *   it shows a seed-picked neon accent. No tap/pause logic in the clip itself: the
+ *   viewer uses TikTok's own native pause control, and whatever color the needle is
+ *   frozen on tells them if they caught it. Zero randomness in the physics (pure time
+ *   → angle) — the seed only picks the accent color. Engineered to loop seamlessly
+ *   after a fixed number of rotations (2D Canvas, headless).
  * 'quotes' = "Reminders" — a silent, 15-second card: a short setup line settles in, a
  *   beat of pause, then a punch line lands with a soft flash (the silent stand-in for a
  *   hit sound, since this content type is intentionally silent). The line comes from a
@@ -100,7 +108,15 @@ export type ClipContentStyle = 'any' | 'talking' | 'gaming';
  * 'storyteller' is still present (dead code) but never invoked; 'marblerace'
  * is superseded by 'colorrace' (the 2D Marble Rush) for this purpose.
  */
-export type ContentType = 'colorrace' | 'escaperace' | 'lasernations' | 'colorwar' | 'followball' | 'eyetest' | 'quotes';
+export type ContentType =
+  | 'colorrace'
+  | 'escaperace'
+  | 'lasernations'
+  | 'colorwar'
+  | 'followball'
+  | 'eyetest'
+  | 'pausegame'
+  | 'quotes';
 
 /** Which Follow-the-ball mode runs. 'random' = a fresh pick each generation. */
 export type FollowBallMode = 'sprint' | 'classic' | 'insane' | 'random';
@@ -294,6 +310,20 @@ export interface Settings {
    *  0 / undefined = a fresh random seed each render. */
   eyeTestSeed?: number;
 
+  // --- Pause Game (sweeping needle / screenshot-pause challenge) ---
+  /** Win-zone width in degrees (5-30). Smaller = harder. */
+  pauseGameTargetDeg: number;
+  /** Milliseconds for one full 360deg sweep (600-2500). Smaller = faster. */
+  pauseGameRotationMs: number;
+  /** Full rotations before the clip ends (4-20) — the render lands exactly
+   *  back on frame 0's angle at that point, so it loops seamlessly on
+   *  TikTok's native replay. */
+  pauseGameLaps: number;
+  /** Pin the sim to an exact seed (the preview studio's "render this seed") —
+   *  picks the neon accent color only, physics has no randomness.
+   *  0 / undefined = a fresh random seed each render. */
+  pauseGameSeed?: number;
+
   // --- Reminders (silent Quran/Hadith-inspired advice card) ---
   /** Pin which bank entry + background drift renders (the preview studio's
    *  "render this seed"). 0 / undefined = a fresh random seed each render. */
@@ -409,6 +439,9 @@ export const DEFAULT_SETTINGS: Settings = {
   followBallMode: 'sprint',
   eyeTestBallsPerRound: [8, 8, 8],
   eyeTestShuffleSec: 6,
+  pauseGameTargetDeg: 9,
+  pauseGameRotationMs: 1100,
+  pauseGameLaps: 10,
 };
 
 // --- Records -----------------------------------------------------------

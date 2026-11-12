@@ -36,7 +36,7 @@ import { DEFAULT_SETTINGS, type Settings } from './types.ts';
 
 const settingsSchema = z
   .object({
-    contentType: z.enum(['colorrace', 'escaperace', 'lasernations', 'colorwar', 'followball', 'eyetest', 'quotes']),
+    contentType: z.enum(['colorrace', 'escaperace', 'lasernations', 'colorwar', 'followball', 'eyetest', 'pausegame', 'quotes']),
     sourceMode: z.enum(['creators', 'search', 'trending']),
     sourcePlatform: z.enum(['youtube', 'twitch', 'both']),
     creators: z.array(z.string().min(1)).max(40),
@@ -97,6 +97,10 @@ const settingsSchema = z
     eyeTestBallsPerRound: z.array(z.number().int().min(4).max(10)).min(1).max(6),
     eyeTestShuffleSec: z.number().min(3).max(15),
     eyeTestSeed: z.number().int().positive().optional(),
+    pauseGameTargetDeg: z.number().int().min(5).max(30),
+    pauseGameRotationMs: z.number().int().min(600).max(2500),
+    pauseGameLaps: z.number().int().min(4).max(20),
+    pauseGameSeed: z.number().int().positive().optional(),
     quotesSeed: z.number().int().positive().optional(),
   })
   .partial();
@@ -319,6 +323,31 @@ export function buildRouter(): Router {
     sendJson(res, 201, { jobId: job.id, seed: body.seed, ballsPerRound: body.ballsPerRound, shuffleSec: body.shuffleSec });
   });
 
+  // Pause Game preview studio — same shape as /colorwar/render / /followball/render.
+  r.post('/pausegame/render', async ({ req, res }) => {
+    const body = z
+      .object({
+        seed: z.number().int().positive(),
+        targetDeg: z.number().int().min(5).max(30).default(9),
+        rotationMs: z.number().int().min(600).max(2500).default(1100),
+        laps: z.number().int().min(4).max(20).default(10),
+      })
+      .parse(await readJson(req));
+    const { createJob } = await import('./db.ts');
+    const settings: Settings = {
+      ...getSettings(),
+      contentType: 'pausegame',
+      pauseGameTargetDeg: body.targetDeg,
+      pauseGameRotationMs: body.rotationMs,
+      pauseGameLaps: body.laps,
+      pauseGameSeed: body.seed,
+      clipsPerRun: 1,
+    };
+    const job = createJob({ settings });
+    queue.enqueue(job.id);
+    sendJson(res, 201, { jobId: job.id, seed: body.seed, targetDeg: body.targetDeg, rotationMs: body.rotationMs, laps: body.laps });
+  });
+
   // Reminders preview studio — same shape as /colorwar/render / /followball/render.
   // No mode to pick: the seed alone picks both the quote and the background drift.
   r.post('/quotes/render', async ({ req, res }) => {
@@ -374,7 +403,7 @@ export function buildRouter(): Router {
     const clean = relPath.replace(/\.\.+/g, '').replace(/^\/+/, '');
     const abs = resolve(paths.repoRoot, clean);
     if (!abs.startsWith(paths.repoRoot) ||
-        !/^(render\/(colorwar|followball|eyetest|lasernations|quotes)\/|assets\/fonts\/)/.test(clean)) {
+        !/^(render\/(colorwar|followball|eyetest|lasernations|pausegame|quotes)\/|assets\/fonts\/)/.test(clean)) {
       return sendJson(ctx.res, 403, { error: 'forbidden' });
     }
     if (!existsSync(abs)) return sendJson(ctx.res, 404, { error: 'not found' });
@@ -387,6 +416,7 @@ export function buildRouter(): Router {
   r.get('/render/colorwar/:file', (ctx) => staticFile(`render/colorwar/${ctx.params.file}`, ctx));
   r.get('/render/followball/:file', (ctx) => staticFile(`render/followball/${ctx.params.file}`, ctx));
   r.get('/render/eyetest/:file', (ctx) => staticFile(`render/eyetest/${ctx.params.file}`, ctx));
+  r.get('/render/pausegame/:file', (ctx) => staticFile(`render/pausegame/${ctx.params.file}`, ctx));
   r.get('/render/lasernations/:file', (ctx) => staticFile(`render/lasernations/${ctx.params.file}`, ctx));
   r.get('/render/quotes/:file', (ctx) => staticFile(`render/quotes/${ctx.params.file}`, ctx));
   r.get('/assets/fonts/:file', (ctx) => staticFile(`assets/fonts/${ctx.params.file}`, ctx));
@@ -473,6 +503,8 @@ export function buildRouter(): Router {
       ? `followball-${s.followBallMode}${s.followBallSeed ? '-' + s.followBallSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'eyetest'
       ? `eyetest-${(s.eyeTestBallsPerRound ?? [8, 8, 8]).length}r${s.eyeTestSeed ? '-' + s.eyeTestSeed : ''}-${job.id}.mp4`
+      : job && s?.contentType === 'pausegame'
+      ? `pausegame${s.pauseGameSeed ? '-' + s.pauseGameSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'quotes'
       ? `reminders${s.quotesSeed ? '-' + s.quotesSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'lasernations' && s.laserNationsMode === 'duel'
