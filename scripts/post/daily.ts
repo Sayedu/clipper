@@ -90,15 +90,16 @@ function settingsFor(kind: Rotation): Settings {
   const base: Settings = { ...DEFAULT_SETTINGS, clipsPerRun: 1 };
   if (kind === 'colorwar') {
     // 'random' picks one of the four ~41-44s wild-duel boards (never SPRINT's
-    // short cold-open) — see render/colorwar/game.js's pickMode(). Shape and
-    // flip-sound are cosmetic design tweaks, randomized here too so the same
-    // board layout doesn't look identical to a prior day's render.
+    // short cold-open) — see render/colorwar/game.js's pickMode(). Shape is a
+    // cosmetic design tweak, randomized here too so the same board layout
+    // doesn't look identical to a prior day's render. Flip-sound stays
+    // pinned to 'bubble' — the user's chosen sound, not randomized.
     return {
       ...base,
       contentType: 'colorwar',
       colorWarMode: 'random',
       colorWarShape: randomInt(0, 2) === 0 ? 'circle' : 'square',
-      colorWarFlipSound: randomInt(0, 2) === 0 ? 'pluck' : 'bubble',
+      colorWarFlipSound: 'bubble',
     };
   }
   if (kind === 'followball') return { ...base, contentType: 'followball', followBallMode: 'random' };
