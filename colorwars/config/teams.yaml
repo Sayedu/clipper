@@ -1,0 +1,29 @@
+# Four color teams. Trait numbers are read by each event's sim -- an event
+# is free to use only the traits that make sense for it.
+teams:
+  - id: red
+    name: Red
+    color: "#FF4D5E"
+    personality: "Heavy hitters -- hard to knock off course."
+    traits:
+      mass_mult: 1.15
+  - id: blue
+    name: Blue
+    color: "#3DA5FF"
+    personality: "Bouncy and a little unpredictable."
+    traits:
+      elasticity_add: 0.08
+  - id: green
+    name: Green
+    color: "#3DDC84"
+    personality: "Small and slippery."
+    traits:
+      radius_mult: 0.9
+  - id: yellow
+    name: Yellow
+    color: "#FFD23F"
+    personality: "Wildcards -- bursts of speed out of nowhere."
+    traits:
+      burst_impulse: true
+      burst_interval_min_sec: 4
+      burst_interval_max_sec: 7

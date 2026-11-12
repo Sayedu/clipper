@@ -1,0 +1,13 @@
+# Filled by hand for this phase -- a later phase's league layer generates
+# this automatically from season standings + a story director.
+episode:
+  number: 1
+  id: ep001
+  crown_team: blue
+  hook_line: "Blue enters as defending champion. Can anyone dethrone them?"
+  standings:
+    red: 0
+    blue: 12
+    green: 4
+    yellow: 2
+  teaser: "Next time: the ring closes in faster than ever."

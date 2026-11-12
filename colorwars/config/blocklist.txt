@@ -1,0 +1,11 @@
+# One blocked name per line, case-insensitive. Cleaned names (letters,
+# digits, underscore only) are checked against this list; a match is
+# dropped and the default "<Team> <N>" name is used instead.
+admin
+null
+test
+nazi
+hitler
+fuck
+shit
+bitch

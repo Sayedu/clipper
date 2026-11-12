@@ -1,0 +1,52 @@
+event:
+  id: ring_of_doom
+  name: "Ring of Doom"
+
+ring:
+  radius: 400
+  center: [540, 820]
+  segments: 96
+  thickness: 10
+  initial_gap_deg: 16
+  rotation_speed: 0.6              # rad/s
+  rotation_speedup_per_phase: 0.04 # +4% speed each gap-widening phase
+  reverse_once: true
+
+gravity: 900
+
+balls:
+  radius: 30
+  per_team: 4
+  elasticity: 0.88
+  friction: 0.4
+
+elimination_radius: 440
+
+gaps:
+  initial_count: 1
+  widen_deg: 6
+  max_gaps: 3
+  interval_sec: 8.0
+  warning_sec: 1.0
+  fast_interval_sec: 4.0
+  fast_after_sec: 48.0
+
+hazards:
+  interval_min_sec: 9.0
+  interval_max_sec: 13.0
+  warning_sec: 1.0
+  types: [lightning, center_bumper, spinner_bar]
+  center_bumper_duration_sec: 5.0
+  spinner_bar_duration_sec: 6.0
+
+physics:
+  step_hz: 240
+  max_speed: 2400
+  wall_thickness: 6
+  anti_stuck_distance_px: 30
+  anti_stuck_window_sec: 1.5
+
+timing:
+  sim_deadline_sec: 66.0
+  video_min_sec: 61.0
+  video_max_sec: 70.0

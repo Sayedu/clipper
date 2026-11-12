@@ -55,8 +55,70 @@ each have theirs, but that wiring happens in a later phase, not now.
 
 ## Status
 
-Not started. Waiting on the Phase 1 prompt.
+**Phase 1: done.** `python -m colorwars render --event ring_of_doom --seed 2`
+produces a 1080x1920/60fps/65.5s `final.mp4` with synthesized sound;
+`find-seed` and `--preview` both work; both tests pass (`simulate()`
+determinism and render-hash determinism). See `README.md` for every
+command. Full brief in `docs/phase-1.md`.
+
+Real numbers on this machine: `find-seed` found seed 2 valid on the 2nd
+try. Full render: 127s. `--preview` render: 28s. Output: `out/ep001/`
+(gitignored) — `final.mp4`, `cover.png`, `meta.json`.
 
 ## Decisions log
 
-(nothing yet — filled in at the end of each phase)
+### Phase 1
+
+- **Stack superseded the pre-phase-1 guess.** The actual Phase 1 brief
+  specified pymunk + skia-python explicitly, overriding my earlier
+  (pre-brief) recommendation of custom physics + Pillow. Both installed
+  cleanly and work well — no fallback to pycairo was needed. Exact pinned
+  versions: `pymunk==7.3.1`, `skia-python==144.1`, `numpy==2.5.4`,
+  `PyYAML==6.0.3`, `pytest==9.2.0`.
+- **Verified pymunk's collision API before writing handlers, per the
+  brief.** pymunk 7.3.1 uses `space.on_collision(type_a, type_b, begin=,
+  pre_solve=, post_solve=, separate=, data=)` — callbacks receive
+  `(arbiter, space, data)`. Confirmed kinematic-circle-vs-dynamic-circle
+  collisions work correctly (an early test of this looked broken, but the
+  bug was the test itself placing the dynamic ball on the wrong side of
+  gravity, not pymunk).
+- **Gap-change rule (brief said "widen... or open a new one," didn't say
+  how to choose):** each cycle, if gap count < 3, a 50/50 seeded choice
+  between widening a random existing gap or opening a new one; once at 3
+  gaps, always widen. "Each phase" (for the rotation speedup) = each gap-
+  change event.
+- **Near miss defined as:** a ball's radial distance crosses into the
+  410-440 band (armed) and later drops back under 390 while still alive
+  (resolved) — logged with its peak radius. If it instead crosses 440
+  first, that's a real elimination, not a near miss, by design.
+- **Duration fitting (61-70s) is adaptive, not fixed-slowmo-amount.** Raw
+  sim length varies by seed (observed 20-22s for seed 2's run, well under
+  the 66s deadline). `direct()` solves for a single "base" speed multiplier
+  so total video time (base-speed stretch of everything outside the
+  near-miss/final-elimination windows, + their own fixed extra-slow
+  windows, + the fixed freeze/winner-card/outro time) lands near the
+  middle of the 61-70s window, then trims/pads by a few frames to land
+  exactly inside it. Known side effect: on a very short raw sim, the
+  computed base speed can end up close to the final-elimination's own
+  0.35x, so that moment doesn't always read as dramatically slower than the
+  rest. A future pass could prefer finding a *longer* raw sim via
+  `find-seed` over stretching a short one this hard.
+- **Placements / lead tie-breaking:** lead ties keep the previous leader if
+  it's still part of the tied-max group; otherwise the tie breaks by team
+  order in `teams.yaml`. Placements = winner, then losers ordered by their
+  own elimination step, most recent first.
+- **Fonts:** reused this repo's existing OFL fonts rather than sourcing new
+  ones — Anton (heavy display text) and Chakra Petch Bold (name labels),
+  both already vendored under the main app's `assets/fonts/`. A proper
+  `OFL.txt` is bundled alongside the copies in `colorwars/assets/fonts/`.
+- **Known limitation, not fixed this phase:** with 16 balls in a 400px-radius
+  ring, name labels overlap heavily once balls cluster (e.g. settling at
+  the bottom under gravity). No label-collision-avoidance was built —
+  flagged rather than silently accepted, since it's a real readability
+  issue the brief cares about, just out of scope for the time this phase
+  took.
+- **Render stage has zero live randomness,** by construction — anything
+  that looks random on screen (confetti layout, particle scatter) is a
+  deterministic function of frame index / event data, never an RNG call in
+  `draw.py`. This is what makes the render-hash determinism test
+  meaningful rather than trivially true.

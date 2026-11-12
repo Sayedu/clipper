@@ -1,0 +1,45 @@
+# Global settings shared by every event. Event-specific tunables live in
+# config/events/<event_id>.yaml instead.
+
+resolution:
+  width: 1080
+  height: 1920
+fps: 60
+
+preview:
+  width: 540
+  height: 960
+  fps: 30
+
+# TikTok safe area (px, in the 1080x1920 frame) -- all HUD text must stay inside this box.
+safe_area:
+  x_min: 120
+  x_max: 960
+  y_min: 160
+  y_max: 1440
+
+audio:
+  sample_rate: 48000
+  target_lufs: -14.0
+
+# The bare `ffmpeg` on PATH on this machine is broken (missing libx265 after
+# a Homebrew upgrade) -- this is the known-working build already used
+# elsewhere in this repo.
+ffmpeg_path: /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg
+
+duration:
+  min_sec: 61
+  max_sec: 70
+
+background_color: "#0B1020"
+
+fonts:
+  heavy: assets/fonts/Anton-Regular.ttf
+  label: assets/fonts/ChakraPetch-Bold.ttf
+
+paths:
+  teams: config/teams.yaml
+  names: config/names.txt
+  blocklist: config/blocklist.txt
+  episode: config/episode.yaml
+  out_dir: out
