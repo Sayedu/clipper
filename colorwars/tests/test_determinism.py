@@ -23,12 +23,14 @@ from colorwars.engine.config import REPO_ROOT, Settings, load_episode, load_even
 from colorwars.events.disaster_drop.event import DisasterDropEvent
 from colorwars.events.ring_of_doom.event import RingOfDoomEvent
 from colorwars.events.shell_shuffle.event import ShellShuffleEvent
+from colorwars.events.great_escape.event import GreatEscapeEvent
 from colorwars.events.turf_war.event import TurfWarEvent
 
 KNOWN_VALID_SEED = 2
 SHELL_SHUFFLE_SEED = 1  # every seed is valid by construction (scripted, not simulated-to-failure); 1 is just stable to pin
 DISASTER_DROP_SEED = 1  # checked once via `find-seed --event disaster_drop`
 TURF_WAR_SEED = 1  # checked once via `find-seed --event turf_war`
+GREAT_ESCAPE_SEED = 1  # checked once via `find-seed --event great_escape`
 
 
 def _load(event_id: str = "ring_of_doom"):
@@ -277,3 +279,62 @@ def test_turf_war_initial_grid_is_fixed_quadrants():
         for owner in row:
             counts[owner] += 1
     assert all(c == 196 for c in counts.values())
+
+
+def test_great_escape_simulate_is_deterministic():
+    settings, teams, cfg, episode = _load("great_escape")
+    event = GreatEscapeEvent()
+
+    r1 = event.simulate(GREAT_ESCAPE_SEED, settings, cfg, teams, episode)
+    r2 = event.simulate(GREAT_ESCAPE_SEED, settings, cfg, teams, episode)
+
+    assert len(r1.steps) == len(r2.steps)
+    assert r1.placements == r2.placements
+    assert r1.winner_team_id == r2.winner_team_id
+    assert r1.mvp_name == r2.mvp_name
+    assert len(r1.events) == len(r2.events)
+    for s1, s2 in zip(r1.steps, r2.steps):
+        for b1, b2 in zip(s1.balls, s2.balls):
+            assert b1.x == b2.x and b1.y == b2.y and b1.vx == b2.vx and b1.vy == b2.vy and b1.alive == b2.alive
+
+
+def test_great_escape_render_three_seconds_twice_matches_by_hash():
+    settings, teams, cfg, episode = _load("great_escape")
+    event = GreatEscapeEvent()
+
+    record = event.simulate(GREAT_ESCAPE_SEED, settings, cfg, teams, episode)
+    assert event.is_valid(record)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+
+    n_frames = min(settings.preview_fps * 3, timeline.total_frames)
+
+    def render_hashes() -> list[str]:
+        event.init_render(settings)
+        surface = skia.Surface(settings.preview_width, settings.preview_height)
+        hashes = []
+        for frame_idx in range(n_frames):
+            with surface as canvas:
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+            img = surface.makeImageSnapshot()
+            hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
+        return hashes
+
+    hashes_a = render_hashes()
+    hashes_b = render_hashes()
+
+    assert len(hashes_a) == n_frames
+    assert hashes_a == hashes_b
+
+
+def test_great_escape_all_rings_eventually_shatter():
+    """A rotating gap sweeps through every world angle once per rotation,
+    so no ball should ever be permanently trapped -- verified directly
+    rather than assumed, since this is the one property the whole event's
+    design leans on instead of an explicit anti-trap reject."""
+    settings, teams, cfg, episode = _load("great_escape")
+    event = GreatEscapeEvent()
+    record = event.simulate(GREAT_ESCAPE_SEED, settings, cfg, teams, episode)
+    shatters = [e for e in record.events if e.kind == "ring_shatter"]
+    escapes = [e for e in record.events if e.kind == "escape"]
+    assert len(shatters) == 6
+    assert len(escapes) == 4

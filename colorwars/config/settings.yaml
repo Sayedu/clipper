@@ -45,3 +45,4 @@ paths:
   out_dir: out
   season: league/season.json
   names_used: league/names_used.txt
+  theme: league/theme.json

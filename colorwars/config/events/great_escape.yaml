@@ -1,0 +1,31 @@
+event:
+  id: great_escape
+  name: "Great Escape"
+
+physics:
+  step_hz: 240
+  max_speed: 2400
+  wall_thickness: 7
+  anti_stuck_distance_px: 30
+  anti_stuck_window_sec: 1.5
+  gravity: 600
+
+arena:
+  center: [540, 960]
+
+rings:
+  radii: [120, 180, 240, 300, 360, 420]
+  gap_deg: 28
+  segments: 72
+  speed_min: 0.35
+  speed_max: 0.9
+
+ball:
+  radius: 18
+  elasticity: 0.85
+  friction: 0.3
+
+timing:
+  sim_deadline_sec: 50.0
+  video_min_sec: 61.0
+  video_max_sec: 70.0

@@ -14,6 +14,7 @@ from ..audio.mix import build_bus, write_wav
 from ..league import season as season_lib
 from ..league.names_queue import consume_names, peek_names
 from ..league.storylines import pick_hook_and_teaser
+from ..league.theme import load_or_build_theme
 from ..render.video import extract_cover, mux_audio, render_video
 from .config import Settings, Team, load_episode, load_event_config, load_teams
 from .event import Event
@@ -24,6 +25,7 @@ EVENT_HASHTAGS = {
     "shell_shuffle": ["shellshuffle", "findtheball"],
     "disaster_drop": ["disasterdrop", "marblerace"],
     "turf_war": ["turfwar", "territory"],
+    "great_escape": ["greatescape", "ringbreak"],
 }
 
 
@@ -59,6 +61,10 @@ def build_episode_from_season(repo_root: Path, event_id: str, is_finale: bool = 
     last_place = season_lib.last_place_team_id(season)
     hook_line, teaser = pick_hook_and_teaser(season, teams_by_id)
     standings_points = {tid: row["points"] for tid, row in season["standings"].items()}
+    # season-wide, not episode-specific -- only Great Escape consumes this
+    # so far, but it lives here (like crown_team/standings) rather than
+    # being threaded through a wider Event interface for one event's sake.
+    theme_notes = load_or_build_theme(season["season_number"], settings.theme_path)
 
     episode = {
         "number": episode_number,
@@ -69,6 +75,7 @@ def build_episode_from_season(repo_root: Path, event_id: str, is_finale: bool = 
         "standings": standings_points,
         "teaser": teaser,
         "is_finale": is_finale,
+        "theme_notes": theme_notes,
     }
     return settings, teams, event_cfg, episode, season
 
