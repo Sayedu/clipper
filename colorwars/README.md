@@ -3,8 +3,10 @@
 Deterministic 2D physics engine that renders Color Wars League episodes.
 Phase 1: the core engine + Ring of Doom. Phase 2: the league layer (season
 standings, crown, storylines, a viewer names queue) and the story director
-(drama mining). See `docs/phase-1.md` / `docs/phase-2.md` for the full
-briefs and `CLAUDE.md` for the project plan, rules and decisions made so far.
+(drama mining). Phase 3: a second event, Shell Shuffle, on the same
+pipeline. See `docs/phase-1.md` / `docs/phase-2.md` /
+`docs/event-shell-shuffle.md` for the full briefs and `CLAUDE.md` for the
+project plan, rules and decisions made so far.
 
 ## Setup
 
@@ -38,6 +40,7 @@ A run is only "valid" if it leaves a single ball by the 66s sim deadline.
 
 ```bash
 .venv/bin/python -m colorwars render --event ring_of_doom --seed 2
+.venv/bin/python -m colorwars render --event shell_shuffle --seed 1
 ```
 
 Writes to `out/<episode_id>/` (episode id comes from `config/episode.yaml`):
@@ -85,9 +88,13 @@ formula.
 .venv/bin/python -m colorwars mine --event ring_of_doom --runs 500 --top 5
 # ~30s on this machine, ~400/500 seeds typically valid
 
-# story flags narrow the field before ranking:
+# story flags narrow the field before ranking (Ring of Doom specific --
+# a field a given event's drama_stats() doesn't have just never filters):
 .venv/bin/python -m colorwars mine --event ring_of_doom --runs 500 \
   --winner green --comeback --min-lead-changes 3 --photo-finish
+
+.venv/bin/python -m colorwars mine --event shell_shuffle --runs 500 --top 5
+# ~2s on this machine (no physics to simulate), typically 500/500 valid
 ```
 
 Writes every valid+matching seed to `out/mine_<event>.csv` (score-
@@ -146,9 +153,14 @@ colorwars/
     names_used.txt          log of consumed names.txt entries -- only `commit` writes this
   colorwars/
     engine/                shared: rng, config loading, records, the Event interface, pipeline,
-                            drama.py (shared drama stats), mining.py (parallel seed scoring)
+                            registry.py (event id -> Event instance), drama.py (Ring of Doom's
+                            drama stats, the default Event.drama_stats()), mining.py (parallel
+                            seed scoring)
     league/                season.py (state + points/streaks/records), storylines.py, names_queue.py
     events/ring_of_doom/   sim.py (physics), direct.py (the edit), draw.py (skia), sound.py, event.py
+    events/shell_shuffle/  sim.py (choreography, no physics engine), direct.py, draw.py, sound.py,
+                            drama.py (its own drama_stats()/is_valid(), too different from Ring of
+                            Doom's to share), event.py
     render/video.py        shared: raw RGBA frames -> ffmpeg -> mp4
     audio/                 shared: synthesis primitives (synth.py) + mixing (mix.py)
     cli.py                 `python -m colorwars ...`
@@ -157,6 +169,7 @@ colorwars/
   out/                     gitignored -- rendered episodes (+ mine_<event>.csv) land here
 ```
 
-Adding a second event (phase 3+) means a new `colorwars/events/<name>/`
-package plus a new `config/events/<name>.yaml` -- nothing in `engine/`,
-`render/`, or `audio/` changes.
+Adding an event means a new `colorwars/events/<name>/` package plus a new
+`config/events/<name>.yaml` -- nothing in `engine/`, `render/`, or `audio/`
+changes. `colorwars/engine/registry.py` is the one place that lists known
+event ids for both `cli.py` and `mining.py`'s worker processes.

@@ -63,3 +63,23 @@ class Event(ABC):
         (e.g. by x position) before returning. The shared mixer
         (audio/mix.py) just places it at cue.video_time and sums the bus;
         it never knows what a 'pluck' or 'bass_drop' actually is."""
+
+    @abstractmethod
+    def is_valid(self, record: SimRecord) -> bool:
+        """Whether this run is usable at all -- find_seed() and mine() both
+        skip a seed for which this returns False. What "valid" means is
+        entirely event-specific (Ring of Doom: exactly one survivor by the
+        sim deadline; Shell Shuffle: no cup motionless for all of round 3)."""
+
+    def drama_stats(self, record: SimRecord, episode: dict) -> dict:
+        """Turns a SimRecord into the stats the story director (mine) ranks
+        by and meta.json/commit() store -- must be a dict with at least a
+        numeric "score" key. This is NOT abstract: engine.drama.analyze_drama
+        covers Ring of Doom (and any future event built on the same generic
+        collision/elimination/hazard/near_miss/lead_change vocabulary) as a
+        sane default. An event whose drama signal doesn't fit that
+        vocabulary -- like a cup game, which has no "alive" balls to wipe
+        out -- overrides this instead of getting nonsense numbers back."""
+        from .drama import analyze_drama
+
+        return analyze_drama(record, episode.get("crown_team")).to_dict()

@@ -15,9 +15,9 @@ each have theirs, but that wiring happens in a later phase, not now.
 
 ## Plan (built one phase at a time — only the phase currently assigned gets built)
 
-1. Core engine plus the first event, **Ring of Doom**: the last ball left inside a spinning ring wins.
-2. League layer (standings, crown, storylines, a viewer name queue) and a story director that simulates hundreds of seeds headless and picks the most dramatic real run.
-3. **Shell Shuffle**: a cup shuffle game where viewers track their team's ball.
+1. Core engine plus the first event, **Ring of Doom**: the last ball left inside a spinning ring wins. (done)
+2. League layer (standings, crown, storylines, a viewer name queue) and a story director that simulates hundreds of seeds headless and picks the most dramatic real run. (done)
+3. **Shell Shuffle**: a cup shuffle game where viewers track their team's ball. (done)
 4. **Disaster Drop**: a vertical obstacle race with disasters and a crusher chasing the pack.
 5. **Turf War**, **Great Escape** and **Champion Duel**.
 
@@ -55,12 +55,14 @@ each have theirs, but that wiring happens in a later phase, not now.
 
 ## Status
 
-**Phase 1: done.** **Phase 2: done.** The league layer, storylines, the
-names queue and the story director (`mine`) are all in. `render` and
-`find-seed` now build the episode from `league/season.json` automatically;
-`colorwars commit <episode_id>` is the only thing that writes it. See
-`README.md` for every command, `docs/phase-1.md` / `docs/phase-2.md` for
-the full briefs.
+**Phase 1: done.** **Phase 2: done.** **Phase 3 (Shell Shuffle): done.**
+The league layer, storylines, the names queue and the story director
+(`mine`) are all in. `render` and `find-seed` now build the episode from
+`league/season.json` automatically; `colorwars commit <episode_id>` is the
+only thing that writes it. Shell Shuffle is a second full event (a cup
+shuffle game) on the same render/audio/league/packaging pipeline, with its
+own drama scoring. See `README.md` for every command, `docs/phase-1.md` /
+`docs/phase-2.md` / `docs/event-shell-shuffle.md` for the full briefs.
 
 Real numbers on this machine, Phase 1: `find-seed` found seed 2 valid on
 the 2nd try. Full render: 127s. `--preview` render: 28s.
@@ -76,7 +78,99 @@ state were reset afterward — the repo ships with a fresh, empty
 `league/season.json` (real schema, zero episodes) rather than my test run's
 results.
 
+Real numbers, Phase 3: `mine --event shell_shuffle --runs 500` finished in
+**1.7s** (no physics to simulate, just choreography) and found **500/500
+valid seeds** — far above the done-when bar. Same full validation loop run
+for real as Phase 2: `mine` → `render --best` (seed 19, score 18.0, winner
+yellow, an upset against the default crown) → `commit ep001` → `render`
+again for ep002, which correctly showed the post-ep001 standings and a
+freshly generated crown-pressure storyline. Test episode/season/names-queue
+state was reset afterward, same as Phase 2.
+
 ## Decisions log
+
+### Phase 3
+
+- **Shell Shuffle is pure choreography, not physics.** Every move (swap,
+  double swap, fake swap, orbit, lift tease) is a deterministic function of
+  a seeded plan plus elapsed time within the move — no pymunk body, no
+  collision resolution. This also means the video's total length is a pure
+  function of config (seed only picks *which* pair swaps or *which* trick
+  plays, never changes how long anything takes), unlike Ring of Doom where
+  raw sim length varies by seed. `direct()` is correspondingly simple: a
+  flat 1:1 frame-to-sim-time mapping, no adaptive base-speed solve needed.
+- **`Event.drama_stats()` replaces a hardcoded call to `engine.drama.
+  analyze_drama()`, found necessary while building this, not assumed up
+  front.** analyze_drama's vocabulary (lead changes, near misses, wiped-out
+  teams) is meaningless for a cup game — worse, actually tried it first and
+  it produced actively wrong numbers (e.g. "wiped out before 15s" firing
+  constantly, since Shell Shuffle's `alive` flag means "ball currently
+  visible," which is false almost the entire episode). `drama_stats()` is
+  now a method on the shared `Event` interface with a concrete default
+  (Ring of Doom's `analyze_drama`, unchanged behavior) that an event
+  overrides when its own drama signal doesn't fit. `is_valid()` was already
+  a de facto requirement (both events implement it, mining/find_seed both
+  call it) but was never actually declared on the `Event` ABC until now —
+  formalized it as abstract instead of relying on duck typing.
+- **A second real architecture bug found and fixed while integrating, not
+  just while building the new event:** `cover.png` selection lived as
+  Ring-of-Doom-specific logic (near-miss hunting) hardcoded directly in the
+  shared `pipeline.py`, silently ignoring the `Timeline.cover_frame_index`
+  field that already existed for exactly this purpose. Shell Shuffle set
+  `cover_frame_index` correctly (the win moment) but the shared pipeline
+  never read it, so its first real cover.png came out picking an
+  undramatic mid-transition frame — caught by actually looking at the
+  rendered cover image, not by reading the code. Fixed by moving the near-
+  miss search into Ring of Doom's own `direct.py` (which already computes
+  the pieces it needs) and having the shared pipeline just honor
+  `timeline.cover_frame_index` for any event.
+- **Round 3's "reject if any cup sits still" is a hard constraint in
+  `is_valid()`, not a scoring penalty** — matches the brief's wording
+  exactly ("reject", not "reward less") and keeps `is_valid()` as the one
+  place both `find-seed` and `mine` agree on "is this seed usable at all."
+  Measured as total on-screen travel distance per cup during round 3 only
+  (reset at the round boundary so the jump into/out of the window never
+  counts), with a 6px floor — chosen conservatively small since even a
+  lift tease or a fake swap, which never changes a cup's resting slot,
+  still moves it visibly by a few pixels.
+- **"Orbit" is not a literal circular path.** With all 4 rest positions
+  collinear (a single row on a table — true to "4 cups on a table," per the
+  brief), polar interpolation around any fixed pivot collapses to only two
+  possible angles, giving no usable spread to animate through. Each cup
+  instead lerps straight from its current slot to the next one in rotation
+  order, with a shared outward bulge (away from the table center,
+  magnitude from config) layered on top — visually reads as the group
+  swinging around the center together without needing true circular
+  geometry.
+- **"One cup passes in front" is decided by scale, not screen position.**
+  `BallState.angle` is repurposed to hold each cup's current draw scale
+  (documented in `sim.py`'s module docstring); `draw.py` sorts cups
+  ascending by that value each frame and draws in that order, so the
+  bigger (closer) cup in a swap is always drawn last/on top — this also
+  covers the orbit and static cases for free, since their scale stays near
+  1.0 and draw order among them doesn't visually matter.
+- **Mining's story-director filters (`--winner`, `--comeback`, `--min-lead-
+  changes`, `--photo-finish`) stayed Ring of Doom specific rather than
+  generalizing to a cross-event filter system** — the brief only asked for
+  Shell Shuffle's own reward signal to land in its *score*, not new CLI
+  flags. `_passes()` and the CLI's result printer were still made
+  defensive (`.get()` with safe defaults) so running `mine` against an
+  event whose `drama_stats()` doesn't have a given key degrades to "that
+  filter doesn't apply" instead of crashing.
+- **"Drumroll" has no literal precedent in Phase 1** — the brief said
+  "plus the drumroll and win sting from phase 1," but Phase 1 never built
+  anything literally named drumroll; its closest relative is the heartbeat
+  voice (a sequence of thumps that tightens near the end). Reused that
+  technique (an accelerating sequence of discrete hits, retuned to noise
+  bursts instead of sine thumps) rather than inventing an unrelated sound.
+  "Win sting" by contrast *is* reused verbatim — the identical
+  `synth.major_chord_arpeggio` call Ring of Doom's sound.py already makes.
+- **Known limitation, not fixed this phase:** round 1 and round 2 pick each
+  swap's pair independently every beat, with no anti-repeat logic — a pair
+  can occasionally swap, then swap right back on the very next beat. Not a
+  correctness issue and not uncommon in a real shell game, but flagged as
+  a possible visual-variety improvement for a future pass rather than
+  silently accepted as deliberate.
 
 ### Phase 2
 

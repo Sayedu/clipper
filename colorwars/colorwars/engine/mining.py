@@ -13,15 +13,11 @@ from dataclasses import dataclass
 from multiprocessing import Pool
 
 from .config import REPO_ROOT, Settings, load_event_config, load_teams
-from .drama import analyze_drama
+from .registry import get_event
 
 
 def _get_event(event_id: str):
-    if event_id == "ring_of_doom":
-        from ..events.ring_of_doom.event import RingOfDoomEvent
-
-        return RingOfDoomEvent()
-    raise ValueError(f"unknown event: {event_id!r}")
+    return get_event(event_id)
 
 
 def _mine_one(task: tuple[int, str, dict]) -> dict | None:
@@ -43,10 +39,10 @@ def _mine_one(task: tuple[int, str, dict]) -> dict | None:
     if not (settings.duration_min_sec <= duration <= settings.duration_max_sec):
         return None
 
-    drama = analyze_drama(record, episode.get("crown_team"))
+    drama = event.drama_stats(record, episode)
     row = {"seed": seed, "winner": record.winner_team_id, "mvp": record.mvp_name,
            "duration_sec": round(duration, 2)}
-    row.update(drama.to_dict())
+    row.update(drama)
     return row
 
 
@@ -60,15 +56,19 @@ class MineFilters:
 
 
 def _passes(row: dict, f: MineFilters) -> bool:
+    """The --comeback/--min-lead-changes/--photo-finish flags are Ring of
+    Doom specific (its drama_stats() is the only one with these keys) --
+    on an event whose drama dict doesn't have them, .get() just treats
+    them as not applying rather than crashing mine() for every seed."""
     if f.winner and row["winner"] != f.winner:
         return False
     if f.not_winner and row["winner"] == f.not_winner:
         return False
-    if f.comeback and not row["was_last_after_15"]:
+    if f.comeback and not row.get("was_last_after_15", False):
         return False
-    if row["lead_changes"] < f.min_lead_changes:
+    if row.get("lead_changes", 0) < f.min_lead_changes:
         return False
-    if f.photo_finish and row["final_two_sec"] < 6.0:
+    if f.photo_finish and row.get("final_two_sec", 0.0) < 6.0:
         return False
     return True
 

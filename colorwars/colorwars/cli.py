@@ -16,19 +16,14 @@ from pathlib import Path
 from .engine.config import REPO_ROOT, Settings, load_teams
 from .engine.mining import MineFilters, mine as run_mine
 from .engine.pipeline import build_episode_from_season, commit_episode, find_seed, run_render
-
-_REGISTRY = {}
+from .engine.registry import get_event
 
 
 def _get_event(event_id: str):
-    if event_id not in _REGISTRY:
-        if event_id == "ring_of_doom":
-            from .events.ring_of_doom.event import RingOfDoomEvent
-
-            _REGISTRY[event_id] = RingOfDoomEvent()
-        else:
-            raise SystemExit(f"unknown event: {event_id!r} (known: ring_of_doom)")
-    return _REGISTRY[event_id]
+    try:
+        return get_event(event_id)
+    except ValueError as e:
+        raise SystemExit(str(e)) from e
 
 
 def _best_seed_from_csv(event_id: str) -> int:
@@ -125,11 +120,15 @@ def main(argv: list[str] | None = None) -> int:
                                           start_seed=args.start, processes=args.processes)
         dt = time.time() - t0
         print(f"mined {args.runs} seeds in {dt:.1f}s -- {total_valid} valid and matching filters")
+        # drama_stats() fields are event-specific (Ring of Doom: lead
+        # changes, near misses...; Shell Shuffle: cup distances, upset...),
+        # so this prints whatever each row actually has instead of assuming
+        # one event's field names.
+        common = {"seed", "winner", "mvp", "duration_sec", "score"}
         for row in top_rows:
+            extra = "  ".join(f"{k} {v}" for k, v in row.items() if k not in common)
             print(f"  seed {row['seed']:>6}  score {row['score']:>6.1f}  "
-                  f"winner {row['winner']:<7} leadchg {row['lead_changes']}  "
-                  f"finaltwo {row['final_two_sec']:.1f}s  nearmiss {row['near_misses']}  "
-                  f"comeback {row['was_last_after_15']}")
+                  f"winner {row['winner']:<7}  mvp {row['mvp']:<10}  {extra}")
         print(f"wrote out/mine_{args.event}.csv")
         return 0
 

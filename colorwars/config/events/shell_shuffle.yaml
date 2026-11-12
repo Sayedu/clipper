@@ -1,0 +1,69 @@
+event:
+  id: shell_shuffle
+  name: "Shell Shuffle"
+
+physics_hz: 60  # pure choreography, no collision resolution needed -- 1 step per video frame is plenty
+
+table:
+  center: [540, 900]
+  slot_spacing: 230     # px between adjacent cup slots along the row
+  cup_radius: 95
+  arc_height_front: 55  # px the "in front" cup rises during a swap
+  arc_height_back: 30   # px the "behind" cup dips during a swap
+  scale_front: 1.14
+  scale_back: 0.90
+  orbit_radius: 170
+  lift_height: 150       # px a fully-lifted cup rises to show its ball
+  lift_tease_max: 0.35   # lift fraction cap for a tease -- stays below the reveal threshold
+
+reveal:
+  show_sec: 2.0
+  drop_sec: 0.6
+
+rounds:
+  - swaps: 10
+    swap_sec: 1.2
+    pause_sec: 0.1
+    tricks: false
+  - swaps: 16
+    swap_sec: 0.75
+    pause_sec: 0.1
+    tricks: false
+  - swaps: 24
+    swap_sec: 0.65
+    pause_sec: 0.1
+    tricks: true
+
+trick_weights:  # round 3 beat-type mix -- a seeded pick from this flattened pool each beat
+  swap: 3
+  double_swap: 2
+  fake_swap: 2
+  orbit: 1
+  lift_tease: 2
+
+got_it:
+  lift_sec: 0.5
+  hold_sec: 0.7
+  drop_sec: 0.6
+
+podium:
+  move_sec: 1.5
+  freeze_sec: 3.0
+  # (x offset from table center, y offset from table center) per placement, 1st..4th
+  slots:
+    - [-330, -70]
+    - [-110, 30]
+    - [110, 55]
+    - [330, 110]
+
+reveal_sequence:
+  lift_sec: 0.4
+  hold_sec: 0.6
+  win_extra_sec: 0.8
+
+outro:
+  confetti_hold_sec: 2.0
+  standings_sec: 5.0
+
+mining:
+  still_threshold_px: 6.0  # a cup's total round-3 travel below this counts as "sat still"

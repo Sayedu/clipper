@@ -16,12 +16,12 @@ from ..league.names_queue import consume_names, peek_names
 from ..league.storylines import pick_hook_and_teaser
 from ..render.video import extract_cover, mux_audio, render_video
 from .config import Settings, Team, load_episode, load_event_config, load_teams
-from .drama import analyze_drama
 from .event import Event
 from .records import SimRecord, Timeline
 
 EVENT_HASHTAGS = {
     "ring_of_doom": ["ringofdoom", "lastballstanding"],
+    "shell_shuffle": ["shellshuffle", "findtheball"],
 }
 
 
@@ -114,21 +114,29 @@ def run_render(
     final_path = out_dir / "final.mp4"
     mux_audio(video_only, wav_path, final_path, settings.ffmpeg_path, settings.target_lufs)
 
+    # cover_frame_index is each event's own call (Ring of Doom: its best
+    # near miss in the final two; Shell Shuffle: the 1st-place reveal) --
+    # the shared pipeline just honors it instead of re-deriving a "best
+    # frame" from Ring of Doom's own event vocabulary (near_miss) here.
     cover_path = out_dir / "cover.png"
-    cover_sim_t = _best_near_miss_time_in_final_two(record) or timeline.frame_sim_time[timeline.freeze_frame_index or -1]
-    cover_frame = _nearest_frame(timeline, cover_sim_t)
-    extract_cover(final_path, cover_path, cover_frame / fps, settings.ffmpeg_path)
+    extract_cover(final_path, cover_path, timeline.cover_frame_index / fps, settings.ffmpeg_path)
 
     video_only.unlink(missing_ok=True)
     wav_path.unlink(missing_ok=True)
 
-    drama = analyze_drama(record, episode.get("crown_team"))
+    drama = event.drama_stats(record, episode)
 
     # which names (per team) this render actually used -- commit() needs this
     # to dequeue the right entries from names.txt; peek_names() is read-only
-    # so this doesn't touch the queue itself.
-    per_team = int(event_cfg["balls"]["per_team"])
-    names_used = {t.name: peek_names(t.name, per_team, settings.names_path, settings.blocklist_path) for t in teams}
+    # so this doesn't touch the queue itself. Per-team ball count is read off
+    # the actual SimRecord rather than event_cfg, since that count is a
+    # different shape per event (Ring of Doom: 4 physics balls per team;
+    # Shell Shuffle: 1 cup-ball per team) and record.balls is always right.
+    per_team_counts: dict[str, int] = {}
+    for b in record.balls:
+        per_team_counts[b.team_id] = per_team_counts.get(b.team_id, 0) + 1
+    names_used = {t.name: peek_names(t.name, per_team_counts.get(t.id, 1), settings.names_path, settings.blocklist_path)
+                  for t in teams}
 
     meta = {
         "seed": seed,
@@ -149,7 +157,7 @@ def run_render(
             "hazards": sum(1 for e in record.events if e.kind == "hazard"),
             "shields_used": sum(1 for e in record.events if e.kind == "shield"),
         },
-        "drama": drama.to_dict(),
+        "drama": drama,
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
@@ -224,27 +232,3 @@ def commit_episode(settings: Settings, teams: list[Team], out_dir: Path) -> dict
         consume_names(names_used, settings.names_path, settings.names_used_path)
 
     return season
-
-
-def _best_near_miss_time_in_final_two(record: SimRecord):
-    misses = [e for e in record.events if e.kind == "near_miss"]
-    if not misses:
-        return None
-    # "in the final two": only misses that happened once <=2 balls were alive
-    final_two_misses = []
-    for e in misses:
-        step_idx = min(len(record.steps) - 1, round(e.t * record.physics_hz))
-        alive = sum(1 for b in record.steps[step_idx].balls if b.alive)
-        if alive <= 2:
-            final_two_misses.append(e)
-    pool = final_two_misses or misses
-    return max(pool, key=lambda e: e.data.get("peak_r", 0.0)).t
-
-
-def _nearest_frame(timeline: Timeline, sim_t: float) -> int:
-    best_i, best_d = 0, float("inf")
-    for i, st in enumerate(timeline.frame_sim_time):
-        d = abs(st - sim_t)
-        if d < best_d:
-            best_d, best_i = d, i
-    return best_i

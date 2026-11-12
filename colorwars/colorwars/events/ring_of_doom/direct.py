@@ -49,6 +49,21 @@ def _two_balls_left_time(record: SimRecord) -> float | None:
     return None
 
 
+def _best_near_miss_time_in_final_two(record: SimRecord) -> float | None:
+    misses = [e for e in record.events if e.kind == "near_miss"]
+    if not misses:
+        return None
+    # "in the final two": only misses that happened once <=2 balls were alive
+    final_two_misses = []
+    for e in misses:
+        step_idx = min(len(record.steps) - 1, round(e.t * record.physics_hz))
+        alive = sum(1 for b in record.steps[step_idx].balls if b.alive)
+        if alive <= 2:
+            final_two_misses.append(e)
+    pool = final_two_misses or misses
+    return max(pool, key=lambda e: e.data.get("peak_r", 0.0)).t
+
+
 def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps: int) -> Timeline:
     sim_total = record.sim_duration_sec()
     last_elim = _find_last_elimination(record)
@@ -189,7 +204,17 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     #    plus the directorial drone/heartbeat/sting in the final stretch --
     audio_cues = _build_audio_cues(record, frame_sim_time, fps, freeze_frame_index, total_frames)
 
-    cover_frame_index = freeze_frame_index  # the frozen near-the-win frame doubles as cover.png
+    # cover.png: the closest near miss in the final two reads better than a
+    # plain freeze frame -- this used to live in the shared pipeline as a
+    # special case keyed off event_id; moved here since "what's my best
+    # cover frame" is squarely this event's own call, same as Shell
+    # Shuffle picking its own 1st-place reveal moment.
+    cover_sim_t = _best_near_miss_time_in_final_two(record)
+    cover_frame_index = freeze_frame_index
+    if cover_sim_t is not None:
+        frame_at = _sim_time_to_frame(frame_sim_time, cover_sim_t)
+        if frame_at is not None:
+            cover_frame_index = frame_at
 
     return Timeline(
         fps=fps,
