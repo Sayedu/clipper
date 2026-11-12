@@ -216,12 +216,19 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
         if frame_at is not None:
             cover_frame_index = frame_at
 
+    # the ring never moves, so the camera (what frame_zoom zooms around)
+    # just sits on its fixed center the whole video -- disaster_drop is the
+    # first event that needs this to actually move.
+    cam_x, cam_y = 540.0, 820.0
+
     return Timeline(
         fps=fps,
         total_frames=total_frames,
         frame_sim_time=frame_sim_time,
         frame_speed=frame_speed,
         frame_zoom=frame_zoom,
+        frame_camera_x=[cam_x] * total_frames,
+        frame_camera_y=[cam_y] * total_frames,
         overlays=overlays,
         audio_cues=audio_cues,
         cover_frame_index=cover_frame_index,

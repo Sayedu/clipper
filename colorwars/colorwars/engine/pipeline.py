@@ -22,6 +22,7 @@ from .records import SimRecord, Timeline
 EVENT_HASHTAGS = {
     "ring_of_doom": ["ringofdoom", "lastballstanding"],
     "shell_shuffle": ["shellshuffle", "findtheball"],
+    "disaster_drop": ["disasterdrop", "marblerace"],
 }
 
 

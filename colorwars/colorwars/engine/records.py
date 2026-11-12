@@ -96,6 +96,8 @@ class Timeline:
     frame_sim_time: list[float]  # len == total_frames; sim seconds to sample for frame i
     frame_speed: list[float]  # len == total_frames; the slow-mo multiplier active at frame i
     frame_zoom: list[float]  # len == total_frames; camera zoom (1.0 = no zoom)
+    frame_camera_x: list[float]  # len == total_frames; world-space point the camera (and zoom) is centered on
+    frame_camera_y: list[float]  # an event with a fixed camera (Ring of Doom, Shell Shuffle) holds this constant
     overlays: list[OverlayCue]
     audio_cues: list[AudioCue]
     cover_frame_index: int

@@ -18,7 +18,7 @@ each have theirs, but that wiring happens in a later phase, not now.
 1. Core engine plus the first event, **Ring of Doom**: the last ball left inside a spinning ring wins. (done)
 2. League layer (standings, crown, storylines, a viewer name queue) and a story director that simulates hundreds of seeds headless and picks the most dramatic real run. (done)
 3. **Shell Shuffle**: a cup shuffle game where viewers track their team's ball. (done)
-4. **Disaster Drop**: a vertical obstacle race with disasters and a crusher chasing the pack.
+4. **Disaster Drop**: a vertical obstacle race with disasters and a crusher chasing the pack. (done)
 5. **Turf War**, **Great Escape** and **Champion Duel**.
 
 ## Rules for the whole project
@@ -56,13 +56,17 @@ each have theirs, but that wiring happens in a later phase, not now.
 ## Status
 
 **Phase 1: done.** **Phase 2: done.** **Phase 3 (Shell Shuffle): done.**
-The league layer, storylines, the names queue and the story director
-(`mine`) are all in. `render` and `find-seed` now build the episode from
-`league/season.json` automatically; `colorwars commit <episode_id>` is the
-only thing that writes it. Shell Shuffle is a second full event (a cup
-shuffle game) on the same render/audio/league/packaging pipeline, with its
-own drama scoring. See `README.md` for every command, `docs/phase-1.md` /
-`docs/phase-2.md` / `docs/event-shell-shuffle.md` for the full briefs.
+**Phase 4 (Disaster Drop): done.** The league layer, storylines, the names
+queue and the story director (`mine`) are all in. `render` and `find-seed`
+build the episode from `league/season.json` automatically; `colorwars
+commit <episode_id>` is the only thing that writes it. Three full events
+now share the one render/audio/league/packaging pipeline -- Ring of Doom
+(real physics, speed-stretched to fit the 61-70s window), Shell Shuffle
+(pure choreography, no physics), Disaster Drop (real physics, course
+*length* is the duration knob instead of a speed stretch). See
+`README.md` for every command, `docs/phase-1.md` / `docs/phase-2.md` /
+`docs/event-shell-shuffle.md` / `docs/event-disaster-drop.md` for the full
+briefs.
 
 Real numbers on this machine, Phase 1: `find-seed` found seed 2 valid on
 the 2nd try. Full render: 127s. `--preview` render: 28s.
@@ -87,7 +91,124 @@ again for ep002, which correctly showed the post-ep001 standings and a
 freshly generated crown-pressure storyline. Test episode/season/names-queue
 state was reset afterward, same as Phase 2.
 
+Real numbers, Phase 4: `mine --event disaster_drop --runs 300` finished in
+**29.7s** and found **76/300 valid** (~25% -- see the decisions log on why
+that rate, not Ring of Doom's ~80%+, is still the right call here), far
+above the done-when bar. Top-ranked seeds showed real drama by design, not
+luck: 10-13 lead changes, winning margins as tight as 0.66s. Same full
+validation loop as the other phases: `mine` → `render --best` (seed 97,
+score 54.5, winner blue) → `commit ep001` → `render` again for ep002,
+which correctly showed the post-ep001 standings and a crown-pressure
+storyline. Test state reset afterward.
+
 ## Decisions log
+
+### Phase 4
+
+- **The validity rate (~25%) is lower than Ring of Doom's (~80%+), and
+  that's an accepted trade-off, not a bug left unfixed.** 12 balls funneling
+  through a 7-module obstacle course genuinely do jam at chokepoints
+  sometimes -- found directly (an isolated trap turned out to be a pile of
+  7+ balls within 200px of each other), not assumed. Real fixes landed for
+  three module types that were outright broken (see below), plus wider
+  gaps, a smaller ball radius, and a stronger/smarter anti-stuck nudge, but
+  pushing congestion-with-12-balls to near-zero would cost much more tuning
+  time than the payoff: `find-seed`/`mine` exist precisely to try many
+  cheap seeds and keep the good ones, and 76 valid seeds out of 300 in
+  29.7s is nowhere near a practical bottleneck.
+- **Three real course-geometry bugs, found by actually dropping balls
+  through each module in isolation rather than trusting the code:**
+  `trapdoor_floor` and `bumper_maze`'s flat horizontal resting surfaces let
+  a ball settle with zero net horizontal force and sit forever (one test
+  showed 9+ seconds motionless) -- fixed by sloping them toward their gap,
+  steeply enough that gravity clearly beats friction (a first, shallower
+  slope just produced a ~35px/s equilibrium creep, slow enough to dodge the
+  anti-stuck check without ever truly stopping -- caught by tracing one
+  ball's actual recorded velocity, not by re-running the same shallow test).
+  `split_paths`' divider had the identical bug in a new shape: a
+  *symmetric* roof cap just relocated the zero-net-force point to the
+  cap's apex. Fixed with an asymmetric lean (no symmetric balance point to
+  land on) instead of another symmetric shape.
+- **`zigzag_ramp`'s gap was 57px wide -- barely wider than two ball radii
+  -- a near-guaranteed jam with 12 balls funneling through nearly single
+  file.** Found by tracing a real stuck ball back to this exact module.
+  Widened to 230px, and funnel/trapdoor/bumper_maze gaps were widened too
+  once the same class of risk was recognized.
+- **Course geometry isn't stored on SimRecord.** Disaster Drop's course is
+  a seeded sequence of 7 possible module types with real pymunk shapes --
+  far more data than a generic dataclass should carry for one event. Since
+  `generate_course()` has no physics to step (pure geometry construction),
+  draw.py just reruns it from `record.seed` the same way `simulate()` did
+  originally, through a small `render_geometry()` extraction helper that
+  turns pymunk shapes into plain (segment/circle/spinner) data, cached per
+  seed. This leans on the same determinism guarantee the whole project is
+  built on rather than widening the shared data contract for one event.
+- **Timeline gained `frame_camera_x`/`frame_camera_y`.** `frame_zoom`
+  already existed (Ring of Doom zooms toward a fixed point), but nothing
+  needed the camera to actually *move* until this event's "follow the
+  leading ball, zoom out as the pack spreads" requirement. Ring of Doom and
+  Shell Shuffle now set these to a constant every frame (one line each) --
+  real work, not just a stub, since Timeline's fields have no defaults and
+  skipping either event would have broken its Timeline construction.
+- **A real correctness bug found only by looking at a rendered frame, not
+  by reading the code:** `BallState.alive` is repurposed here (documented
+  in sim.py) to mean "still an active racer," which is `False` for *both*
+  a ball that finished and one the crusher eliminated -- not enough on its
+  own to draw them differently. draw.py used `alive` alone to decide the
+  death-eyes mark, so the eventual winner's own ball showed up crossed out
+  dead in its own victory shot. Fixed by reconstructing each ball's real
+  outcome (`finished` vs `eliminated`, with the time it happened) from
+  `record.events`, cached per seed.
+- **`is_valid()` requires a real finish, not just "a team got resolved."**
+  A team resolves either by finishing or by being fully wiped out: without
+  checking which one actually happened, a race where the crusher
+  eliminated all 12 balls before anyone crossed the line still produced a
+  "winner" (whoever's best ball got furthest before dying) -- caught by
+  the same rendered-frame inspection that found the X-eyes bug above, not
+  assumed fixed by that bug alone.
+- **`event.drama_stats()` takes the brief's own wording ("DRAMA SCORE
+  ADDITIONS") literally: this event *adds to* `engine.drama.analyze_drama`'s
+  score rather than overriding it, unlike Shell Shuffle.** Its repurposed
+  `alive` flag ("still an active racer") lines up well enough with Ring of
+  Doom's generic vocabulary (lead_change/near_miss/elimination, all real
+  SimEvents this event actually logs) that reusing it as a base is
+  genuinely meaningful here, not misleading the way it was for a cup game.
+  `near_miss` specifically reuses Ring of Doom's exact armed/resolved
+  threshold-crossing pattern, tracking the crusher's closing gap on
+  whichever ball is currently furthest behind -- which also directly
+  answers the brief's own "how close the crusher got to the last ball."
+- **Duration is controlled by course length (module count), not a speed
+  stretch, on purpose, not just because it was simpler.** The brief says
+  "the miner may change the number of modules so the final video lands
+  between 61 and 70s" -- read as: module count is itself seeded (already
+  true, needed no new code), so different seeds naturally land at
+  different durations, and `find-seed`/`mine`'s existing duration check
+  filters for ones that land well, the same mechanism Ring of Doom already
+  has. Speed-stretching a race the way Ring of Doom stretches Ring of Doom
+  would undercut the "race" framing (viewers expect real-time physics, not
+  arbitrarily paced ones) -- flagged as a deliberate design choice, not
+  just the easy path.
+- **A damping bug, found by directly measuring open-space terminal
+  velocity rather than trusting the configured number:** `space.damping`
+  is a PER-SECOND decay constant that Chipmunk already raises to `dt`
+  internally -- applying `** dt` again in code (an easy mistake to make
+  reasoning from first principles) nearly cancelled it, so balls fell at
+  essentially undamped free-fall speed regardless of the configured value.
+  Confirmed and fixed by dropping a single ball with no obstacles and
+  measuring its actual terminal velocity before and after.
+- **Hammer is an instant impulse, not a literal animated swinging body
+  balls collide with** -- a deliberate scope trade-off given everything
+  else this phase needed (course generation, the crusher, 6 disaster
+  types, a moving camera), flagged the same way Phase 2 flagged the
+  shield's velocity-damping approximation. The *sound and overlay card*
+  still sell "a bar swings across a lane"; only the physics is simplified.
+- **Known limitation, not fixed this phase:** round 1/2-style anti-repeat
+  logic doesn't exist for module type selection (consecutive modules of
+  the same kind are excluded, but beyond that it's a flat seeded pick), and
+  the crusher's speed curve is a simple linear acceleration rather than
+  anything that reacts to how the actual pack is doing. Both are
+  reasonable follow-ups if a future pass wants tighter pacing control, not
+  required for this phase's done-when bar.
 
 ### Phase 3
 

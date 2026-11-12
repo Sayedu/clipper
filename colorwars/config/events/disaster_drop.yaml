@@ -1,0 +1,69 @@
+event:
+  id: disaster_drop
+  name: "Disaster Drop"
+
+physics:
+  step_hz: 240
+  max_speed: 2400
+  wall_thickness: 7
+  anti_stuck_distance_px: 20
+  anti_stuck_window_sec: 1.2
+  stuck_trap_sec: 5.0       # cumulative stuck time (even across nudges) that invalidates the whole seed --
+                            # looser than Ring of Doom's 30px/1.5s/3s: this event's balls normally move much
+                            # slower (damped, obstacle-dense course) so the same numbers would false-positive
+  gravity: 900
+  damping: 0.05             # pymunk applies this as the PER-SECOND decay constant itself (it
+                            # internally raises it to dt) -- do not re-exponentiate this in code
+
+playfield:
+  x_min: 120
+  x_max: 960
+
+balls:
+  radius: 19
+  per_team: 3
+  elasticity: 0.8
+  friction: 0.3
+
+course:
+  modules_min: 7
+  modules_max: 9
+  module_height_min: 1050
+  module_height_max: 1350
+  start_margin_px: 900      # empty drop space above the first module -- also how much the
+                            # 12 balls' starting heights get staggered, so they don't all
+                            # arrive at the first bottleneck in one dense simultaneous pack
+  finish_margin_px: 220     # empty space below the last module before the finish line
+
+crusher:
+  start_y: -500
+  start_speed: 60           # px/s
+  accel: 1.5                # px/s^2
+
+disasters:
+  interval_min_sec: 6.0
+  interval_max_sec: 9.0
+  warning_sec: 1.0
+  types: [lightning, hammer, wall, boost, gravity_flip, magnet]
+  lightning_freeze_sec: 1.2
+  hammer_sweep_sec: 1.5
+  hammer_impulse: 900
+  wall_duration_sec: 2.5
+  boost_impulse: 700
+  gravity_flip_sec: 1.5
+  magnet_duration_sec: 1.8
+  magnet_force: 2200
+  crown_weight: 2.0
+  leader_weight: 1.5
+
+timing:
+  sim_deadline_sec: 80.0
+  finish_tail_sec: 3.0
+  video_min_sec: 61.0
+  video_max_sec: 70.0
+
+camera:
+  smoothing_per_sec: 3.2    # higher = camera catches up to the leader faster
+  zoom_min: 0.6
+  spread_zoom_start_px: 650
+  spread_zoom_full_px: 2100

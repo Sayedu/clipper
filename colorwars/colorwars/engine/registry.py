@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from .event import Event
 
-KNOWN_EVENT_IDS = ["ring_of_doom", "shell_shuffle"]
+KNOWN_EVENT_IDS = ["ring_of_doom", "shell_shuffle", "disaster_drop"]
 
 
 def get_event(event_id: str) -> Event:
@@ -20,4 +20,8 @@ def get_event(event_id: str) -> Event:
         from ..events.shell_shuffle.event import ShellShuffleEvent
 
         return ShellShuffleEvent()
+    if event_id == "disaster_drop":
+        from ..events.disaster_drop.event import DisasterDropEvent
+
+        return DisasterDropEvent()
     raise ValueError(f"unknown event: {event_id!r} (known: {', '.join(KNOWN_EVENT_IDS)})")

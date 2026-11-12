@@ -3,9 +3,10 @@
 Deterministic 2D physics engine that renders Color Wars League episodes.
 Phase 1: the core engine + Ring of Doom. Phase 2: the league layer (season
 standings, crown, storylines, a viewer names queue) and the story director
-(drama mining). Phase 3: a second event, Shell Shuffle, on the same
-pipeline. See `docs/phase-1.md` / `docs/phase-2.md` /
-`docs/event-shell-shuffle.md` for the full briefs and `CLAUDE.md` for the
+(drama mining). Phase 3: a second event, Shell Shuffle. Phase 4: a third
+event, Disaster Drop, a real-physics vertical obstacle race. See
+`docs/phase-1.md` / `docs/phase-2.md` / `docs/event-shell-shuffle.md` /
+`docs/event-disaster-drop.md` for the full briefs and `CLAUDE.md` for the
 project plan, rules and decisions made so far.
 
 ## Setup
@@ -41,6 +42,7 @@ A run is only "valid" if it leaves a single ball by the 66s sim deadline.
 ```bash
 .venv/bin/python -m colorwars render --event ring_of_doom --seed 2
 .venv/bin/python -m colorwars render --event shell_shuffle --seed 1
+.venv/bin/python -m colorwars render --event disaster_drop --seed 1
 ```
 
 Writes to `out/<episode_id>/` (episode id comes from `config/episode.yaml`):
@@ -95,6 +97,10 @@ formula.
 
 .venv/bin/python -m colorwars mine --event shell_shuffle --runs 500 --top 5
 # ~2s on this machine (no physics to simulate), typically 500/500 valid
+
+.venv/bin/python -m colorwars mine --event disaster_drop --runs 300 --top 5
+# ~30s on this machine, typically ~25% valid (a real course-congestion risk with 12
+# balls, not just a rare edge case -- is_valid() filters it, mine() just tries more seeds)
 ```
 
 Writes every valid+matching seed to `out/mine_<event>.csv` (score-
@@ -161,6 +167,12 @@ colorwars/
     events/shell_shuffle/  sim.py (choreography, no physics engine), direct.py, draw.py, sound.py,
                             drama.py (its own drama_stats()/is_valid(), too different from Ring of
                             Doom's to share), event.py
+    events/disaster_drop/  sim.py (real pymunk physics -- 12 balls, a crusher, 6 disaster types),
+                            course.py (seeded module generation + a render_geometry() extraction
+                            helper draw.py uses), direct.py (a smoothed/zooming camera, the one
+                            thing unique to this event's edit), draw.py, sound.py, drama.py (adds
+                            to analyze_drama's score rather than overriding it -- this event's
+                            "alive" flag lines up with the generic vocabulary), event.py
     render/video.py        shared: raw RGBA frames -> ffmpeg -> mp4
     audio/                 shared: synthesis primitives (synth.py) + mixing (mix.py)
     cli.py                 `python -m colorwars ...`

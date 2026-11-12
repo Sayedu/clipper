@@ -20,11 +20,13 @@ from pathlib import Path
 import skia
 
 from colorwars.engine.config import REPO_ROOT, Settings, load_episode, load_event_config, load_teams
+from colorwars.events.disaster_drop.event import DisasterDropEvent
 from colorwars.events.ring_of_doom.event import RingOfDoomEvent
 from colorwars.events.shell_shuffle.event import ShellShuffleEvent
 
 KNOWN_VALID_SEED = 2
 SHELL_SHUFFLE_SEED = 1  # every seed is valid by construction (scripted, not simulated-to-failure); 1 is just stable to pin
+DISASTER_DROP_SEED = 1  # checked once via `find-seed --event disaster_drop`
 
 
 def _load(event_id: str = "ring_of_doom"):
@@ -148,3 +150,67 @@ def test_shell_shuffle_rejects_a_cup_that_never_moves_in_round3():
                         mvp_name="n0", duration_steps=len(steps))
 
     assert shuffle_is_valid(record) is False
+
+
+def test_disaster_drop_simulate_is_deterministic():
+    settings, teams, cfg, episode = _load("disaster_drop")
+    event = DisasterDropEvent()
+
+    r1 = event.simulate(DISASTER_DROP_SEED, settings, cfg, teams, episode)
+    r2 = event.simulate(DISASTER_DROP_SEED, settings, cfg, teams, episode)
+
+    assert len(r1.steps) == len(r2.steps)
+    assert r1.placements == r2.placements
+    assert r1.winner_team_id == r2.winner_team_id
+    assert r1.mvp_name == r2.mvp_name
+    assert len(r1.events) == len(r2.events)
+    for s1, s2 in zip(r1.steps, r2.steps):
+        for b1, b2 in zip(s1.balls, s2.balls):
+            assert b1.x == b2.x and b1.y == b2.y and b1.vx == b2.vx and b1.vy == b2.vy and b1.alive == b2.alive
+
+
+def test_disaster_drop_render_three_seconds_twice_matches_by_hash():
+    settings, teams, cfg, episode = _load("disaster_drop")
+    event = DisasterDropEvent()
+
+    record = event.simulate(DISASTER_DROP_SEED, settings, cfg, teams, episode)
+    assert event.is_valid(record)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+
+    n_frames = min(settings.preview_fps * 3, timeline.total_frames)
+
+    def render_hashes() -> list[str]:
+        event.init_render(settings)
+        surface = skia.Surface(settings.preview_width, settings.preview_height)
+        hashes = []
+        for frame_idx in range(n_frames):
+            with surface as canvas:
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+            img = surface.makeImageSnapshot()
+            hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
+        return hashes
+
+    hashes_a = render_hashes()
+    hashes_b = render_hashes()
+
+    assert len(hashes_a) == n_frames
+    assert hashes_a == hashes_b
+
+
+def test_disaster_drop_rejects_a_race_nobody_finishes():
+    """is_valid() must require a real finisher, not just "someone had the
+    best progress when the crusher wiped everyone" -- a rendered frame
+    showed this directly (the "winner"'s own ball had the same X-eyes
+    elimination mark as everything the crusher actually hit)."""
+    from colorwars.engine.records import BallInfo, SimEvent, SimRecord
+    from colorwars.events.disaster_drop.drama import is_valid as drop_is_valid
+
+    balls = [BallInfo(id=i, team_id=t, team_name=t.title(), name=f"n{i}", base_radius=19.0)
+             for i, t in enumerate(["red", "blue", "green", "yellow"])]
+    events = [SimEvent(0, 10.0, "elimination", {"ball_id": i, "team_id": t, "cause": "crusher"})
+              for i, t in enumerate(["red", "blue", "green", "yellow"])]
+    record = SimRecord(seed=1, event_id="disaster_drop", physics_hz=240, steps=[], events=events,
+                        balls=balls, teams=[], winner_team_id="blue",
+                        placements=["blue", "red", "green", "yellow"], mvp_name="n1", duration_steps=0)
+
+    assert drop_is_valid(record) is False

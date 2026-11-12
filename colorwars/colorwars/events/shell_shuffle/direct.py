@@ -59,6 +59,8 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
 
     frame_speed = [1.0] * total_frames
     frame_zoom = [1.0] * total_frames
+    frame_camera_x = [540.0] * total_frames
+    frame_camera_y = [960.0] * total_frames
 
     overlays = _build_overlays(record, frame_sim_time, total_frames, episode)
     audio_cues = _build_audio_cues(record, frame_sim_time, fps)
@@ -74,6 +76,8 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
         frame_sim_time=frame_sim_time,
         frame_speed=frame_speed,
         frame_zoom=frame_zoom,
+        frame_camera_x=frame_camera_x,
+        frame_camera_y=frame_camera_y,
         overlays=overlays,
         audio_cues=audio_cues,
         cover_frame_index=cover_frame_index,
