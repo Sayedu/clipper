@@ -1,0 +1,24 @@
+event:
+  id: turf_war
+  name: "Turf War"
+
+grid:
+  size: 28
+  cell_px: 30
+  origin: [120, 300]  # top-left corner of the 840x840 arena
+
+ball:
+  radius: 11
+  speed: 260          # px/s, constant magnitude except while the speed power-up is active
+
+powerups:
+  interval_sec: 8.0
+  bomb_radius_cells: 1   # 1 = a 3x3 block centered on the power-up cell
+  ghost_cells: 3
+  speed_mult: 1.3
+  speed_duration_sec: 4.0
+
+timing:
+  sim_deadline_sec: 58.0
+  video_min_sec: 61.0
+  video_max_sec: 70.0

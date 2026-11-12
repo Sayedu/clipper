@@ -23,6 +23,7 @@ EVENT_HASHTAGS = {
     "ring_of_doom": ["ringofdoom", "lastballstanding"],
     "shell_shuffle": ["shellshuffle", "findtheball"],
     "disaster_drop": ["disasterdrop", "marblerace"],
+    "turf_war": ["turfwar", "territory"],
 }
 
 

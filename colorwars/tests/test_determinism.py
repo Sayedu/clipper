@@ -23,10 +23,12 @@ from colorwars.engine.config import REPO_ROOT, Settings, load_episode, load_even
 from colorwars.events.disaster_drop.event import DisasterDropEvent
 from colorwars.events.ring_of_doom.event import RingOfDoomEvent
 from colorwars.events.shell_shuffle.event import ShellShuffleEvent
+from colorwars.events.turf_war.event import TurfWarEvent
 
 KNOWN_VALID_SEED = 2
 SHELL_SHUFFLE_SEED = 1  # every seed is valid by construction (scripted, not simulated-to-failure); 1 is just stable to pin
 DISASTER_DROP_SEED = 1  # checked once via `find-seed --event disaster_drop`
+TURF_WAR_SEED = 1  # checked once via `find-seed --event turf_war`
 
 
 def _load(event_id: str = "ring_of_doom"):
@@ -214,3 +216,64 @@ def test_disaster_drop_rejects_a_race_nobody_finishes():
                         placements=["blue", "red", "green", "yellow"], mvp_name="n1", duration_steps=0)
 
     assert drop_is_valid(record) is False
+
+
+def test_turf_war_simulate_is_deterministic():
+    settings, teams, cfg, episode = _load("turf_war")
+    event = TurfWarEvent()
+
+    r1 = event.simulate(TURF_WAR_SEED, settings, cfg, teams, episode)
+    r2 = event.simulate(TURF_WAR_SEED, settings, cfg, teams, episode)
+
+    assert len(r1.steps) == len(r2.steps)
+    assert r1.placements == r2.placements
+    assert r1.winner_team_id == r2.winner_team_id
+    assert r1.mvp_name == r2.mvp_name
+    assert len(r1.events) == len(r2.events)
+    for s1, s2 in zip(r1.steps, r2.steps):
+        for b1, b2 in zip(s1.balls, s2.balls):
+            assert b1.x == b2.x and b1.y == b2.y and b1.vx == b2.vx and b1.vy == b2.vy and b1.alive == b2.alive
+
+
+def test_turf_war_render_three_seconds_twice_matches_by_hash():
+    settings, teams, cfg, episode = _load("turf_war")
+    event = TurfWarEvent()
+
+    record = event.simulate(TURF_WAR_SEED, settings, cfg, teams, episode)
+    assert event.is_valid(record)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+
+    n_frames = min(settings.preview_fps * 3, timeline.total_frames)
+
+    def render_hashes() -> list[str]:
+        event.init_render(settings)
+        surface = skia.Surface(settings.preview_width, settings.preview_height)
+        hashes = []
+        for frame_idx in range(n_frames):
+            with surface as canvas:
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+            img = surface.makeImageSnapshot()
+            hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
+        return hashes
+
+    hashes_a = render_hashes()
+    hashes_b = render_hashes()
+
+    assert len(hashes_a) == n_frames
+    assert hashes_a == hashes_b
+
+
+def test_turf_war_initial_grid_is_fixed_quadrants():
+    from colorwars.events.turf_war.sim import initial_grid
+
+    team_ids = ["red", "blue", "green", "yellow"]
+    grid = initial_grid(28, team_ids)
+    assert grid[0][0] == "red"
+    assert grid[0][27] == "blue"
+    assert grid[27][0] == "green"
+    assert grid[27][27] == "yellow"
+    counts = {tid: 0 for tid in team_ids}
+    for row in grid:
+        for owner in row:
+            counts[owner] += 1
+    assert all(c == 196 for c in counts.values())
