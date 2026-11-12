@@ -56,24 +56,6 @@ export function TopBar({ right }: { right?: React.ReactNode }) {
       <nav className="flex items-center gap-5 text-[14px] text-[color:var(--color-muted)]">
         {right}
         <ThemeToggle />
-        <Link href="/colorwar" className="hover:text-[color:var(--color-text)]">
-          Color War
-        </Link>
-        <Link href="/colorwar-season" className="hover:text-[color:var(--color-text)]">
-          Seasons
-        </Link>
-        <Link href="/followball" className="hover:text-[color:var(--color-text)]">
-          Follow Ball
-        </Link>
-        <Link href="/eyetest" className="hover:text-[color:var(--color-text)]">
-          Eye Test
-        </Link>
-        <Link href="/quotes" className="hover:text-[color:var(--color-text)]">
-          Reminders
-        </Link>
-        <Link href="/laser-duel" className="hover:text-[color:var(--color-text)]">
-          Laser Duel
-        </Link>
         <Link href="/schedule" className="hover:text-[color:var(--color-text)]">
           Schedule
         </Link>

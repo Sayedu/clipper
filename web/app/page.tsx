@@ -8,8 +8,10 @@ import { useJobStream } from '@/lib/useJobStream';
 import { CandidateReview } from '@/components/CandidateReview';
 import { ColorWarStudio } from '@/components/ColorWarStudio';
 import { ContentTypePicker } from '@/components/ContentTypePicker';
+import { ContentTypeIcon } from '@/components/ContentTypeIcons';
 import { FollowBallStudio } from '@/components/FollowBallStudio';
 import { EyeTestStudio } from '@/components/EyeTestStudio';
+import { PauseGameStudio } from '@/components/PauseGameStudio';
 import { QuotesStudio } from '@/components/QuotesStudio';
 import { LaserNationsStudio } from '@/components/LaserNationsStudio';
 import { DoctorBanner } from '@/components/DoctorBanner';
@@ -29,7 +31,7 @@ type Phase = 'boot' | 'idle' | 'running' | 'input' | 'review' | 'error';
 // (settings.laserNationsMode === 'duel') — plain territory mode still uses
 // the generic settings-driven autonomous flow — so it's checked separately
 // wherever this list is, rather than living in it.
-const STUDIO_CONTENT_TYPES: ContentType[] = ['colorwar', 'followball', 'eyetest', 'quotes'];
+const STUDIO_CONTENT_TYPES: ContentType[] = ['colorwar', 'followball', 'eyetest', 'pausegame', 'quotes'];
 const isLaserDuel = (settings: Settings) => settings.contentType === 'lasernations' && settings.laserNationsMode === 'duel';
 
 export default function DashboardPage() {
@@ -272,29 +274,34 @@ export default function DashboardPage() {
         {/* ---------------- IDLE · studio (Color War / Follow the ball / Eye test / Laser Duel) ---------------- */}
         {phase === 'idle' && (STUDIO_CONTENT_TYPES.includes(settings.contentType) || isLaserDuel(settings)) && (
           <div className="clip-fade-up">
-            <header className="mb-8">
-              <h1 className="text-[28px] font-semibold tracking-tight">
-                {settings.contentType === 'colorwar'
-                  ? 'Color War'
-                  : settings.contentType === 'followball'
-                  ? 'Follow The Ball'
-                  : settings.contentType === 'eyetest'
-                  ? 'Eye Test'
-                  : settings.contentType === 'quotes'
-                  ? 'Reminders'
-                  : 'Laser Nations: Duel'}
-              </h1>
-              <p className="mt-1.5 text-[15px] text-[color:var(--color-muted)]">
-                {settings.contentType === 'colorwar'
-                  ? 'Reroll seeds until you like one, then render and download it. The finished clip has the “Who Will Win?” text, the TikTok-safe framing, sound and a ready-to-paste caption baked in.'
-                  : settings.contentType === 'followball'
-                  ? 'Reroll seeds until you like a shuffle, then render and download it. The finished clip has the TikTok-safe framing, the shell-game sound, the end-card score list and a caption baked in.'
-                  : settings.contentType === 'eyetest'
-                  ? 'Reroll seeds until you like a run, then render and download it. The finished clip has the target highlight, the freeze-and-reveal beat, sound and a caption baked in.'
-                  : settings.contentType === 'quotes'
-                  ? 'Reroll seeds until you like the line, then render and download it. Silent, dark, 15 seconds — a setup line, a pause, then the punch lands. A ready-to-paste caption comes free.'
-                  : 'Pick two fighters, decide who wins (or let it play out), then render. Health bars, power-ups, and a fight-poster cover come free.'}
-              </p>
+            <header className="mb-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <ContentTypeIcon
+                  type={isLaserDuel(settings) ? 'lasernations' : settings.contentType}
+                  className="h-6 w-6 text-[color:var(--color-accent)]"
+                />
+                <h1 className="text-[22px] font-semibold tracking-tight">
+                  {settings.contentType === 'colorwar'
+                    ? 'Color War'
+                    : settings.contentType === 'followball'
+                    ? 'Follow The Ball'
+                    : settings.contentType === 'eyetest'
+                    ? 'Eye Test'
+                    : settings.contentType === 'pausegame'
+                    ? 'Pause Game'
+                    : settings.contentType === 'quotes'
+                    ? 'Reminders'
+                    : 'Laser Duel'}
+                </h1>
+              </div>
+              {isLaserDuel(settings) && (
+                <button
+                  onClick={() => patchSettings({ laserNationsMode: 'territory' })}
+                  className="text-[13px] text-[color:var(--color-muted)] hover:text-[color:var(--color-text)]"
+                >
+                  Switch to Territory
+                </button>
+              )}
             </header>
 
             <ContentTypePicker
@@ -302,13 +309,15 @@ export default function DashboardPage() {
               onChange={(v) => patchSettings({ contentType: v })}
             />
 
-            <div className="mt-8">
+            <div className="mt-7">
               {settings.contentType === 'colorwar' ? (
                 <ColorWarStudio />
               ) : settings.contentType === 'followball' ? (
                 <FollowBallStudio />
               ) : settings.contentType === 'eyetest' ? (
                 <EyeTestStudio />
+              ) : settings.contentType === 'pausegame' ? (
+                <PauseGameStudio />
               ) : settings.contentType === 'quotes' ? (
                 <QuotesStudio />
               ) : (
@@ -321,21 +330,15 @@ export default function DashboardPage() {
         {/* ---------------- IDLE ---------------- */}
         {phase === 'idle' && !STUDIO_CONTENT_TYPES.includes(settings.contentType) && !isLaserDuel(settings) && (
           <div className="clip-fade-up">
-            <header className="mb-10">
-              <h1 className="text-[28px] font-semibold tracking-tight">
+            <header className="mb-6 flex items-center gap-2.5">
+              <ContentTypeIcon type={settings.contentType} className="h-6 w-6 text-[color:var(--color-accent)]" />
+              <h1 className="text-[22px] font-semibold tracking-tight">
                 {settings.contentType === 'colorrace'
-                  ? 'New color race'
+                  ? 'Color Race'
                   : settings.contentType === 'escaperace'
-                    ? 'New escape race'
-                    : 'New laser nations'}
+                    ? 'Escape Race'
+                    : 'Laser Nations'}
               </h1>
-              <p className="mt-1.5 text-[15px] text-[color:var(--color-muted)]">
-                {settings.contentType === 'colorrace'
-                  ? 'Renders a fresh "which colour wins?" marble race down a neon obstacle course — boost pads, mud traps, spinning blades, a chase camera and a photo finish. New course and new winner every run.'
-                  : settings.contentType === 'escaperace'
-                  ? 'Generates a fresh "which color escapes first?" ring-escape race — spinning neon rings, ascending bounce notes, a new winner every run. Post it and ask viewers to pick.'
-                  : 'Renders a fresh neon territory sim — four nations bounce leaving glowing laser trails and slice each other’s, and the highest score at the buzzer wins. New nations and a new winner every run.'}
-              </p>
             </header>
 
             <SettingsForm

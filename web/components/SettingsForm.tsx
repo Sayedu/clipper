@@ -93,10 +93,6 @@ export function SettingsForm({
             />
           </Field>
         </div>
-        <p className="text-[13px] text-[color:var(--color-muted)]">
-          No source video, no AI writing — a physics race rendered from scratch with synthesised
-          bounce sounds, sized to fit under TikTok&rsquo;s buttons. Every run is a brand-new map and a new winner.
-        </p>
       </fieldset>
     );
   }
@@ -143,11 +139,6 @@ export function SettingsForm({
             />
           </Field>
         </div>
-        <p className="text-[13px] text-[color:var(--color-muted)]">
-          No source video, no AI writing — colored balls bounce out of a stack of skinny spinning
-          neon rings, one rotating gap each. Soft music-box notes that climb as balls get deeper,
-          a big neon winner card. Every run is a brand-new race and a new winner.
-        </p>
       </fieldset>
     );
   }
@@ -157,11 +148,19 @@ export function SettingsForm({
       <fieldset disabled={disabled} className="space-y-9 disabled:opacity-60">
         {contentTypeControl}
 
+        <Field label="Mode">
+          <SegmentedControl<'territory' | 'duel'>
+            value={settings.laserNationsMode}
+            onChange={(v) => onChange({ laserNationsMode: v })}
+            options={[
+              { value: 'territory', label: 'Territory — 4 nations' },
+              { value: 'duel', label: 'Duel — 1v1 fight' },
+            ]}
+          />
+        </Field>
+
         <div className="grid grid-cols-2 gap-x-5 gap-y-9">
-          <Field
-            label="Match length"
-            hint={`~${settings.laserNationsMatchSec}s on the clock (35–65s) + a short winner card. Four random nations every run.`}
-          >
+          <Field label="Match length" hint={`~${settings.laserNationsMatchSec}s + a winner card`}>
             <input
               type="range"
               min={35}
@@ -177,17 +176,8 @@ export function SettingsForm({
         <Toggle
           checked={settings.laserNationsBlackHole}
           onChange={(v) => onChange({ laserNationsBlackHole: v })}
-          label="Black hole (a vortex opens near the end — touch the core and you're out; highest score still wins)"
+          label="Black hole sudden-death finish"
         />
-
-        <p className="text-[13px] text-[color:var(--color-muted)]">
-          No source video, no AI writing — a 2D physics sim rendered from scratch. Four flagged balls
-          bounce around a widening neon arena leaving glowing laser trails and slicing each other&rsquo;s;
-          the pace steps up every 5 seconds. Each nation&rsquo;s score climbs the whole match for the
-          territory it holds, and the highest score at the buzzer wins. Soft, relaxing music-box tones,
-          a big flag + score on the winner card. With the black hole on, get pulled into the core and
-          you detonate.
-        </p>
       </fieldset>
     );
   }
