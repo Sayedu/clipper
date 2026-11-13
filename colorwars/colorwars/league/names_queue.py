@@ -28,6 +28,13 @@ def _read_queue(names_path: Path) -> list[tuple[str, str]]:
     return out
 
 
+def read_queue_lines(names_path: Path) -> list[tuple[str, str]]:
+    """Public read-only alias of _read_queue() -- the Studio's API uses
+    this directly (e.g. to build a scratch queue for custom names) rather
+    than reaching into a leading-underscore name from another package."""
+    return _read_queue(names_path)
+
+
 def peek_names(team_name: str, count: int, names_path: Path, blocklist_path: Path) -> list[str]:
     if count <= 0:
         # a real case, not just a defensive guard: Champion Duel is 1v1, so

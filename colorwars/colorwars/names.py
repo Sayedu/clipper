@@ -11,9 +11,16 @@ from pathlib import Path
 _CLEAN_RE = re.compile(r"[^A-Za-z0-9_]")
 
 
+def strip_invalid_chars(raw: str) -> str:
+    """The same cleaning clean_name() does, minus its 12-char truncation --
+    exposed separately so a caller (the Studio's raw-comment parser) can
+    tell "too long" apart from "fine once truncated" before committing to
+    either outcome."""
+    return _CLEAN_RE.sub("", raw).strip("_")
+
+
 def clean_name(raw: str) -> str:
-    cleaned = _CLEAN_RE.sub("", raw).strip("_")
-    return cleaned[:12]
+    return strip_invalid_chars(raw)[:12]
 
 
 def load_blocklist(path: Path) -> set[str]:

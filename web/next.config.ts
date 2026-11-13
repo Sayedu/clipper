@@ -16,6 +16,10 @@ const workerHost = process.env.WORKER_HOST ?? '127.0.0.1';
 const workerPort = process.env.WORKER_PORT ?? '8787';
 const workerBase = `http://${workerHost}:${workerPort}`;
 
+const colorwarsApiHost = process.env.COLORWARS_API_HOST ?? '127.0.0.1';
+const colorwarsApiPort = process.env.COLORWARS_API_PORT ?? '8799';
+const colorwarsApiBase = `http://${colorwarsApiHost}:${colorwarsApiPort}`;
+
 // When the dashboard runs on a remote box (e.g. an Oracle Cloud VM) you open it
 // by IP or Tailscale name, not localhost — `next dev` blocks that as cross-origin
 // unless the host is allow-listed. Comma-separated hostnames in DEV_ORIGINS.
@@ -32,7 +36,13 @@ const nextConfig: NextConfig = {
 
   // The browser only ever talks to this origin; everything backend is proxied.
   async rewrites() {
-    return [{ source: '/worker/:path*', destination: `${workerBase}/:path*` }];
+    return [
+      { source: '/worker/:path*', destination: `${workerBase}/:path*` },
+      // The colorwars Studio's own local API (see colorwars/colorwars/studio_api) —
+      // same same-origin-via-rewrite pattern as /worker above, so the browser
+      // never talks to it directly.
+      { source: '/colorwars-api/:path*', destination: `${colorwarsApiBase}/:path*` },
+    ];
   },
   // Allow <video> preview served from the worker.
   async headers() {

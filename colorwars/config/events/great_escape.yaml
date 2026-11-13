@@ -29,3 +29,7 @@ timing:
   sim_deadline_sec: 50.0
   video_min_sec: 61.0
   video_max_sec: 70.0
+
+replay:
+  win_slowmo_window_sec: 1.6
+  win_slowmo_speed: 0.4

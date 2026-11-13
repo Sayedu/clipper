@@ -15,8 +15,6 @@ import skia
 from ...engine.config import Settings, Team
 from ...engine.records import SimRecord, Timeline
 
-RING_RADIUS = 400.0
-RING_CENTER = (540.0, 820.0)
 GAP_NEAR_PX = 60.0
 TRAIL_STEPS_BACK = 6
 
@@ -25,38 +23,6 @@ def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
     h = hex_str.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return skia.Color(r, g, b, alpha)
-
-
-class _GlowCache:
-    """Pre-rendered radial-glow sprites, one per (color, radius) pair --
-    built once, blitted every frame. Never re-blurred per frame."""
-
-    def __init__(self):
-        self._cache: dict[tuple[str, int], skia.Image] = {}
-
-    def get(self, color_hex: str, radius: float) -> skia.Image:
-        key = (color_hex, int(radius))
-        img = self._cache.get(key)
-        if img is not None:
-            return img
-        size = int(radius * 4)
-        surface = skia.Surface(size, size)
-        with surface as canvas:
-            canvas.clear(skia.ColorTRANSPARENT)
-            cx = cy = size / 2
-            shader = skia.GradientShader.MakeRadial(
-                center=(cx, cy), radius=radius * 2,
-                colors=[_hex_to_color(color_hex, 160), _hex_to_color(color_hex, 0)],
-                positions=[0.0, 1.0],
-            )
-            paint = skia.Paint(Shader=shader, AntiAlias=True)
-            canvas.drawCircle(cx, cy, radius * 2, paint)
-        img = surface.makeImageSnapshot()
-        self._cache[key] = img
-        return img
-
-
-_GLOW = _GlowCache()
 
 
 def _vignette_paint(w: float, h: float) -> skia.Paint:
@@ -81,7 +47,8 @@ def _recent_events(record: SimRecord, sim_t: float, window: float, kinds: set[st
     return [e for e in record.events if e.kind in kinds and sim_t - window <= e.t <= sim_t]
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     w, h = float(settings.width), float(settings.height)
     sim_t = timeline.frame_sim_time[frame_idx]
     zoom = timeline.frame_zoom[frame_idx]
@@ -89,6 +56,15 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     overlays = _active_overlays(timeline, frame_idx)
     overlay_kinds = {o.kind for o in overlays}
     teams_by_id = {t.id: t for t in teams}
+
+    # must match whatever ring.* the actual simulate() call used -- never a
+    # hardcoded default. A Studio override of ring.radius/segments/center
+    # that this draw path ignored would desync the drawn wall from the real
+    # physics wall, visually reading as "the ball passed through solid wall".
+    ring_cfg = event_cfg["ring"]
+    ring_radius = float(ring_cfg["radius"])
+    ring_center = (float(ring_cfg["center"][0]), float(ring_cfg["center"][1]))
+    ring_segments = int(ring_cfg["segments"])
 
     # -- screen shake: a small, deterministic jitter near a recent elimination --
     recent_elims = _recent_events(record, sim_t, 0.15, {"elimination"})
@@ -106,16 +82,16 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     canvas.clear(_hex_to_color(settings.background_color))
     canvas.drawRect(skia.Rect(0, 0, w, h), _vignette_paint(w, h))
 
-    cx, cy = RING_CENTER
+    cx, cy = ring_center
 
     canvas.save()
     canvas.translate(cx, cy)
     canvas.scale(zoom, zoom)
     canvas.translate(-cx, -cy)
 
-    _draw_ring(canvas, step, sim_t, record, overlays)
-    _draw_particles(canvas, record, sim_t)
-    _draw_balls(canvas, step, record, teams_by_id, sim_t)
+    _draw_ring(canvas, step, sim_t, record, overlays, ring_center, ring_radius, ring_segments)
+    _draw_particles(canvas, record, sim_t, ring_center)
+    _draw_balls(canvas, step, record, teams_by_id, sim_t, ring_center, ring_radius)
 
     canvas.restore()  # back to un-zoomed, un-shaken-but-still-shaken-outer space
 
@@ -124,20 +100,15 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     _draw_hud(canvas, settings, record, episode_overlays=overlays, overlay_kinds=overlay_kinds, step=step, teams=teams)
 
 
-def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays) -> None:
-    cx, cy = RING_CENTER
+def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays, ring_center, ring_radius: float,
+               ring_segments: int) -> None:
+    cx, cy = ring_center
     gap_warning_active = any(e.kind == "warning" and e.data.get("about") == "gap" and abs(e.t - sim_t) < 1.0
                               for e in record.events)
 
     ring_color = "#B8C0CC"
-    glow_paint = skia.Paint(
-        AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=28,
-        Color=_hex_to_color(ring_color, 50),
-        ImageFilter=skia.ImageFilters.Blur(10, 10),
-    )
-    canvas.drawCircle(cx, cy, RING_RADIUS, glow_paint)
 
-    slot_deg = 360.0 / 96
+    slot_deg = 360.0 / ring_segments
     gaps = step.gaps_deg
     ring_angle_deg = math.degrees(step.ring_angle)
 
@@ -145,15 +116,15 @@ def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays) -> None:
     warn_paint = skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=12,
                              Color=_hex_to_color("#FF4D5E", 220))
 
-    for i in range(96):
+    for i in range(ring_segments):
         slot_center_local = (i + 0.5) * slot_deg
         covered = any(abs(((slot_center_local - c + 180) % 360) - 180) <= hw for c, hw in gaps)
         if covered:
             continue
         a0 = math.radians(i * slot_deg + ring_angle_deg)
         a1 = math.radians((i + 1) * slot_deg + ring_angle_deg)
-        p0 = (cx + RING_RADIUS * math.cos(a0), cy + RING_RADIUS * math.sin(a0))
-        p1 = (cx + RING_RADIUS * math.cos(a1), cy + RING_RADIUS * math.sin(a1))
+        p0 = (cx + ring_radius * math.cos(a0), cy + ring_radius * math.sin(a0))
+        p1 = (cx + ring_radius * math.cos(a1), cy + ring_radius * math.sin(a1))
         canvas.drawLine(p0[0], p0[1], p1[0], p1[1], wall_paint)
 
     if gap_warning_active:
@@ -163,12 +134,12 @@ def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays) -> None:
             a0 = math.radians(c - hw + ring_angle_deg)
             a1 = math.radians(c + hw + ring_angle_deg)
             path = skia.Path()
-            path.addArc(skia.Rect(cx - RING_RADIUS, cy - RING_RADIUS, cx + RING_RADIUS, cy + RING_RADIUS),
+            path.addArc(skia.Rect(cx - ring_radius, cy - ring_radius, cx + ring_radius, cy + ring_radius),
                         math.degrees(a0), math.degrees(a1 - a0))
             canvas.drawPath(path, warn_paint)
 
 
-def _draw_particles(canvas, record: SimRecord, sim_t: float) -> None:
+def _draw_particles(canvas, record: SimRecord, sim_t: float, ring_center) -> None:
     hits = _recent_events(record, sim_t, 0.4, {"collision", "elimination"})
     for e in hits:
         if e.kind == "collision" and e.data.get("impulse", 0) < 900:
@@ -178,7 +149,7 @@ def _draw_particles(canvas, record: SimRecord, sim_t: float) -> None:
         if age > life:
             continue
         frac = age / life
-        x, y = e.data.get("x", RING_CENTER[0]), e.data.get("y", RING_CENTER[1])
+        x, y = e.data.get("x", ring_center[0]), e.data.get("y", ring_center[1])
         color = skia.Color(255, 90, 90, int(255 * (1 - frac))) if e.kind == "elimination" else \
             skia.Color(255, 230, 160, int(200 * (1 - frac)))
         paint = skia.Paint(AntiAlias=True, Color=color)
@@ -190,7 +161,7 @@ def _draw_particles(canvas, record: SimRecord, sim_t: float) -> None:
             canvas.drawCircle(px, py, max(1.0, 4 * (1 - frac)), paint)
 
 
-def _draw_balls(canvas, step, record: SimRecord, teams_by_id: dict, sim_t: float) -> None:
+def _draw_balls(canvas, step, record: SimRecord, teams_by_id: dict, sim_t: float, ring_center, ring_radius: float) -> None:
     step_idx = _step_index(record, sim_t)
     for i, bs in enumerate(step.balls):
         info = record.balls[i]
@@ -211,14 +182,11 @@ def _draw_balls(canvas, step, record: SimRecord, teams_by_id: dict, sim_t: float
                 paint = skia.Paint(AntiAlias=True, Color=_hex_to_color(color_hex, alpha))
                 canvas.drawCircle(prev.x, prev.y, r * 0.8, paint)
 
-            glow = _GLOW.get(color_hex, r)
-            canvas.drawImage(glow, bs.x - glow.width() / 2, bs.y - glow.height() / 2)
-
             body_paint = skia.Paint(AntiAlias=True, Color=_hex_to_color(color_hex))
             canvas.drawCircle(bs.x, bs.y, r, body_paint)
 
-            dist_from_center = math.hypot(bs.x - RING_CENTER[0], bs.y - RING_CENTER[1])
-            near_wall = dist_from_center >= RING_RADIUS - GAP_NEAR_PX
+            dist_from_center = math.hypot(bs.x - ring_center[0], bs.y - ring_center[1])
+            near_wall = dist_from_center >= ring_radius - GAP_NEAR_PX
             _draw_eyes(canvas, bs, r, eliminated=False, widened=near_wall)
             _draw_label(canvas, bs, r, info.name)
         else:

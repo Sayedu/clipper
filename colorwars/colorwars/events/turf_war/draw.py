@@ -14,7 +14,6 @@ from ...engine.records import SimRecord, Timeline
 from .sim import initial_grid
 
 CELL_GAP = 1.5
-GRID_SIZE = 28  # duplicates config/events/turf_war.yaml's grid.size -- draw_frame has no event_cfg to read it from
 
 
 def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
@@ -23,9 +22,9 @@ def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
     return skia.Color(r, g, b, alpha)
 
 
-def _grid_state_at(record: SimRecord, sim_t: float) -> tuple[list[list[str]], dict[str, int]]:
+def _grid_state_at(record: SimRecord, sim_t: float, grid_size: int) -> tuple[list[list[str]], dict[str, int]]:
     team_ids = [t.id for t in record.teams]
-    grid = initial_grid(GRID_SIZE, team_ids)
+    grid = initial_grid(grid_size, team_ids)
     counts = {tid: 0 for tid in team_ids}
     for row in grid:
         for owner in row:
@@ -89,7 +88,8 @@ def _active_powerup_at(record: SimRecord, sim_t: float):
     return last_spawn
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     w, h = float(settings.width), float(settings.height)
     sim_t = timeline.frame_sim_time[frame_idx]
     step = record.steps[_step_index(record, sim_t)]
@@ -99,10 +99,15 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
 
     canvas.clear(_hex_to_color(settings.background_color))
 
-    grid, counts = _grid_state_at(record, sim_t)
-    size = len(grid)
-    cell_px = 840.0 / size
-    ox, oy = 120.0, 300.0
+    # must match sim.py's own grid.size/cell_px/origin reads exactly -- it
+    # derives none of these from the others (cell_px isn't 840/size, it's
+    # its own config leaf), so a Studio override to any one of them needs
+    # the real numbers here too, not an 840x840-arena assumption.
+    grid_cfg = event_cfg["grid"]
+    size = int(grid_cfg["size"])
+    cell_px = float(grid_cfg["cell_px"])
+    ox, oy = float(grid_cfg["origin"][0]), float(grid_cfg["origin"][1])
+    grid, counts = _grid_state_at(record, sim_t, size)
 
     paint = skia.Paint(AntiAlias=True)
     for r in range(size):

@@ -2,34 +2,40 @@
 SimRecord (it would be a lot of event-specific data bolted onto a generic
 dataclass) -- it's regenerated here from record.seed the same way
 simulate() built it originally (course generation is cheap and has no
-physics to step, just geometry), then cached per seed. Zero live
+physics to step, just geometry), then cached per (seed, cfg). Zero live
 randomness in the actual pixels, same rule as the other two events.
 """
 
 from __future__ import annotations
 
+import json
 import math
 
 import pymunk
 import skia
 
-from ...engine.config import REPO_ROOT, Settings, Team, load_event_config
+from ...engine.config import Settings, Team
 from ...engine.records import SimRecord, Timeline
 from ...engine.rng import Rng
 from .course import generate_course, render_geometry
 
-_COURSE_CACHE: dict[int, dict] = {}
+_COURSE_CACHE: dict[tuple[int, str], dict] = {}
 
 
-def _get_course_geometry(seed: int) -> dict:
-    if seed not in _COURSE_CACHE:
-        cfg = load_event_config(REPO_ROOT, "disaster_drop")
+def _get_course_geometry(seed: int, cfg: dict) -> dict:
+    # keyed by the actual cfg used, not just seed -- this is a long-running
+    # server process (the Studio's API), and the same seed can legitimately
+    # be rendered with different course overrides across requests; caching
+    # by seed alone silently reused a stale (and visually mismatched)
+    # course from an earlier request with different config.
+    key = (seed, json.dumps(cfg, sort_keys=True, default=str))
+    if key not in _COURSE_CACHE:
         rng = Rng(seed)
         space = pymunk.Space()
         x0, x1 = float(cfg["playfield"]["x_min"]), float(cfg["playfield"]["x_max"])
         modules, _height = generate_course(space, rng, cfg, x0, x1)
-        _COURSE_CACHE[seed] = render_geometry(space, modules)
-    return _COURSE_CACHE[seed]
+        _COURSE_CACHE[key] = render_geometry(space, modules)
+    return _COURSE_CACHE[key]
 
 
 def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
@@ -76,7 +82,8 @@ def _step_index(record: SimRecord, sim_t: float) -> int:
     return max(0, min(len(record.steps) - 1, idx))
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     w, h = float(settings.width), float(settings.height)
     sim_t = timeline.frame_sim_time[frame_idx]
     zoom = timeline.frame_zoom[frame_idx]
@@ -87,7 +94,7 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     overlays = _active_overlays(timeline, frame_idx)
     overlay_kinds = {o.kind for o in overlays}
     teams_by_id = {t.id: t for t in teams}
-    geometry = _get_course_geometry(record.seed)
+    geometry = _get_course_geometry(record.seed, event_cfg)
 
     canvas.clear(_hex_to_color(settings.background_color))
 

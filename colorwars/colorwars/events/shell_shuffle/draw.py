@@ -2,12 +2,13 @@
 of Doom's draw.py -- any visual "randomness" (confetti layout) is a
 deterministic function of frame index, never an RNG call here.
 
-Geometry constants below duplicate config/events/shell_shuffle.yaml's
-table/podium numbers -- draw_frame() only gets (record, timeline, settings,
-teams, frame_idx) per the shared Event interface, no event_cfg, so it can't
-read the YAML directly. Ring of Doom's draw.py already does the same thing
-(RING_RADIUS/RING_CENTER duplicate ring_of_doom.yaml) -- keep both in sync
-by hand if the YAML changes.
+cup_radius/lift_height come from event_cfg (the exact cfg simulate() used),
+not hardcoded -- the Studio can override table.cup_radius/table.lift_height
+per render, and a draw path that ignored the override would size/lift cups
+inconsistently with whatever sim.py actually used. table.center stays a
+plain constant here: it's a list, so the Studio's generic param walker
+never exposes it as an override (no "list" ParamSpec type), making it
+unreachable in practice -- revisit if a future curated spec changes that.
 """
 
 from __future__ import annotations
@@ -20,9 +21,6 @@ from ...engine.config import Settings, Team
 from ...engine.records import SimRecord, Timeline
 
 TABLE_CENTER = (540.0, 900.0)
-CUP_RADIUS = 95.0
-CUP_HEIGHT = CUP_RADIUS * 1.15
-LIFT_HEIGHT = 150.0
 PODIUM_SLOTS = [(-330.0, -70.0), (-110.0, 30.0), (110.0, 55.0), (330.0, 110.0)]
 RANK_LABELS = ["1ST", "2ND", "3RD", "4TH"]
 
@@ -100,13 +98,17 @@ def _cup_paint(base_y: float, h: float) -> skia.Paint:
     return skia.Paint(AntiAlias=True, Shader=shader)
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     w, h = float(settings.width), float(settings.height)
     sim_t = timeline.frame_sim_time[frame_idx]
     step = record.steps[_step_index(record, sim_t)]
     overlays = _active_overlays(timeline, frame_idx)
     overlay_kinds = {o.kind for o in overlays}
     teams_by_id = {t.id: t for t in teams}
+    table_cfg = event_cfg["table"]
+    cup_radius = float(table_cfg["cup_radius"])
+    lift_height = float(table_cfg["lift_height"])
 
     canvas.clear(_hex_to_color(settings.background_color))
     canvas.drawRect(skia.Rect(0, 0, w, h), _vignette_paint(w, h))
@@ -118,10 +120,11 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     # ascending by scale draws the smaller (farther) cup first.
     draw_order = sorted(range(4), key=lambda cup: step.balls[cup].angle)
     for cup in draw_order:
-        _draw_cup_and_ball(canvas, step.balls[cup], record.balls[cup], teams_by_id[record.balls[cup].team_id], settings)
+        _draw_cup_and_ball(canvas, step.balls[cup], record.balls[cup], teams_by_id[record.balls[cup].team_id], settings,
+                            cup_radius, lift_height)
 
     if "podium_labels" in overlay_kinds:
-        _draw_podium_labels(canvas, settings)
+        _draw_podium_labels(canvas, settings, cup_radius)
 
     _draw_hud(canvas, settings, overlays, overlay_kinds)
 
@@ -132,12 +135,12 @@ def _draw_table_shadow(canvas) -> None:
     canvas.drawOval(skia.Rect(cx - 520, cy + 10, cx + 520, cy + 60), paint)
 
 
-def _draw_cup_and_ball(canvas, bs, info, team: Team, settings: Settings) -> None:
+def _draw_cup_and_ball(canvas, bs, info, team: Team, settings: Settings, cup_radius: float, lift_height: float) -> None:
     x, base_y = bs.x, bs.y
     scale = bs.angle
     lift = max(0.0, min(1.0, bs.vy))
-    r = CUP_RADIUS * scale
-    cup_h = CUP_HEIGHT * scale
+    r = cup_radius * scale
+    cup_h = r * 1.15
 
     if lift > 0.0:
         glow = _GLOW.get(team.color, r * 0.6)
@@ -150,7 +153,7 @@ def _draw_cup_and_ball(canvas, bs, info, team: Team, settings: Settings) -> None
         if lift > 0.85:
             _draw_ball_label(canvas, settings, x, base_y, r, info.name)
 
-    cup_y = base_y - lift * LIFT_HEIGHT
+    cup_y = base_y - lift * lift_height
     path = _cup_path(x, cup_y, r, cup_h)
     canvas.drawPath(path, _cup_paint(cup_y, cup_h))
     rim_paint = skia.Paint(AntiAlias=True, Color=skia.Color(255, 255, 255, 40),
@@ -189,7 +192,7 @@ def init_fonts(settings: Settings) -> None:
     _LABEL_FONT = skia.Font(tf, 22)
 
 
-def _draw_podium_labels(canvas, settings: Settings) -> None:
+def _draw_podium_labels(canvas, settings: Settings, cup_radius: float) -> None:
     font = _heavy_font(settings, 34)
     paint = skia.Paint(AntiAlias=True, Color=skia.ColorWHITE)
     cx, cy = TABLE_CENTER
@@ -197,7 +200,7 @@ def _draw_podium_labels(canvas, settings: Settings) -> None:
         x, y = cx + dx, cy + dy
         text = RANK_LABELS[rank]
         tw = font.measureText(text)
-        canvas.drawString(text, x - tw / 2, y + CUP_RADIUS * 1.35, font, paint)
+        canvas.drawString(text, x - tw / 2, y + cup_radius * 1.35, font, paint)
 
 
 def _wrap_text(text: str, font: skia.Font, max_width: float) -> list[str]:

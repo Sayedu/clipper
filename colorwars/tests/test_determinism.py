@@ -76,7 +76,7 @@ def test_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes
@@ -121,7 +121,7 @@ def test_shell_shuffle_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes
@@ -191,7 +191,7 @@ def test_disaster_drop_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes
@@ -255,7 +255,7 @@ def test_turf_war_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes
@@ -316,7 +316,7 @@ def test_great_escape_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes
@@ -375,7 +375,7 @@ def test_champion_duel_render_three_seconds_twice_matches_by_hash():
         hashes = []
         for frame_idx in range(n_frames):
             with surface as canvas:
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
             img = surface.makeImageSnapshot()
             hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
         return hashes

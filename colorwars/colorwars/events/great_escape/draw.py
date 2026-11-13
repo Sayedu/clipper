@@ -8,20 +8,24 @@ to recover them, then computes each ring's current angle analytically
 
 from __future__ import annotations
 
+import json
 import math
 
 import skia
 
-from ...engine.config import REPO_ROOT, Settings, Team, load_event_config
+from ...engine.config import Settings, Team
 from ...engine.records import SimRecord, Timeline
 from ...engine.rng import Rng
 
-_RING_CACHE: dict[int, list[dict]] = {}
+_RING_CACHE: dict[tuple[int, str], list[dict]] = {}
 
 
-def _get_rings(seed: int) -> list[dict]:
-    if seed not in _RING_CACHE:
-        cfg = load_event_config(REPO_ROOT, "great_escape")
+def _get_rings(seed: int, cfg: dict) -> list[dict]:
+    # keyed by (seed, cfg) -- see disaster_drop's _get_course_geometry for
+    # why seed alone isn't enough once the Studio can override rings.* per
+    # request against this same long-running process.
+    key = (seed, json.dumps(cfg.get("rings", {}), sort_keys=True, default=str))
+    if key not in _RING_CACHE:
         rcfg = cfg["rings"]
         radii = [float(r) for r in rcfg["radii"]]
         speed_min, speed_max = float(rcfg["speed_min"]), float(rcfg["speed_max"])
@@ -32,8 +36,8 @@ def _get_rings(seed: int) -> list[dict]:
             omega_mag = rng.uniform(speed_min, speed_max)
             omega = omega_mag if i % 2 == 0 else -omega_mag
             rings.append({"radius": radius, "omega": omega, "gap_half_deg": gap_half})
-        _RING_CACHE[seed] = rings
-    return _RING_CACHE[seed]
+        _RING_CACHE[key] = rings
+    return _RING_CACHE[key]
 
 
 def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
@@ -83,7 +87,8 @@ def _shatter_t(record: SimRecord, radius: float) -> float | None:
     return None
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     sim_t = timeline.frame_sim_time[frame_idx]
     cam_x = timeline.frame_camera_x[frame_idx]
     cam_y = timeline.frame_camera_y[frame_idx]
@@ -92,7 +97,7 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     overlays = _active_overlays(timeline, frame_idx)
     overlay_kinds = {o.kind for o in overlays}
     teams_by_id = {t.id: t for t in teams}
-    rings = _get_rings(record.seed)
+    rings = _get_rings(record.seed, event_cfg)
     w, h = float(settings.width), float(settings.height)
 
     canvas.clear(_hex_to_color(settings.background_color))

@@ -198,15 +198,47 @@ npm test          # vitest (scoring, segment, ASS, crop, migration runner, coold
 
 ---
 
+## Color Wars Studio
+
+A second, separate section of the same dashboard at **http://localhost:3100/colorwars**
+("Color Wars" in the top nav) for the `colorwars/` engine — six physics-sim TikTok events
+(Ring of Doom, Shell Shuffle, Disaster Drop, Turf War, Great Escape, Champion Duel). Set up any
+event, lock or randomize settings, preview before rendering, mine hundreds of seeds for the
+most dramatic run, queue full renders, and manage the library/standings/names queue — all from
+the browser.
+
+`npm run dev` starts this too, no second command: it launches a small local FastAPI service
+(`colorwars/colorwars/studio_api`) alongside the worker and the dashboard, bound to
+`127.0.0.1` only. The dashboard reaches it the same way it reaches the worker — a same-origin
+Next.js rewrite (`/colorwars-api/*`), never a direct browser request to another port. It's
+skipped automatically (with a note in the log) if `colorwars/.venv` doesn't exist yet:
+
+```bash
+cd colorwars
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Engine-level details (events, CLI, phases) are in [`colorwars/CLAUDE.md`](colorwars/CLAUDE.md)
+and [`colorwars/README.md`](colorwars/README.md). Studio-specific tests:
+
+```bash
+colorwars/.venv/bin/python -m pytest colorwars/tests/      # API + engine tests
+cd web && npx playwright test e2e/colorwars-studio.spec.ts  # end-to-end (needs npm run dev running)
+```
+
+---
+
 ## Layout
 
 ```
-web/      Next.js dashboard (UI only; proxies to the worker)
-worker/   long-lived job runner — HTTP + SSE, SQLite + migrations, the 11-step pipeline
-python/   ML helpers (transcribe · scene-detect · reframe · screen · demucs_split), 3.12 venv
-assets/   caption fonts · face model · SFX packs
-data/     SQLite db · per-job scratch · saved clip library   (gitignored)
-scripts/  setup.sh · make-sfx.sh
+web/        Next.js dashboard (UI only; proxies to the worker and the colorwars API)
+worker/     long-lived job runner — HTTP + SSE, SQLite + migrations, the 11-step pipeline
+python/     ML helpers (transcribe · scene-detect · reframe · screen · demucs_split), 3.12 venv
+colorwars/  physics-sim video engine + its own local Studio API (own venv, own tests)
+assets/     caption fonts · face model · SFX packs
+data/       SQLite db · per-job scratch · saved clip library   (gitignored)
+scripts/    setup.sh · make-sfx.sh · dev.mjs (launches worker + web + colorwars API together)
 ```
 
 ## Notes

@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from .config import Settings, Team
+from .params import ParamSpec
 from .records import AudioCue, SimRecord, Timeline
 
 
@@ -51,10 +52,21 @@ class Event(ABC):
         settings: Settings,
         teams: list[Team],
         frame_idx: int,
+        event_cfg: dict,
     ) -> None:
         """Draw exactly one output frame onto the given skia.Canvas, sized
         to settings.width x settings.height (the shared renderer handles
-        scaling down for --preview, not the event)."""
+        scaling down for --preview, not the event).
+
+        event_cfg MUST be the exact same cfg dict simulate()/direct() were
+        called with for this record -- never re-loaded fresh from disk and
+        never a hardcoded default. The Studio can override any config leaf
+        per render (ring radius, grid size, course length, ...); a draw
+        path that assumes the on-disk default desyncs from the physics that
+        actually produced this record's ball positions -- found for real as
+        a ball visually "passing through a solid wall" when the ring's
+        config-driven radius/segment count had been overridden but the
+        renderer was still using its old hardcoded/disk-loaded geometry."""
 
     @abstractmethod
     def sound_voice(self, cue: AudioCue, sample_rate: int):
@@ -83,3 +95,17 @@ class Event(ABC):
         from .drama import analyze_drama
 
         return analyze_drama(record, episode.get("crown_team")).to_dict()
+
+    def params_schema(self, event_cfg: dict, teams: list[Team] | None = None) -> list[ParamSpec]:
+        """The Studio page builds its Setup form from this -- every event
+        gets a working (if plainly labeled) form for free by generically
+        walking its own event_cfg into param specs; an event overrides this
+        to prepend hand-curated specs (better labels/ranges/help text) for
+        its most important knobs ahead of the generic ones, deduping by
+        name so a curated spec always wins over its generic twin. `teams`
+        is passed through so an override can expose team-trait knobs the
+        event actually reads (e.g. Ring of Doom's mass_mult); the default
+        here ignores it since a plain config walk has no use for it."""
+        from .params import walk_config_params
+
+        return walk_config_params(event_cfg)

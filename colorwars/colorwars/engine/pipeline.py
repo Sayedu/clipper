@@ -99,6 +99,9 @@ def run_render(
     episode: dict,
     out_dir: Path,
     preview: bool = False,
+    volume_mult: float = 1.0,
+    on_frame=None,
+    should_cancel=None,
 ) -> dict:
     record: SimRecord = event.simulate(seed, settings, event_cfg, teams, episode)
     if not event.is_valid(record):
@@ -115,9 +118,11 @@ def run_render(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     video_only = out_dir / "_video_only.mp4"
-    render_video(event, record, timeline, settings, teams, video_only, width, height, fps)
+    render_video(event, record, timeline, settings, teams, event_cfg, video_only, width, height, fps,
+                 on_frame=on_frame, should_cancel=should_cancel)
 
-    bus = build_bus(timeline.audio_cues, event.sound_voice, settings.sample_rate, timeline.duration_sec())
+    bus = build_bus(timeline.audio_cues, event.sound_voice, settings.sample_rate, timeline.duration_sec(),
+                     volume_mult=volume_mult)
     wav_path = out_dir / "_audio.wav"
     write_wav(bus, settings.sample_rate, wav_path)
 

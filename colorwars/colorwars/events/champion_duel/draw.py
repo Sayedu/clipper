@@ -11,18 +11,9 @@ import math
 
 import skia
 
-from ...engine.config import REPO_ROOT, Settings, Team, load_event_config
+from ...engine.config import Settings, Team
 from ...engine.records import SimRecord, Timeline
 from .sim import _blue_shield_half_deg, _duel_power, _red_reach
-
-_CFG_CACHE: dict | None = None
-
-
-def _cfg() -> dict:
-    global _CFG_CACHE
-    if _CFG_CACHE is None:
-        _CFG_CACHE = load_event_config(REPO_ROOT, "champion_duel")
-    return _CFG_CACHE
 
 
 def _hex_to_color(hex_str: str, alpha: int = 255) -> int:
@@ -79,7 +70,8 @@ def _recent_hits(record: SimRecord, sim_t: float, window: float):
     return [e for e in record.events if e.kind == "hit" and sim_t - window <= e.t <= sim_t]
 
 
-def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int) -> None:
+def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings, teams: list[Team], frame_idx: int,
+               event_cfg: dict) -> None:
     sim_t = timeline.frame_sim_time[frame_idx]
     cam_x = timeline.frame_camera_x[frame_idx]
     cam_y = timeline.frame_camera_y[frame_idx]
@@ -89,7 +81,7 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     overlay_kinds = {o.kind for o in overlays}
     teams_by_id = {t.id: t for t in teams}
     w, h = float(settings.width), float(settings.height)
-    pcfg = _cfg()["powers"]
+    pcfg = event_cfg["powers"]
     is_replay = "replay" in overlay_kinds
 
     canvas.clear(_hex_to_color(settings.background_color))
@@ -101,8 +93,8 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     canvas.translate(-cam_x, -cam_y)
 
     # arena floor
-    origin = _cfg()["arena"]["origin"]
-    size = float(_cfg()["arena"]["size"])
+    origin = event_cfg["arena"]["origin"]
+    size = float(event_cfg["arena"]["size"])
     ox, oy = float(origin[0]), float(origin[1])
     floor_paint = skia.Paint(AntiAlias=True, Color=skia.Color(20, 24, 40),
                               Style=skia.Paint.kStroke_Style, StrokeWidth=4)

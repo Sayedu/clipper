@@ -4,6 +4,10 @@ web/.next/
 web/out/
 *.tsbuildinfo
 
+# Playwright's own run artifacts (traces, screenshots, HTML report)
+web/test-results/
+web/playwright-report/
+
 # python
 python/.venv/
 python/__pycache__/

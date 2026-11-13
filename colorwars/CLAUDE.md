@@ -9,9 +9,9 @@ commenting. Every video is 1080x1920, 60 fps, 61-70 seconds long, with fully
 synthesized sound.
 
 This lives at `colorwars/` inside the main `clipping` repo — not a separate
-project or git repo. It will eventually get its own section in the web
-dashboard, the same way Color War / Follow The Ball / Eye Test / Pause Game
-each have theirs, but that wiring happens in a later phase, not now.
+project or git repo. It now has its own section in the web dashboard (the
+Studio, at `/colorwars`) the same way Color War / Follow The Ball / Eye Test /
+Pause Game each have theirs — see "Website Studio" below.
 
 ## Plan (built one phase at a time — only the phase currently assigned gets built)
 
@@ -20,6 +20,7 @@ each have theirs, but that wiring happens in a later phase, not now.
 3. **Shell Shuffle**: a cup shuffle game where viewers track their team's ball. (done)
 4. **Disaster Drop**: a vertical obstacle race with disasters and a crusher chasing the pack. (done)
 5. **Turf War**, **Great Escape** and **Champion Duel** (events batch 2). (done)
+6. **Website Studio**: all six events exposed as a page on the main dashboard — setup/randomize/preview/mine/render/library/league. (done)
 
 ## Rules for the whole project
 
@@ -122,7 +123,159 @@ rounds) across several rounds of actual mechanical fixes -- see the
 decisions log for the full story, including the one it didn't fully
 solve.
 
+Website Studio: a FastAPI service (`colorwars/studio_api/`) imports the
+engine directly and exposes it as `/colorwars` on the main dashboard --
+Setup (schema-driven form, lock/Randomize/Reroll/Reset, presets), Preview
+(quick check, 6-frame filmstrip, 540x960 preview video), Story director
+(headless mining with story-flag filters), Render (a one-at-a-time disk-
+backed job queue, cancel, Make N), Library (cards with caption/pinned-
+comment copy, render-again, delete), and League (standings, storylines,
+head-to-head, a raw-comment names parser, commit-with-confirm). `npm run
+dev` launches it alongside the worker and the dashboard; the browser never
+talks to it directly (a same-origin Next.js rewrite, same pattern as
+`/worker`). 34 Python tests pass (17 engine + 17 new API tests) and the
+Playwright E2E spec (randomize → quick check → preview → fast render →
+library) passes reliably. Two real bugs were found and fixed by actually
+using the finished UI, not just by building it -- see the decisions log.
+
 ## Decisions log
+
+### Website Studio
+
+- **A real, user-reported bug, found the day this shipped: Ring of Doom
+  balls visually passing straight through a "solid" section of the
+  wall.** Root cause was structural, not a one-off: `draw_frame()` never
+  received the `event_cfg` that `simulate()`/`direct()` actually ran
+  with -- every event's renderer either hardcoded geometry constants that
+  duplicated the YAML (`RING_RADIUS`/`RING_CENTER`/a bare `96` for Ring of
+  Doom's segment count; `GRID_SIZE` for Turf War, which even had a comment
+  flagging it; `CUP_RADIUS`/`LIFT_HEIGHT` for Shell Shuffle) or reloaded
+  the config fresh from disk with a cache keyed by seed alone (Disaster
+  Drop, Great Escape) or forever (Champion Duel's cache was never
+  invalidated at all, for the life of the process). None of this mattered
+  before this phase -- nothing could override an event's config at
+  render time until the Studio's Randomize existed. Fixed by adding
+  `event_cfg: dict` to the shared `Event.draw_frame()` signature (and
+  `render_video()`'s), threading the real cfg through every call site
+  (the CLI render path, `studio_api/filmstrip.py`, and all 6 determinism
+  tests), and having each event's draw.py read ring/grid/course/arena
+  geometry from it instead of a stale value. Verified directly, not just
+  by re-running tests: overrode `ring.radius`/`ring.segments` via the API
+  and confirmed the rendered wall now sits exactly where the balls
+  physically are, by rendering and visually inspecting a frame before and
+  after the fix.
+- **Randomize could hand Ring of Doom a config no seed could ever satisfy
+  -- found by the Playwright E2E test itself, not assumed safe.** Two
+  distinct causes, both from the same root (the generic Advanced-group
+  param walker ranges every leaf independently, with no notion of which
+  leaves are related): (1) `_heuristic_range()` floors every positive
+  leaf's range at 0, so an int field like `ring.segments` could Randomize
+  down to exactly 0 -- an unconditional `ZeroDivisionError` in both
+  sim.py and draw.py (`360.0 / segments`). Fixed generically in
+  `params.py`: any int whose own default isn't already 0 gets its floor
+  raised to 1, covering every count/segments/Hz-like field across all six
+  events at once, not just Ring of Doom's. (2) `elimination_radius` and
+  `ring.radius` are randomized independently with overlapping ranges;
+  landing `elimination_radius <= ring.radius` eliminates balls at the
+  wall instead of past it, making a clean single-survivor outcome
+  rare-to-impossible for every seed, not just an unlucky one -- no amount
+  of "Reroll seed" fixes a bad *config*. Same failure mode existed for
+  `timing.sim_deadline_sec` (the sim's only real stopping condition)
+  randomized down near 0, leaving no time to ever resolve. Fixed by
+  curating these three fields for Ring of Doom with ranges chosen so
+  `elimination_radius > ring.radius` always holds and the deadline always
+  leaves real time to play out, rather than leaving them to the generic
+  fallback. This was found through an actual stress-test loop (reroll up
+  to 15 times on an invalid quick-check, mirroring the engine's own
+  `find-seed`), not by reasoning about ranges on paper -- a raw
+  before/after comparison script is what proved the fix (0/5 clean runs
+  before, 8/8 after for the segment fix, then a further fix after the
+  E2E test still intermittently failed on the deadline/elimination-radius
+  case).
+- **Removed Ring of Doom's glow effects (the ring's blurred glow stroke,
+  each ball's soft halo sprite) on request, for a sharper/crisper look.**
+  Scoped to Ring of Doom only, not applied to the other five events --
+  flagged to the user as something to extend on request rather than
+  assumed to be wanted everywhere.
+- **The Library's "render again with these settings" needs the original
+  Setup overrides back, and `meta.json` never stored them** (only
+  derived outcomes -- seed, winner, placements). Rather than cross-
+  referencing the job store (job files aren't kept forever the way
+  `out/<episode>/` is), `render_worker.py` now folds the job's own
+  `overrides`/`episode_overrides` into `meta.json` itself right after
+  `run_render()` returns, so the full config is always recoverable
+  directly from the episode's own folder.
+- **Render jobs can't be named after the season's next episode id.**
+  `episode["id"]` comes from `len(season["episodes"]) + 1`, which doesn't
+  change until `commit` -- two renders queued back to back (exactly what
+  "Make N" does) would otherwise both resolve to the same `out/ep004`
+  folder and overwrite each other mid-render. Each render job's folder is
+  suffixed with its own (always-unique) job id instead; the human-
+  readable episode id still lives inside `meta.json`/the caption for
+  `commit` to use.
+- **A canceled render now deletes its own output directory.** Canceling
+  mid-render previously left a half-written `_video_only.mp4` and an
+  empty folder behind every time -- this job system expects to be run
+  and canceled often, so that would have accumulated as real clutter, not
+  a one-off.
+- **"Make N" has no backend route.** Randomizing needs the params schema
+  and the Setup form's lock state, which only the frontend has -- it
+  composes the existing `/jobs/mine` and `/jobs/render` building blocks
+  itself (randomize, mine, read the top seed, queue a render, repeat),
+  rather than duplicating that logic server-side.
+- **`/league/commit` is never called by anything automated, including
+  this project's own tests.** The brief's "never commit automatically"
+  rule was read literally: the pytest suite exercises the route's 404
+  path only, never a real commit, since that would mutate the real
+  season standings as a side effect of running tests.
+- **The Setup form was initially missing an audio volume control** --
+  `run_render()`/`build_bus()` already supported a `volume_mult`
+  multiplier (added this phase for exactly this), but nothing in the UI
+  ever set it to anything but the 1.0 default, missing the brief's own
+  "cover at least: ... audio volumes" line. Fixed: a volume slider (with
+  its own lock toggle, included in Randomize like every other setting)
+  now lives in Setup and is threaded through every render-job-creating
+  call (Preview's preview render, Render's queue button, Make N).
+- **Known limitations, not fixed this phase:** the same hardcoded-
+  geometry risk this phase found and fixed for Ring of Doom's wall (and
+  Disaster Drop / Great Escape / Champion Duel's disk-reload caches)
+  likely has smaller-scale cousins in the other events' decorative
+  constants that don't move ball positions (e.g. Shell Shuffle's
+  `table.center`, Turf War's `grid.origin`) -- left alone because they're
+  lists, which the generic param walker never exposes as randomizable, so
+  they're not reachable from the Studio today. The heuristic-range audit
+  above covered Ring of Doom specifically (where it was found); the other
+  five events' Advanced-group fields weren't individually re-audited for
+  the same zero/incoherent-pair risk -- the same class of bug (a field
+  that can zero out or invert against a related field) could in principle
+  still exist for e.g. Disaster Drop's `course.modules_min`/`modules_max`
+  or Champion Duel's `champion.hp`/`contact_damage`, just not found yet.
+
+### Gameplay features noticed as missing while building the Studio (not built -- per "do not add new gameplay features in this task," flagged for a decision)
+
+- **No way to preview or render a Champion Duel bracket (3-episode semis
+  + final) from the Studio** -- `colorwars bracket` only exists as a CLI
+  command; the Studio's Setup/Render flow is built around one episode at
+  a time.
+- **No UI for `colorwars balance`** (Champion Duel's auto-tuner for
+  `teams.yaml`'s `duel_power` per team) -- still CLI-only.
+- **No per-event validity/duration-window diagnostics beyond the raw
+  pass/fail quick check** -- e.g. Disaster Drop's own ~25% seed-validity
+  rate (real, by design -- see Phase 4's decisions) gives no on-screen
+  hint to a Studio user about *why* several rerolls in a row failed,
+  unlike the targeted fix this phase made for Ring of Doom's specific
+  failure modes.
+- **No cross-field validation at the schema level** -- Setup can't
+  express "these two numbers must stay in this relationship" generically;
+  each case (like Ring of Doom's elimination_radius > ring.radius) has to
+  be hand-curated per event as it's found, not caught automatically.
+- **Mining only supports Ring of Doom's drama vocabulary of filters**
+  (winner / not winner / comeback / min lead changes / photo finish) --
+  `MineFilters`' fields are the same across all events, but a filter like
+  "comeback" is meaningless for e.g. Shell Shuffle's drama_stats(), the
+  same cross-event-filter gap Phase 3 already flagged for the CLI.
+- **No audio preview** (hearing cue sounds/music before committing to a
+  full render) -- only the rendered video itself carries audio.
 
 ### Events batch 2 (Turf War, Great Escape, Champion Duel)
 

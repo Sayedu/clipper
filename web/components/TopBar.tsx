@@ -62,6 +62,9 @@ export function TopBar({ right }: { right?: React.ReactNode }) {
         <Link href="/library" className="hover:text-[color:var(--color-text)]">
           Library
         </Link>
+        <Link href="/colorwars" className="hover:text-[color:var(--color-text)]">
+          Color Wars
+        </Link>
       </nav>
     </header>
   );

@@ -32,10 +32,16 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     win_event = next((e for e in record.events if e.kind == "escape" and e.data["place"] == 1), None)
     win_t = win_event.t if win_event else sim_total
 
-    special_start = max(0.0, win_t - WIN_SLOWMO_WINDOW_SEC)
+    # slow-mo amounts live in config (cfg["replay"]) rather than as module
+    # constants, so the Studio page can expose and randomize them per run.
+    rcfg = cfg.get("replay", {})
+    win_slowmo_window = float(rcfg.get("win_slowmo_window_sec", WIN_SLOWMO_WINDOW_SEC))
+    win_slowmo_speed = float(rcfg.get("win_slowmo_speed", WIN_SLOWMO_SPEED))
+
+    special_start = max(0.0, win_t - win_slowmo_window)
     special_end = min(sim_total, win_t + 0.2)
     special_sim_time = special_end - special_start
-    special_video_time = special_sim_time / WIN_SLOWMO_SPEED
+    special_video_time = special_sim_time / win_slowmo_speed
     normal_sim_time = max(0.0, sim_total - special_sim_time)
 
     fixed_sec = FREEZE_SEC + WINNER_CARD_SEC + OUTRO_SEC
@@ -47,7 +53,7 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     dt_video = 1.0 / fps
 
     def speed_at(sim_t: float) -> float:
-        return WIN_SLOWMO_SPEED if special_start <= sim_t <= special_end else base_speed
+        return win_slowmo_speed if special_start <= sim_t <= special_end else base_speed
 
     frame_sim_time: list[float] = []
     frame_speed: list[float] = []

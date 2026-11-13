@@ -72,14 +72,22 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
 
     last_elim_t = last_elim.t if last_elim else sim_total
 
+    # slow-mo amounts live in config (cfg["replay"]) rather than as module
+    # constants, so the Studio page can expose and randomize them per run.
+    rcfg = cfg.get("replay", {})
+    near_miss_window = float(rcfg.get("near_miss_window_sec", NEAR_MISS_WINDOW_SEC))
+    near_miss_speed = float(rcfg.get("near_miss_speed", NEAR_MISS_SPEED))
+    final_slowmo_window = float(rcfg.get("final_slowmo_window_sec", FINAL_SLOWMO_WINDOW_SEC))
+    final_slowmo_speed = float(rcfg.get("final_slowmo_speed", FINAL_SLOWMO_SPEED))
+
     # -- special (extra-slow) sim-time windows, clamped to the sim's own range --
     special: list[tuple[float, float, float, str]] = []  # (sim_start, sim_end, speed, label)
     if near_miss is not None:
         nm_t = near_miss.t
-        special.append((max(0.0, nm_t - NEAR_MISS_WINDOW_SEC * 0.5), min(sim_total, nm_t + NEAR_MISS_WINDOW_SEC * 0.5),
-                         NEAR_MISS_SPEED, "near_miss"))
-    final_start = max(0.0, last_elim_t - FINAL_SLOWMO_WINDOW_SEC)
-    special.append((final_start, last_elim_t, FINAL_SLOWMO_SPEED, "final"))
+        special.append((max(0.0, nm_t - near_miss_window * 0.5), min(sim_total, nm_t + near_miss_window * 0.5),
+                         near_miss_speed, "near_miss"))
+    final_start = max(0.0, last_elim_t - final_slowmo_window)
+    special.append((final_start, last_elim_t, final_slowmo_speed, "final"))
     special.sort(key=lambda s: s[0])
     # drop/merge accidental overlaps (keeps things simple and still correct)
     merged: list[tuple[float, float, float, str]] = []

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 import skia
 
@@ -21,11 +22,18 @@ def render_video(
     timeline: Timeline,
     settings: Settings,
     teams: list,
+    event_cfg: dict,
     out_path: Path,
     width: int,
     height: int,
     fps: int,
+    on_frame: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> Path:
+    """on_frame(frames_done, total_frames) -- an optional progress hook
+    (the Studio's job worker uses it to write progress to disk; every
+    other caller, including the CLI, just omits it). should_cancel() lets
+    a caller abort mid-render (checked between frames, not mid-frame)."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if hasattr(event, "init_render"):
         event.init_render(settings)
@@ -47,17 +55,21 @@ def render_video(
 
     try:
         for frame_idx in range(timeline.total_frames):
+            if should_cancel is not None and should_cancel():
+                raise RuntimeError("canceled")
             with surface as canvas:
                 canvas.save()
                 if scale != 1.0:
                     canvas.scale(scale, scale)
-                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx)
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, event_cfg)
                 canvas.restore()
             img = surface.makeImageSnapshot()
             # skia.Surface's native snapshot format is already RGBA_8888, matching
             # the -pix_fmt rgba ffmpeg is told to expect below -- confirmed directly
             # (img.colorType() == kRGBA_8888_ColorType) rather than assumed.
             proc.stdin.write(img.tobytes())
+            if on_frame is not None:
+                on_frame(frame_idx + 1, timeline.total_frames)
     finally:
         proc.stdin.close()
         stderr = proc.stderr.read().decode("utf-8", "ignore") if proc.stderr else ""
