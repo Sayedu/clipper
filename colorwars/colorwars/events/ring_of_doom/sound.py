@@ -34,7 +34,10 @@ def sound_voice(cue, sample_rate: int) -> np.ndarray:
         degree = seed_int % 5
         octave = int(progress * 2.4)  # pitch range climbs through the episode
         freq = synth.note_freq(ROOT_HZ, degree, octave)
-        vol = max(0.08, min(1.0, impulse / 2200.0))
+        # ceiling lowered 1.0 -> 0.7 -- paired with the min-gap spacing in
+        # direct.py, so a dense run of hits stays punchy without summing
+        # into a harsh, overloud wall of noise.
+        vol = max(0.07, min(0.7, impulse / 2200.0))
         # a short upward pitch sweep reads as a water-bubble "bloop" rather
         # than the plucked-string resonance karplus_strong gave it -- snappier
         # too (0.12s vs 0.35s), which matters more now that bouncier balls

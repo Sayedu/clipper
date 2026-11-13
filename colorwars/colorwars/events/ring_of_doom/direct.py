@@ -194,8 +194,15 @@ def _sim_time_to_frame(frame_sim_time: list[float], t: float) -> int | None:
 def _build_audio_cues(record: SimRecord, frame_sim_time: list[float], fps: int,
                        freeze_frame_index: int, total_frames: int) -> list[AudioCue]:
     cues: list[AudioCue] = []
+    # a real minimum gap between any two collision sounds, not just a loose
+    # "at most N within 100ms" cap -- the old cap (12 within 100ms, i.e.
+    # sounds allowed as close as ~8ms apart) let the dense early mosh-pit
+    # phase stack a dozen near-simultaneous "bloops" into one harsh, grating
+    # wall of noise once summed (reported directly: "annoying" with a lot of
+    # balls). This guarantees every accepted pluck is audibly separated from
+    # the last one instead.
+    MIN_PLUCK_GAP_SEC = 0.045
     last_pluck_video_t = -1.0
-    pluck_count_in_window: list[float] = []
 
     for e in record.events:
         frame_at = _sim_time_to_frame(frame_sim_time, e.t)
@@ -204,10 +211,9 @@ def _build_audio_cues(record: SimRecord, frame_sim_time: list[float], fps: int,
         video_t = frame_at / fps
 
         if e.kind == "collision":
-            pluck_count_in_window = [t for t in pluck_count_in_window if video_t - t < 0.1]
-            if len(pluck_count_in_window) >= 12:
+            if video_t - last_pluck_video_t < MIN_PLUCK_GAP_SEC:
                 continue
-            pluck_count_in_window.append(video_t)
+            last_pluck_video_t = video_t
             cues.append(AudioCue(video_t, "pluck", {
                 "impulse": e.data.get("impulse", 0.0),
                 "x": e.data.get("x", 540.0),

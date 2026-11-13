@@ -48,6 +48,20 @@ def render_video(
         "-i", "-",
         "-an",
         "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+        # explicit BT.709 tagging -- without it libx264 writes no color
+        # metadata at all, so a downstream decoder/transcoder (TikTok's own
+        # ingest, confirmed: colors came out visibly shifted -- red->purple,
+        # blue->orange, yellow->cyan -- after posting, even though every
+        # local decode of the same file looked correct) has to guess the
+        # matrix instead of reading it. Cheap, standard fix: make it
+        # unambiguous rather than relying on every decoder guessing the same way.
+        "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
+        # belt and suspenders: this ffmpeg/libx264 build wrote color_space
+        # correctly from the flags above but left color_primaries/transfer
+        # "unknown" (confirmed with ffprobe) -- x264's own option names talk
+        # to its VUI emission directly instead of going through ffmpeg's
+        # flag mapping, which is the reliable way to get the full tag set.
+        "-x264opts", "colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off",
         str(out_path),
     ]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)

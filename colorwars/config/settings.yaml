@@ -31,7 +31,7 @@ duration:
   min_sec: 61
   max_sec: 70
 
-background_color: "#0B1020"
+background_color: "#000000"   # was #0B1020 (a dark navy, not actually black) -- by request
 
 fonts:
   heavy: assets/fonts/Anton-Regular.ttf
