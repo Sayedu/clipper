@@ -121,7 +121,7 @@ def _spawn_positions(count: int, center: tuple[float, float], radius: float) -> 
 
 class _Ball:
     __slots__ = ("info", "body", "shape", "alive", "near_miss_armed", "near_miss_peak_r",
-                 "stuck_ref_pos", "stuck_ref_t", "elim_fall_vx", "elim_fall_vy", "body_pos_fallback")
+                 "elim_fall_vx", "elim_fall_vy", "body_pos_fallback")
 
     def __init__(self, info: BallInfo, body: pymunk.Body, shape: pymunk.Circle):
         self.info = info
@@ -130,8 +130,6 @@ class _Ball:
         self.alive = True
         self.near_miss_armed = False
         self.near_miss_peak_r = 0.0
-        self.stuck_ref_pos = body.position
-        self.stuck_ref_t = 0.0
         self.elim_fall_vx = 0.0
         self.elim_fall_vy = 0.0
         self.body_pos_fallback = None
@@ -147,8 +145,6 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
     gravity = float(cfg["gravity"])
     elim_radius = float(cfg["elimination_radius"])
     max_speed = float(cfg["physics"]["max_speed"])
-    anti_stuck_dist = float(cfg["physics"]["anti_stuck_distance_px"])
-    anti_stuck_window = float(cfg["physics"]["anti_stuck_window_sec"])
     ball_radius_base = float(cfg["balls"]["radius"])
     ball_elasticity = float(cfg["balls"]["elasticity"])
     ball_friction = float(cfg["balls"]["friction"])
@@ -385,14 +381,6 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
                 b.body.velocity = v * (max_speed / speed)
 
             pos = b.body.position
-            if (pos - b.stuck_ref_pos).length >= anti_stuck_dist:
-                b.stuck_ref_pos = pos
-                b.stuck_ref_t = t
-            elif t - b.stuck_ref_t >= anti_stuck_window:
-                ang = rng.uniform(0, TAU)
-                b.body.apply_impulse_at_local_point((220 * math.cos(ang), 220 * math.sin(ang)))
-                b.stuck_ref_pos = pos
-                b.stuck_ref_t = t
 
             r = math.hypot(pos.x - cx, pos.y - cy)
             if r >= 410 and not b.near_miss_armed:

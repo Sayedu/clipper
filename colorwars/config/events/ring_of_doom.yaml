@@ -43,8 +43,13 @@ physics:
   step_hz: 240
   max_speed: 3200   # was 2400 -- balls can move noticeably faster now
   wall_thickness: 6
-  anti_stuck_distance_px: 30
-  anti_stuck_window_sec: 1.5
+  # anti_stuck_distance_px/anti_stuck_window_sec used to live here -- a
+  # ball that hadn't moved far enough in a while got a random, invisible
+  # impulse "out of nowhere" by request, removed: a ball should only ever
+  # move because something physical touched it (and the ring's own
+  # spinning, ever-widening gap already guarantees nothing can stay
+  # trapped forever; mining/find-seed reject the rare seed where it
+  # somehow would, same as any other invalid run).
 
 timing:
   sim_deadline_sec: 66.0

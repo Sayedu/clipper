@@ -90,7 +90,7 @@ def test_event_schema_unknown_event_404():
 
 
 def test_quick_check_known_valid_seed():
-    body = {"event_id": "ring_of_doom", "seed": 2, "overrides": {}, "episode_overrides": {}, "finale": False}
+    body = {"event_id": "ring_of_doom", "seed": 1, "overrides": {}, "episode_overrides": {}, "finale": False}
     data = client.post("/quick-check", json=body).json()
     assert data["valid"] is True
     assert data["winner"] in ("red", "blue", "green", "yellow")
@@ -102,11 +102,11 @@ def test_quick_check_known_valid_seed():
 
 
 def test_quick_check_override_changes_ball_count():
-    # seed 2 is only known-valid at the default ball count -- a different
+    # seed 1 is only known-valid at the default ball count -- a different
     # count can genuinely produce an invalid (no single survivor by the
     # deadline) run, so this doesn't assert valid=True, just that the
     # override was applied and the call completes either way.
-    body = {"event_id": "ring_of_doom", "seed": 2,
+    body = {"event_id": "ring_of_doom", "seed": 1,
              "overrides": {"balls.per_team": 2}, "episode_overrides": {}, "finale": False}
     data = client.post("/quick-check", json=body).json()
     placements = data["placements"]
@@ -115,7 +115,7 @@ def test_quick_check_override_changes_ball_count():
 
 def test_quick_check_custom_hook_and_crown_override():
     body = {
-        "event_id": "ring_of_doom", "seed": 2, "overrides": {},
+        "event_id": "ring_of_doom", "seed": 1, "overrides": {},
         "episode_overrides": {
             "hook_line_mode": "custom", "hook_line_text": "TEST HOOK LINE",
             "crown_team_mode": "override", "crown_team_override": "green",
@@ -133,7 +133,7 @@ def test_quick_check_unknown_event_404():
 
 
 def test_filmstrip_returns_six_servable_frames():
-    body = {"event_id": "ring_of_doom", "seed": 2, "overrides": {}, "episode_overrides": {}, "finale": False}
+    body = {"event_id": "ring_of_doom", "seed": 1, "overrides": {}, "episode_overrides": {}, "finale": False}
     data = client.post("/filmstrip", json=body).json()
     assert data["valid"] is True
     assert len(data["frame_urls"]) == 6
@@ -196,7 +196,7 @@ def test_jobs_mine_runs_and_completes():
 
 
 def test_jobs_render_preview_completes_and_appears_in_library():
-    body = {"event_id": "ring_of_doom", "seed": 2, "overrides": {}, "episode_overrides": {},
+    body = {"event_id": "ring_of_doom", "seed": 1, "overrides": {}, "episode_overrides": {},
             "finale": False, "mode": "preview"}
     job = client.post("/jobs/render", json=body).json()["job"]
     job_id, out_dir_name = job["id"], job["out_dir"].rsplit("/", 1)[-1]
@@ -220,7 +220,7 @@ def test_jobs_render_preview_completes_and_appears_in_library():
 
 
 def test_jobs_cancel_while_still_queued():
-    body = {"event_id": "ring_of_doom", "seed": 2, "overrides": {}, "episode_overrides": {},
+    body = {"event_id": "ring_of_doom", "seed": 1, "overrides": {}, "episode_overrides": {},
             "finale": False, "mode": "final"}
     # queue two -- the scheduler runs one at a time, so the second is
     # guaranteed to still be "queued" (never spawned a subprocess) when we
