@@ -130,36 +130,62 @@
         "wiped_before_15": false,
         "score": 36.337
       }
+    },
+    {
+      "id": "ep006",
+      "event": "ring_of_doom",
+      "seed": 264,
+      "placements": [
+        "yellow",
+        "blue",
+        "green",
+        "red"
+      ],
+      "mvp": "Dash",
+      "date": "2026-11-13",
+      "is_finale": false,
+      "duration_sec": 29.616666666666667,
+      "drama": {
+        "lead_changes": 8,
+        "near_misses": 0,
+        "final_two_sec": 4.733,
+        "was_last_after_15": true,
+        "comeback_margin": 1,
+        "crown_team_lost": true,
+        "dead_stretches_over_9s": 0,
+        "wiped_before_15": false,
+        "score": 39.733
+      }
     }
   ],
   "standings": {
     "red": {
-      "points": 37,
+      "points": 38,
       "wins": 3,
       "podiums": 4,
       "streak_type": "loss",
-      "streak_count": 1
+      "streak_count": 2
     },
     "blue": {
-      "points": 31,
+      "points": 37,
       "wins": 1,
-      "podiums": 5,
-      "streak_type": "loss",
-      "streak_count": 4
-    },
-    "green": {
-      "points": 16,
-      "wins": 0,
-      "podiums": 4,
+      "podiums": 6,
       "streak_type": "loss",
       "streak_count": 5
     },
+    "green": {
+      "points": 19,
+      "wins": 0,
+      "podiums": 5,
+      "streak_type": "loss",
+      "streak_count": 6
+    },
     "yellow": {
-      "points": 16,
-      "wins": 1,
-      "podiums": 2,
+      "points": 26,
+      "wins": 2,
+      "podiums": 3,
       "streak_type": "win",
-      "streak_count": 1
+      "streak_count": 2
     }
   },
   "records": {
@@ -175,33 +201,33 @@
     },
     "longest_losing_streak": {
       "team": "green",
-      "count": 5
+      "count": 6
     }
   },
   "head_to_head": {
     "blue|red": {
       "red": 4,
-      "blue": 1
+      "blue": 2
     },
     "green|red": {
       "red": 4,
-      "green": 1
+      "green": 2
     },
     "red|yellow": {
       "red": 3,
-      "yellow": 2
+      "yellow": 3
     },
     "blue|green": {
-      "blue": 5,
+      "blue": 6,
       "green": 0
     },
     "blue|yellow": {
       "blue": 4,
-      "yellow": 1
+      "yellow": 2
     },
     "green|yellow": {
       "green": 4,
-      "yellow": 1
+      "yellow": 2
     }
   }
 }
