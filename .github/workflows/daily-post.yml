@@ -114,9 +114,13 @@ jobs:
         # would see the same un-committed season.json and keep rendering
         # "ep001" forever. A no-op is expected and fine on days ringofdoom
         # wasn't in the rotation, or failed before its commit step.
+        # config/names.txt was missing from this list -- found directly:
+        # every run consumed the SAME front-of-queue names (the "comment
+        # your name for a ball" feature never actually advanced) because
+        # the pool file's own consumption never made it back to the repo.
         if: always()
         run: |
-          git add colorwars/league/season.json colorwars/league/names_used.txt
+          git add colorwars/league/season.json colorwars/league/names_used.txt colorwars/config/names.txt
           if git diff --cached --quiet; then
             echo "no season state changes to persist"
           else

@@ -4,230 +4,86 @@
     {
       "id": "ep001",
       "event": "ring_of_doom",
-      "seed": 157,
-      "placements": [
-        "blue",
-        "green",
-        "yellow",
-        "red"
-      ],
-      "mvp": "Echo",
-      "date": "2026-11-13",
-      "is_finale": false,
-      "duration_sec": 27.55,
-      "drama": {
-        "lead_changes": 6,
-        "near_misses": 0,
-        "final_two_sec": 8.896,
-        "was_last_after_15": true,
-        "comeback_margin": 1,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 37.896
-      }
-    },
-    {
-      "id": "ep002",
-      "event": "ring_of_doom",
-      "seed": 223,
-      "placements": [
-        "red",
-        "blue",
-        "green",
-        "yellow"
-      ],
-      "mvp": "Max",
-      "date": "2026-11-13",
-      "is_finale": false,
-      "duration_sec": 26.533333333333335,
-      "drama": {
-        "lead_changes": 7,
-        "near_misses": 0,
-        "final_two_sec": 4.146,
-        "was_last_after_15": true,
-        "comeback_margin": 2,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 36.146
-      }
-    },
-    {
-      "id": "ep003",
-      "event": "ring_of_doom",
-      "seed": 180,
-      "placements": [
-        "red",
-        "blue",
-        "green",
-        "yellow"
-      ],
-      "mvp": "Kira",
-      "date": "2026-11-13",
-      "is_finale": false,
-      "duration_sec": 30.383333333333333,
-      "drama": {
-        "lead_changes": 7,
-        "near_misses": 0,
-        "final_two_sec": 5.008,
-        "was_last_after_15": true,
-        "comeback_margin": 1,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 37.008
-      }
-    },
-    {
-      "id": "ep004",
-      "event": "ring_of_doom",
-      "seed": 180,
-      "placements": [
-        "red",
-        "blue",
-        "green",
-        "yellow"
-      ],
-      "mvp": "Kira",
-      "date": "2026-11-13",
-      "is_finale": false,
-      "duration_sec": 30.383333333333333,
-      "drama": {
-        "lead_changes": 7,
-        "near_misses": 0,
-        "final_two_sec": 5.008,
-        "was_last_after_15": true,
-        "comeback_margin": 1,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 37.008
-      }
-    },
-    {
-      "id": "ep005",
-      "event": "ring_of_doom",
-      "seed": 22,
+      "seed": 264,
       "placements": [
         "yellow",
         "red",
         "blue",
         "green"
       ],
-      "mvp": "Bolt",
-      "date": "2026-11-13",
-      "is_finale": false,
-      "duration_sec": 24.116666666666667,
-      "drama": {
-        "lead_changes": 7,
-        "near_misses": 0,
-        "final_two_sec": 4.338,
-        "was_last_after_15": true,
-        "comeback_margin": 1,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 36.337
-      }
-    },
-    {
-      "id": "ep006",
-      "event": "ring_of_doom",
-      "seed": 264,
-      "placements": [
-        "yellow",
-        "blue",
-        "green",
-        "red"
-      ],
       "mvp": "Dash",
       "date": "2026-11-13",
       "is_finale": false,
-      "duration_sec": 29.616666666666667,
-      "drama": {
-        "lead_changes": 8,
-        "near_misses": 0,
-        "final_two_sec": 4.733,
-        "was_last_after_15": true,
-        "comeback_margin": 1,
-        "crown_team_lost": true,
-        "dead_stretches_over_9s": 0,
-        "wiped_before_15": false,
-        "score": 39.733
-      }
+      "duration_sec": 29.6,
+      "drama": {}
     }
   ],
   "standings": {
     "red": {
-      "points": 38,
-      "wins": 3,
-      "podiums": 4,
+      "points": 6,
+      "wins": 0,
+      "podiums": 1,
       "streak_type": "loss",
-      "streak_count": 2
+      "streak_count": 1
     },
     "blue": {
-      "points": 37,
-      "wins": 1,
-      "podiums": 6,
+      "points": 3,
+      "wins": 0,
+      "podiums": 1,
       "streak_type": "loss",
-      "streak_count": 5
+      "streak_count": 1
     },
     "green": {
-      "points": 19,
+      "points": 1,
       "wins": 0,
-      "podiums": 5,
+      "podiums": 0,
       "streak_type": "loss",
-      "streak_count": 6
+      "streak_count": 1
     },
     "yellow": {
-      "points": 26,
-      "wins": 2,
-      "podiums": 3,
+      "points": 10,
+      "wins": 1,
+      "podiums": 1,
       "streak_type": "win",
-      "streak_count": 2
+      "streak_count": 1
     }
   },
   "records": {
     "fastest_win": {
-      "episode_id": "ep005",
+      "episode_id": "ep001",
       "team": "yellow",
-      "sim_seconds": 22.6125
+      "sim_seconds": 28.1
     },
-    "biggest_comeback": {
-      "episode_id": "ep002",
-      "team": "red",
-      "margin": 2
-    },
+    "biggest_comeback": null,
     "longest_losing_streak": {
-      "team": "green",
-      "count": 6
+      "team": "red",
+      "count": 1
     }
   },
   "head_to_head": {
     "blue|red": {
-      "red": 4,
-      "blue": 2
+      "red": 1,
+      "blue": 0
     },
     "green|red": {
-      "red": 4,
-      "green": 2
+      "red": 1,
+      "green": 0
     },
     "red|yellow": {
-      "red": 3,
-      "yellow": 3
+      "red": 0,
+      "yellow": 1
     },
     "blue|green": {
-      "blue": 6,
+      "blue": 1,
       "green": 0
     },
     "blue|yellow": {
-      "blue": 4,
-      "yellow": 2
+      "blue": 0,
+      "yellow": 1
     },
     "green|yellow": {
-      "green": 4,
-      "yellow": 2
+      "green": 0,
+      "yellow": 1
     }
   }
 }

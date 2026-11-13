@@ -185,18 +185,23 @@ def run_render(
 
 
 def _write_caption(out_dir: Path, event_id: str, episode: dict, record: SimRecord, meta: dict) -> None:
-    hook = episode.get("hook_line", "")
     ep_num = episode.get("number", "?")
     event_title = "Ring of Doom" if event_id == "ring_of_doom" else event_id.replace("_", " ").title()
-    tags = ["colorwars", "simulation"] + EVENT_HASHTAGS.get(event_id, [])
-    hashtag_line = " ".join(f"#{t}" for t in tags)
 
-    body = (
-        f"{event_title}, Episode {ep_num}\n\n"
-        f"{hook}\n\n"
-        f"MVP shoutout: {record.mvp_name} carried the whole episode.\n\n"
-        f"{hashtag_line}"
-    )
+    if event_id == "ring_of_doom":
+        # simplified by request -- no hook line, no MVP shoutout, no
+        # hashtags, just this exact two-line caption.
+        body = f"{event_title}, Episode {ep_num}\n\nComment Who Will Win"
+    else:
+        hook = episode.get("hook_line", "")
+        tags = ["colorwars", "simulation"] + EVENT_HASHTAGS.get(event_id, [])
+        hashtag_line = " ".join(f"#{t}" for t in tags)
+        body = (
+            f"{event_title}, Episode {ep_num}\n\n"
+            f"{hook}\n\n"
+            f"MVP shoutout: {record.mvp_name} carried the whole episode.\n\n"
+            f"{hashtag_line}"
+        )
     # "Never use dashes in captions" -- a hard guarantee, not just a style
     # choice in the generated text above, in case a future storyline string adds one.
     body = body.replace("—", ",").replace("–", ",").replace("-", " ")

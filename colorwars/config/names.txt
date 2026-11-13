@@ -1,34 +1,15 @@
-# Viewer name pool -- "<Team> <Name>" per line. Names are cleaned (letters,
-# digits, underscore only; max 12 chars) and checked against blocklist.txt
-# before use. Empty slots fall back to "<Team> <N>" defaults.
-Red Max
-Red Nova
-Red Blaze
-Red Kira
 Red Ash
 Red Rex
 Red Luna
 Red Dex
-Blue Sam
-Blue Echo
-Blue Finn
-Blue Zara
 Blue Milo
 Blue Vex
 Blue Juno
 Blue Cole
-Green Pip
-Green Sage
-Green Fern
-Green Moss
 Green Kai
 Green Wren
 Green Ivy
 Green Rook
-Yellow Jett
-Yellow Dash
-Yellow Spark
-Yellow Bolt
 Yellow Nyx
 Yellow Zip
 Yellow Fizz
