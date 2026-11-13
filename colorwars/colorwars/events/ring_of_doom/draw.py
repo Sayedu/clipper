@@ -74,6 +74,7 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     _draw_ring(canvas, step, ring_center, ring_radius, ring_segments)
     _draw_particles(canvas, record, sim_t, ring_center)
     _draw_balls(canvas, step, record, teams_by_id, sim_t, ring_center, ring_radius)
+    _draw_hazard(canvas, record, event_cfg, sim_t, ring_center, step)
 
     _draw_hud(canvas, settings, record, episode_overlays=overlays, overlay_kinds=overlay_kinds, step=step, teams=teams)
 
@@ -129,6 +130,81 @@ def _draw_particles(canvas, record: SimRecord, sim_t: float, ring_center) -> Non
             dist = frac * (70 if e.kind == "elimination" else 32)
             px, py = x + dist * math.cos(ang), y + dist * math.sin(ang)
             canvas.drawCircle(px, py, max(1.0, 4 * (1 - frac)), paint)
+
+
+HAZARD_COLOR = skia.Color(255, 90, 60, 255)
+CENTER_BUMPER_RADIUS = 70.0   # must match sim.py's pymunk.Circle(hb, 70)
+SPINNER_BAR_HALF_LEN = 180.0  # must match sim.py's Segment((-180,0),(180,0),10)
+SPINNER_BAR_THICKNESS = 10.0
+
+
+def _draw_hazard(canvas, record: SimRecord, event_cfg: dict, sim_t: float, ring_center, step) -> None:
+    """Hazards used to apply real physics (a solid bumper/spinner body, or a
+    flat impulse for lightning) with nothing drawn for any of them -- a ball
+    getting hit looked exactly like it "moved on its own," reported directly.
+    Finds whichever hazard is most recently active (sim.py never overlaps
+    two -- a new one can't start until the last one's window ends) and
+    draws it for real."""
+    haz_cfg = event_cfg["hazards"]
+    last = None
+    for e in record.events:
+        if e.t > sim_t:
+            break
+        if e.kind == "hazard":
+            last = e
+    if last is None:
+        return
+    cx, cy = ring_center
+    kind = last.data.get("kind")
+    age = sim_t - last.t
+
+    if kind == "center_bumper":
+        if age < float(haz_cfg["center_bumper_duration_sec"]):
+            _draw_center_bumper(canvas, cx, cy, age)
+    elif kind == "spinner_bar":
+        if age < float(haz_cfg["spinner_bar_duration_sec"]):
+            angular_velocity = float(last.data.get("angular_velocity", 3.0))
+            _draw_spinner_bar(canvas, cx, cy, angular_velocity * age)
+    elif kind == "lightning":
+        if age < 0.2:
+            ball_id = last.data.get("ball_id")
+            if ball_id is not None and 0 <= ball_id < len(step.balls):
+                bs = step.balls[ball_id]
+                _draw_lightning_flash(canvas, bs.x, bs.y, age)
+
+
+def _draw_center_bumper(canvas, cx: float, cy: float, age: float) -> None:
+    pulse = 0.85 + 0.15 * math.sin(age * 14.0)
+    r = CENTER_BUMPER_RADIUS * pulse
+    canvas.drawCircle(cx, cy, r, skia.Paint(AntiAlias=True, Color=skia.Color(255, 90, 60, 90)))
+    canvas.drawCircle(cx, cy, r, skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style,
+                                             StrokeWidth=5, Color=HAZARD_COLOR))
+
+
+def _draw_spinner_bar(canvas, cx: float, cy: float, angle: float) -> None:
+    dx, dy = math.cos(angle), math.sin(angle)
+    x0, y0 = cx - dx * SPINNER_BAR_HALF_LEN, cy - dy * SPINNER_BAR_HALF_LEN
+    x1, y1 = cx + dx * SPINNER_BAR_HALF_LEN, cy + dy * SPINNER_BAR_HALF_LEN
+    bar_paint = skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style,
+                            StrokeWidth=SPINNER_BAR_THICKNESS, StrokeCap=skia.Paint.kRound_Cap,
+                            Color=HAZARD_COLOR)
+    canvas.drawLine(x0, y0, x1, y1, bar_paint)
+    end_paint = skia.Paint(AntiAlias=True, Color=skia.Color(255, 160, 90, 255))
+    canvas.drawCircle(x0, y0, SPINNER_BAR_THICKNESS * 0.9, end_paint)
+    canvas.drawCircle(x1, y1, SPINNER_BAR_THICKNESS * 0.9, end_paint)
+
+
+def _draw_lightning_flash(canvas, x: float, y: float, age: float) -> None:
+    frac = max(0.0, 1.0 - age / 0.2)
+    glow = skia.Paint(AntiAlias=True, Color=skia.Color(255, 240, 180, int(160 * frac)))
+    canvas.drawCircle(x, y, 60 * frac + 10, glow)
+    bolt_paint = skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=4,
+                             Color=skia.Color(255, 255, 255, int(255 * frac)))
+    for k in range(6):
+        ang = (k / 6) * 2 * math.pi + 0.4
+        r0, r1 = 14, 14 + 55 * frac
+        canvas.drawLine(x + r0 * math.cos(ang), y + r0 * math.sin(ang),
+                         x + r1 * math.cos(ang), y + r1 * math.sin(ang), bolt_paint)
 
 
 def _draw_balls(canvas, step, record: SimRecord, teams_by_id: dict, sim_t: float, ring_center, ring_radius: float) -> None:

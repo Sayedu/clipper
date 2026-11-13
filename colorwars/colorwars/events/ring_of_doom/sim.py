@@ -361,7 +361,11 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
                     hs.collision_type = CT_HAZARD
                     space.add(hb, hs)
                     active_hazard = {"kind": kind, "body": hb, "shapes": [hs], "end_t": t + haz_cfg["spinner_bar_duration_sec"]}
-                    events.append(SimEvent(i, t, "hazard", {"kind": kind}))
+                    # angular_velocity recorded so draw.py can replay the bar's
+                    # exact rotation -- it was never drawn at all before (see
+                    # draw.py), which is exactly why a ball suddenly getting
+                    # hit by it looked like it moved "out of nowhere."
+                    events.append(SimEvent(i, t, "hazard", {"kind": kind, "angular_velocity": hb.angular_velocity}))
                 next_hazard_t = t + rng.uniform(haz_cfg["interval_min_sec"], haz_cfg["interval_max_sec"])
                 hazard_warning_fired = False
 
