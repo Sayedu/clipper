@@ -15,10 +15,13 @@ from ..league import season as season_lib
 from ..league.names_queue import consume_names, peek_names
 from ..league.storylines import pick_hook_and_teaser
 from ..league.theme import load_or_build_theme
-from ..render.video import extract_cover, mux_audio, render_video
+from ..render.video import append_end_card, extract_cover, mux_audio, render_video
 from .config import Settings, Team, load_episode, load_event_config, load_teams
 from .event import Event
 from .records import SimRecord, Timeline
+
+# must match scripts/render-endcard.mjs's own hardcoded -t 2.0
+END_CARD_SEC = 2.0
 
 EVENT_HASHTAGS = {
     "ring_of_doom": ["ringofdoom", "lastballstanding"],
@@ -136,6 +139,13 @@ def run_render(
     cover_path = out_dir / "cover.png"
     extract_cover(final_path, cover_path, timeline.cover_frame_index / fps, settings.ffmpeg_path)
 
+    # the branded follow/CTA card, held for its own full length at the end
+    # of every real (non-preview) render -- by request. After cover
+    # extraction, not before: the cover image should show a real gameplay
+    # moment, never the end card.
+    if not preview:
+        append_end_card(final_path, settings.end_card_path, settings.ffmpeg_path, fps)
+
     video_only.unlink(missing_ok=True)
     wav_path.unlink(missing_ok=True)
 
@@ -161,7 +171,10 @@ def run_render(
         "episode_id": episode.get("id"),
         "episode_number": episode.get("number"),
         "is_finale": bool(episode.get("is_finale", False)),
-        "duration_sec": timeline.duration_sec(),
+        # the real final file's length -- includes the appended end card
+        # (below) on a non-preview render, since that's genuinely part of
+        # what gets posted now.
+        "duration_sec": timeline.duration_sec() + (0.0 if preview else END_CARD_SEC),
         "placements": record.placements,
         "mvp": record.mvp_name,
         "winner": record.winner_team_id,

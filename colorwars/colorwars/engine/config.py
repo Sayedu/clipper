@@ -48,6 +48,7 @@ class Settings:
     background_color: str
     font_heavy: Path
     font_label: Path
+    end_card_path: Path
     out_dir: Path
     teams_path: Path
     names_path: Path
@@ -90,6 +91,7 @@ class Settings:
             background_color=raw["background_color"],
             font_heavy=repo_root / fonts["heavy"],
             font_label=repo_root / fonts["label"],
+            end_card_path=repo_root / raw["end_card"],
             out_dir=repo_root / paths["out_dir"],
             teams_path=repo_root / paths["teams"],
             names_path=repo_root / paths["names"],

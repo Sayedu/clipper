@@ -15,6 +15,9 @@ export const paths = {
   sfx: resolve(env.assetsDir, 'sfx'),
   models: resolve(env.assetsDir, 'models'),
   yunet: resolve(env.assetsDir, 'models', 'face_detection_yunet.onnx'),
+  // the branded follow/CTA card appended to the end of every finished
+  // video -- see scripts/render-endcard.mjs for how to regenerate it.
+  endCard: resolve(env.assetsDir, 'endcard', 'end_card.mp4'),
 
   python: resolve(env.repoRoot, 'python'),
   venvPython: resolve(env.repoRoot, 'python', '.venv', 'bin', 'python'),

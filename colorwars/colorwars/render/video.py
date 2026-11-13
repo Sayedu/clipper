@@ -122,3 +122,32 @@ def mux_audio(video_only_path: Path, wav_path: Path, final_path: Path, ffmpeg_pa
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     return final_path
+
+
+def append_end_card(video_path: Path, end_card_path: Path, ffmpeg_path: str, fps: int) -> None:
+    """Concatenates end_card_path onto the end of video_path, in place --
+    held for its own full length (currently 2s), by request, on every
+    final render. Uses the `concat` FILTER (decoded frames), not the
+    concat demuxer (raw stream copy): the end card is a fixed 30fps clip
+    muxed once by scripts/render-endcard.mjs, while the main video can be
+    any fps (60 normally), so the two almost never share identical stream
+    parameters -- the filter re-encodes and re-times frames to handle
+    that, the demuxer would just refuse to join them."""
+    if not end_card_path.exists():
+        raise FileNotFoundError(f"end card asset missing: {end_card_path}")
+    tmp_path = video_path.with_name(video_path.stem + "_endcard" + video_path.suffix)
+    cmd = [
+        ffmpeg_path, "-y",
+        "-i", str(video_path), "-i", str(end_card_path),
+        "-filter_complex",
+        "[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[v][a]",
+        "-map", "[v]", "-map", "[a]",
+        "-r", str(fps),
+        "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+        "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
+        "-x264opts", "colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off",
+        "-c:a", "aac", "-b:a", "192k",
+        str(tmp_path),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    tmp_path.replace(video_path)

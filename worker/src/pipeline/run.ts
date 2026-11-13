@@ -17,7 +17,8 @@ import {
   type Transcript,
 } from '../types.ts';
 import { CanceledError, createContext, type Broadcaster, type StepContext } from './context.ts';
-import { ffprobe } from './ffmpeg.ts';
+import { appendEndCard, ffprobe } from './ffmpeg.ts';
+import { paths } from '../paths.ts';
 import { shiftTranscript } from './ytTranscript.ts';
 import { search } from './steps/search.ts';
 import { faceCamBias, score } from './steps/score.ts';
@@ -276,12 +277,20 @@ function skipStepsExcept(ctx: StepContext, used: Step[]): void {
 }
 
 /** Emit the finished single-candidate result shared by both post formats. */
-function finishPost(
+async function finishPost(
   ctx: StepContext,
   jobId: string,
   render: RenderResult,
   opts: { hookTitle: string; reason: string; draft: DraftText },
-): RunOutcome {
+): Promise<RunOutcome> {
+  // the branded follow/CTA card, held for its own full length at the end
+  // of every finished video -- by request. finishPost is the one place
+  // every content type's own render step converges before the job is
+  // marked ready, so this covers all of them from here.
+  await appendEndCard(render.videoPath, paths.endCard, ctx.signal);
+  const withEndCard = await ffprobe(render.videoPath);
+  render = { ...render, durationSec: withEndCard.durationSec };
+
   const candidates: JobCandidate[] = [
     {
       index: 0,

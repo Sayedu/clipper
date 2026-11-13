@@ -119,3 +119,47 @@ export async function ffmpegOnce(args: string[], signal?: AbortSignal): Promise<
 export function escapeFilterPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
 }
+
+/**
+ * Concatenates the branded end-card clip (paths.endCard) onto the end of
+ * videoPath, in place -- held for its own full length, on every finished
+ * video, by request. Uses the `concat` FILTER (decoded frames), not the
+ * concat demuxer (raw stream copy): the end card is a fixed clip (30 fps,
+ * see scripts/render-endcard.mjs) while the main video can be a different
+ * fps/codec depending on content type, so the two rarely share identical
+ * stream parameters -- the filter re-encodes and re-times frames to
+ * handle that, the demuxer would just refuse to join them.
+ */
+export async function appendEndCard(videoPath: string, endCardPath: string, signal?: AbortSignal): Promise<void> {
+  // the end card is a fixed 1080x1920 asset, but content types render at
+  // different resolutions (followball/eyetest go out at 2160x3840) -- the
+  // concat filter requires every input frame to be the SAME size, so scale
+  // the end card up/down to match whatever the main video actually is
+  // (found directly: without this, libx264 rejected the mismatched frame
+  // size with "Invalid argument" and produced an empty output).
+  const main = await ffprobe(videoPath);
+  const tmpPath = videoPath.replace(/(\.[^./]+)$/, '_endcard$1');
+  await ffmpegOnce(
+    [
+      '-y',
+      '-i', videoPath,
+      '-i', endCardPath,
+      '-filter_complex',
+      `[0:v]setsar=1[v0];[1:v]scale=${main.width}:${main.height}:flags=lanczos,setsar=1[v1];` +
+        '[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[v][a]',
+      '-map', '[v]',
+      '-map', '[a]',
+      '-c:v', 'libx264',
+      '-preset', 'medium',
+      '-crf', '19',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-movflags', '+faststart',
+      tmpPath,
+    ],
+    signal,
+  );
+  const { rename } = await import('node:fs/promises');
+  await rename(tmpPath, videoPath);
+}

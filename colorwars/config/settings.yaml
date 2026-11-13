@@ -37,6 +37,14 @@ fonts:
   heavy: assets/fonts/Anton-Regular.ttf
   label: assets/fonts/ChakraPetch-Bold.ttf
 
+# appended (concatenated, not overlaid) to the end of every FINAL (non
+# preview) render, held for its own full length -- by request, every
+# video gets this same branded follow/CTA card at the end. 2 seconds,
+# 1080x1920, silent audio track already baked in -- see
+# scripts/render-endcard.mjs (repo root) for how to regenerate it from
+# its design source if that ever changes.
+end_card: assets/endcard/end_card.mp4
+
 paths:
   teams: config/teams.yaml
   names: config/names.txt
