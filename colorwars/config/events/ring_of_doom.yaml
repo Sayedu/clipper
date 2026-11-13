@@ -4,28 +4,28 @@ event:
 
 ring:
   radius: 400
-  center: [540, 820]
+  center: [540, 770]   # was 820 -- moved up to free more room for the bigger roster below it
   segments: 96
   thickness: 10
   initial_gap_deg: 16
   rotation_speed: 1.1               # rad/s -- was 0.6, nearly double for a faster spin
   rotation_speedup_per_phase: 0.07  # +7% speed each gap-widening phase, was 4%
-  reverse_once: true
+  reverse_once: false  # was true, but ignored -- the ring always reversed regardless; now it's a real toggle, off by request
 
 gravity: 900
 
 balls:
   radius: 30
   per_team: 4
-  elasticity: 0.96   # was 0.88 -- bouncier, close to a superball (kept under 1.0 for solver stability)
-  friction: 0.15     # was 0.4 -- less friction bleeds off less speed on every bounce
+  elasticity: 0.99   # was 0.88, then 0.96 -- asked again for more bounce; as close to a real superball as the solver stays stable at
+  friction: 0.1      # was 0.4, then 0.15 -- bounces keep almost all their speed now
 
 elimination_radius: 440
 
 gaps:
   initial_count: 1
   widen_deg: 6
-  max_gaps: 3
+  max_gaps: 1   # was 3 -- only ever one opening in the wall, by request (it only ever widens now, never opens a second one)
   interval_sec: 8.0
   warning_sec: 1.0
   fast_interval_sec: 4.0

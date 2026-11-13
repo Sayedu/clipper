@@ -5,6 +5,7 @@ simulate or direct comes from one of these files.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -79,7 +80,11 @@ class Settings:
             safe_y_max=safe["y_max"],
             sample_rate=audio["sample_rate"],
             target_lufs=audio["target_lufs"],
-            ffmpeg_path=raw["ffmpeg_path"],
+            # the configured path is a local macOS dev workaround (this
+            # machine's bare `ffmpeg` is broken -- see settings.yaml's own
+            # comment); CI (Ubuntu, apt-installed ffmpeg, no such path)
+            # overrides it with this env var instead of editing the YAML.
+            ffmpeg_path=os.environ.get("COLORWARS_FFMPEG_PATH", raw["ffmpeg_path"]),
             duration_min_sec=dur["min_sec"],
             duration_max_sec=dur["max_sec"],
             background_color=raw["background_color"],

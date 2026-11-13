@@ -25,8 +25,15 @@ teams:
   - id: yellow
     name: Yellow
     color: "#FFD23F"
-    personality: "Wildcards -- bursts of speed out of nowhere."
+    personality: "Wildcards in Disaster Drop (random bursts of speed); steady everywhere else."
     traits:
+      # burst_impulse/burst_interval_*_sec are read by Disaster Drop's sim
+      # only -- Ring of Doom used to apply this same burst too (hardcoded to
+      # team_id=="yellow", not actually reading these trait values), but that
+      # was removed by request: it was a silent, unwarned random impulse that
+      # just looked like a ball going crazy with no visible cause, unlike
+      # lightning/hazards which are telegraphed first. Left in place here so
+      # Disaster Drop (which does read these) is unaffected.
       burst_impulse: true
       burst_interval_min_sec: 4
       burst_interval_max_sec: 7

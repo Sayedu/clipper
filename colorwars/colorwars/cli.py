@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 import time
 from pathlib import Path
@@ -53,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     p_render.add_argument("--finale", action="store_true", help="this episode's points count double")
     p_render.add_argument("--legacy-episode", action="store_true",
                            help="use config/episode.yaml directly instead of building it from league/season.json")
+    p_render.add_argument("--json", action="store_true",
+                           help="print one JSON summary line instead of the human-readable report -- for scripts/callers "
+                                "(e.g. the daily auto-poster) that need the out_dir/episode_id back, not just stdout text")
 
     p_find = sub.add_parser("find-seed", help="return the first seed that produces a valid run")
     p_find.add_argument("--event", required=True)
@@ -101,11 +105,17 @@ def main(argv: list[str] | None = None) -> int:
         t0 = time.time()
         meta = run_render(event, seed, settings, event_cfg, teams, episode, out_dir, preview=args.preview)
         dt = time.time() - t0
-        print(f"rendered {out_dir / 'final.mp4'} in {dt:.1f}s")
-        print(f"  seed: {seed}  duration: {meta['duration_sec']:.1f}s  winner: {meta['winner']}  mvp: {meta['mvp']}")
-        print(f"  placements: {meta['placements']}")
-        print(f"  hook: {episode.get('hook_line')}")
-        print(f"  teaser: {episode.get('teaser')}")
+        if args.json:
+            # meta already carries seed/episode_id (see pipeline.py's
+            # run_render) -- out_dir and render_sec are the only two things
+            # a caller needs that aren't already in there.
+            print(json.dumps({"out_dir": str(out_dir), "render_sec": round(dt, 1), **meta}))
+        else:
+            print(f"rendered {out_dir / 'final.mp4'} in {dt:.1f}s")
+            print(f"  seed: {seed}  duration: {meta['duration_sec']:.1f}s  winner: {meta['winner']}  mvp: {meta['mvp']}")
+            print(f"  placements: {meta['placements']}")
+            print(f"  hook: {episode.get('hook_line')}")
+            print(f"  teaser: {episode.get('teaser')}")
         return 0
 
     if args.command == "find-seed":

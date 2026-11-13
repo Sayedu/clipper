@@ -18,6 +18,13 @@ class Event(ABC):
     id: ClassVar[str]
     display_name: ClassVar[str]
 
+    # Whether mine()/find-seed must reject a seed whose achieved duration
+    # falls outside settings.duration_min_sec/max_sec. True for every event
+    # except Ring of Doom, which dropped the 61s floor by request -- its
+    # video now ends shortly after the winner is shown regardless of how
+    # long the raw sim ran, so there is no window left to enforce.
+    enforce_duration_window: ClassVar[bool] = True
+
     @abstractmethod
     def simulate(
         self,
@@ -40,8 +47,9 @@ class Event(ABC):
         fps: int,
     ) -> Timeline:
         """The edit: slow motion, camera, overlays, audio cue timing. Owns
-        the hard 61-70s duration requirement -- trims slow motion to fit,
-        never touches the physics."""
+        the 61-70s duration requirement for events that have one (see
+        enforce_duration_window) -- trims slow motion to fit, never touches
+        the physics."""
 
     @abstractmethod
     def draw_frame(

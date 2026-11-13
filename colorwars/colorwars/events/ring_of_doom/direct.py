@@ -3,14 +3,15 @@ sim-time to show at which video frame, where the camera zooms, what text
 overlays when. Never re-simulates anything; only ever samples the SimRecord
 that already exists.
 
-Duration strategy: no slow motion anywhere, by request -- the action always
-plays at real speed or faster (never slower). A sim run can finish anywhere
-from ~15s to the 66s deadline depending on the seed, almost always well
-under the required 61-70s video floor; rather than stretch that short
-action out in slow motion to fill the gap (tried first, and explicitly
-asked to be removed), the leftover time replays the action again, from the
-top, at real speed, under the winner/standings card (which has no opaque
-backdrop -- see draw.py -- so the replay is genuinely visible through it).
+Duration strategy: no slow motion anywhere, and no minimum length either,
+both by request. The action always plays at real speed (never slower, never
+sped up either -- there's nothing left to fit a speed multiplier to). The
+video ends ~1.5s after the winner card appears instead of being padded out
+(the old approach: replaying the action again under the winner card) to
+reach a 61s floor -- a short raw sim now just makes a short video, which is
+fine. The raw sim is capped at a 66s deadline (config timing.sim_deadline_sec),
+so even the longest run plus this short tail still lands comfortably under
+the 70s video ceiling with no fitting required.
 """
 
 from __future__ import annotations
@@ -20,23 +21,14 @@ import math
 from ...engine.config import Settings
 from ...engine.records import AudioCue, OverlayCue, SimRecord, Timeline
 
-FREEZE_SEC = 0.5
-WINNER_CARD_SEC = 3.0
-OUTRO_SEC = 5.0
-HOOK_SEC = 1.0
-STORYLINE_SEC = 2.0
+FREEZE_SEC = 0.3
+WINNER_CARD_SEC = 1.0
+OUTRO_SEC = 0.2
 
 
 def _find_last_elimination(record: SimRecord):
     elims = [e for e in record.events if e.kind == "elimination"]
     return elims[-1] if elims else None
-
-
-def _two_balls_left_time(record: SimRecord) -> float | None:
-    for step in record.steps:
-        if sum(1 for b in step.balls if b.alive) <= 2:
-            return step.t
-    return None
 
 
 def _best_near_miss_time_in_final_two(record: SimRecord) -> float | None:
@@ -56,26 +48,20 @@ def _best_near_miss_time_in_final_two(record: SimRecord) -> float | None:
 
 def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps: int) -> Timeline:
     sim_total = record.sim_duration_sec()
-    two_left_t = _two_balls_left_time(record)
 
-    fixed_sec = FREEZE_SEC + WINNER_CARD_SEC + OUTRO_SEC
-    target_total = (settings.duration_min_sec + settings.duration_max_sec) / 2.0
-    normal_video_budget = max(1.0, target_total - fixed_sec)
-    base_speed = sim_total / normal_video_budget if normal_video_budget > 0 else 1.0
-    # never slower than real time -- can still speed up a long sim to help
-    # it fit, but the action itself is never stretched into slow motion.
-    # A short raw sim (typical: ~10-35s against a 61-70s video) just means
-    # more replay time later, not a slower-looking run.
-    base_speed = max(1.0, min(4.0, base_speed))
+    # real time, always -- no duration target to fit anymore, so no speed
+    # multiplier is needed (see module docstring).
+    base_speed = 1.0
 
     # -- walk sim time from 0 -> sim_total, building the video frame array --
+    # the ring stays a constant size the whole video now (reported directly:
+    # the zoom-in during the final two balls made it look like the circle
+    # was changing size) -- frame_zoom is always 1.0, kept as a real field
+    # (not removed from Timeline) only because other events still use it.
     frame_sim_time: list[float] = []
     frame_speed: list[float] = []
     frame_zoom: list[float] = []
     dt_video = 1.0 / fps
-
-    def zoom_at(sim_t: float) -> float:
-        return 1.25 if (two_left_t is not None and sim_t >= two_left_t) else 1.0
 
     sim_t = 0.0
     # cap the frame count generously; the loop breaks once we exhaust sim_total
@@ -83,7 +69,7 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     while sim_t < sim_total and guard < 200_000:
         frame_sim_time.append(sim_t)
         frame_speed.append(base_speed)
-        frame_zoom.append(zoom_at(sim_t))
+        frame_zoom.append(1.0)
         sim_t += dt_video * base_speed
         guard += 1
     if not frame_sim_time:
@@ -99,7 +85,7 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     for _ in range(freeze_frame_count):
         frame_sim_time.append(sim_total)
         frame_speed.append(0.0)
-        frame_zoom.append(1.25)
+        frame_zoom.append(1.0)
 
     # -- winner card + outro: no sim playback, just held on the final instant --
     winner_frames = max(1, round(WINNER_CARD_SEC * fps))
@@ -111,13 +97,14 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
 
     total_frames = len(frame_sim_time)
 
-    # -- trim or pad by a few frames so we land exactly inside [min,max] sec,
-    #    per "direct() may trim slow motion to fit" --
-    min_frames = round(settings.duration_min_sec * fps)
+    # -- safety trim only -- there's no minimum to pad up to anymore (by
+    #    request: the video should end ~1-1.5s after the winner card, not
+    #    wait out a 61s floor). A sim that ran right up against its own
+    #    deadline could in principle still land past video_max_sec once the
+    #    short tail above is added, so this trims evenly-spaced frames out
+    #    of the action portion if so; in practice this almost never fires.
     max_frames = round(settings.duration_max_sec * fps)
     if total_frames > max_frames:
-        # trim from the base (non-special, non-structural) stretch first: drop
-        # evenly-spaced frames out of the action portion.
         excess = total_frames - max_frames
         if excess < action_frames:
             keep = action_frames - excess
@@ -130,28 +117,15 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
             frame_zoom = trimmed_zoom + frame_zoom[action_frames:]
             freeze_frame_index = len(trimmed_time)
             total_frames = len(frame_sim_time)
-    elif total_frames < min_frames:
-        pad = min_frames - total_frames
-        # replay the action again (from the top, real speed) rather than
-        # freezing on the final instant for the rest of the video -- no
-        # slow motion anywhere, and a frozen hold that could run past 30s
-        # on a short raw sim is just as boring in a different way. The
-        # winner/standings text has no opaque backdrop (draw.py), so the
-        # replay stays genuinely visible underneath it.
-        replay_time = frame_sim_time[:action_frames] or [sim_total]
-        replay_speed = frame_speed[:action_frames] or [1.0]
-        replay_zoom = frame_zoom[:action_frames] or [1.0]
-        n = len(replay_time)
-        frame_sim_time.extend(replay_time[i % n] for i in range(pad))
-        frame_speed.extend(replay_speed[i % n] for i in range(pad))
-        frame_zoom.extend(replay_zoom[i % n] for i in range(pad))
-        total_frames = len(frame_sim_time)
 
     # -- overlays --
+    # the "comment which color wins" prompt now stays up for the whole
+    # action, not just the first second -- by request, it's the one thing
+    # that should be on screen the entire time until the winner is shown.
+    # It replaces the old hook(1s)->storyline(2s)->nothing sequence, which
+    # would otherwise compete with it for the same screen region.
     overlays: list[OverlayCue] = [
-        OverlayCue(0, min(round(HOOK_SEC * fps), total_frames), "hook", {"text": "ONLY 1 SURVIVES", "chips": True}),
-        OverlayCue(round(HOOK_SEC * fps), min(round((HOOK_SEC + STORYLINE_SEC) * fps), total_frames),
-                   "storyline", {"text": episode.get("hook_line", "")}),
+        OverlayCue(0, freeze_frame_index, "hook", {"text": "COMMENT WHICH COLOR WINS"}),
     ]
     for e in record.events:
         if e.kind != "elimination":
@@ -188,8 +162,10 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
 
     # the ring never moves, so the camera (what frame_zoom zooms around)
     # just sits on its fixed center the whole video -- disaster_drop is the
-    # first event that needs this to actually move.
-    cam_x, cam_y = 540.0, 820.0
+    # first event that needs this to actually move. Read from cfg rather
+    # than hardcoded (a stale hardcoded ring center was a real bug class in
+    # this project before -- see CLAUDE.md's draw_frame/event_cfg decision).
+    cam_x, cam_y = float(cfg["ring"]["center"][0]), float(cfg["ring"]["center"][1])
 
     return Timeline(
         fps=fps,

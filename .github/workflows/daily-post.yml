@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       force_pick:
-        description: "Force one game instead of the random pick (colorwar / lasernationsDuel / followball / eyetest) — leave blank for normal behavior"
+        description: "Force one game instead of the random pick (colorwar / ringofdoom / followball / eyetest) — leave blank for normal behavior"
         required: false
         type: string
 
@@ -23,16 +23,20 @@ concurrency:
   group: daily-post
   cancel-in-progress: false
 
+permissions:
+  contents: write  # needed to push colorwars/league/season.json back after a Ring of Doom post
+
 jobs:
   post:
     runs-on: ubuntu-latest
     # This run renders ALL 4 rotation games back to back, not just one.
     # Measured in CI: Follow The Ball ~8min, Eye Test ~14min (3 rounds of real
-    # physics is heavier than it looks), Color War ~15min. Laser Nations Duel
-    # has no fixed timer (runs a dramatic-fight seed search, then the actual
-    # fight plays out until someone hits 0 hp) and ran notably longer in
-    # testing — worst case all 4 summing past 120min is plausible. The repo is
-    # public, so Actions minutes are unlimited — generous headroom costs nothing.
+    # physics is heavier than it looks), Color War ~15min. Ring of Doom
+    # (replaced Laser Nations Duel) mines 300 seeds first (pure physics, no
+    # browser — well under a minute even on a shared 2-vCPU runner) then
+    # renders whichever one scored best; real CI duration not yet measured,
+    # budgeted generously here like the others. The repo is public, so
+    # Actions minutes are unlimited — generous headroom costs nothing.
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -66,13 +70,22 @@ jobs:
           python-version: "3.12"
 
       - name: Set up the small audio-synthesis venv
-        # Only numpy/scipy/soundfile — the 3 rotation games just need procedural
-        # sound synthesis, none of the heavy ML stack (torch/whisper/etc) that
-        # scripts/setup.sh installs for the full sourced-video pipeline. Keeps
-        # this job fast instead of pulling in gigabytes nothing here uses.
+        # Only numpy/scipy/soundfile — the 3 JS-pipeline rotation games just
+        # need procedural sound synthesis, none of the heavy ML stack
+        # (torch/whisper/etc) that scripts/setup.sh installs for the full
+        # sourced-video pipeline. Keeps this job fast instead of pulling in
+        # gigabytes nothing here uses.
         run: |
           python3 -m venv python/.venv
           python/.venv/bin/pip install --quiet numpy soundfile scipy
+
+      - name: Set up the colorwars venv (Ring of Doom's own engine)
+        # colorwars/ is a separate Python project (pymunk + skia-python, its
+        # own render/audio/league pipeline) from the JS games above — see
+        # colorwars/CLAUDE.md. Its own requirements.txt, its own venv.
+        run: |
+          python3 -m venv colorwars/.venv
+          colorwars/.venv/bin/pip install --quiet -r colorwars/requirements.txt
 
       - name: Render today's game and post it to TikTok via Buffer
         run: npx tsx scripts/post/daily.ts
@@ -82,3 +95,25 @@ jobs:
           OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
           OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
           FORCE_PICK: ${{ inputs.force_pick }}
+          # colorwars/config/settings.yaml hardcodes a local macOS dev path
+          # for ffmpeg (that machine's bare `ffmpeg` is broken) — this
+          # overrides it to the apt-installed one already on PATH here.
+          COLORWARS_FFMPEG_PATH: ffmpeg
+
+      - name: Persist Ring of Doom's season state (if it posted today)
+        # `colorwars commit` (run by daily.ts's ringofdoom step, after a
+        # successful Buffer post) only updates these files on THIS runner's
+        # local checkout -- nothing pushes that back to the repo on its own.
+        # Without this, the season would never actually advance: every run
+        # would see the same un-committed season.json and keep rendering
+        # "ep001" forever. A no-op is expected and fine on days ringofdoom
+        # wasn't in the rotation, or failed before its commit step.
+        if: always()
+        run: |
+          git add colorwars/league/season.json colorwars/league/names_used.txt
+          if git diff --cached --quiet; then
+            echo "no season state changes to persist"
+          else
+            git -c user.email=bot@clipper.local -c user.name=clipper-bot commit -m "post: advance Color Wars League season"
+            git push
+          fi

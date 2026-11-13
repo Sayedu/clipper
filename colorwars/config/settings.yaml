@@ -7,8 +7,8 @@ resolution:
 fps: 60
 
 preview:
-  width: 540
-  height: 960
+  width: 810    # was 540 -- a quarter of final's pixels looked soft zoomed in; this is 0.75x final instead of 0.5x
+  height: 1440  # was 960
   fps: 30
 
 # TikTok safe area (px, in the 1080x1920 frame) -- all HUD text must stay inside this box.

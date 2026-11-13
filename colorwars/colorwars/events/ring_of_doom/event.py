@@ -17,6 +17,10 @@ from .sim import simulate as _simulate
 class RingOfDoomEvent(Event):
     id: ClassVar[str] = "ring_of_doom"
     display_name: ClassVar[str] = "Ring of Doom"
+    # the video ends ~1.5s after the winner card now instead of being
+    # padded to a 61s floor (see direct.py) -- mine()/find-seed must not
+    # reject an otherwise-valid seed just for being short.
+    enforce_duration_window: ClassVar[bool] = False
 
     def simulate(self, seed: int, settings: Settings, event_cfg: dict, teams: list[Team], episode: dict) -> SimRecord:
         # last_place_team_id travels through the generic `episode` dict
@@ -94,6 +98,6 @@ class RingOfDoomEvent(Event):
         if teams:
             curated += team_trait_params(
                 {t.id: t.traits for t in teams},
-                ["mass_mult", "elasticity_add", "radius_mult", "burst_impulse"],
+                ["mass_mult", "elasticity_add", "radius_mult"],
             )
         return dedupe_by_name(curated + super().params_schema(event_cfg))

@@ -36,7 +36,7 @@ def _mine_one(task: tuple[int, str, dict]) -> dict | None:
 
     timeline = event.direct(record, settings, cfg, episode, settings.fps)
     duration = timeline.duration_sec()
-    if not (settings.duration_min_sec <= duration <= settings.duration_max_sec):
+    if event.enforce_duration_window and not (settings.duration_min_sec <= duration <= settings.duration_max_sec):
         return None
 
     drama = event.drama_stats(record, episode)

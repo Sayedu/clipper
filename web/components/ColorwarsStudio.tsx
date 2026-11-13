@@ -34,9 +34,18 @@ export function ColorwarsStudio() {
   // background right after a valid quick check so there's something to
   // watch while deciding whether to keep this seed.
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
-  const [previewRendering, setPreviewRendering] = useState(false);
+  // if the browser ever fails to actually load the preview clip (seen for
+  // real, cause unconfirmed -- possibly load on this machine during heavy
+  // concurrent rendering), fall back to the filmstrip instead of leaving a
+  // broken, stuck-at-0:00 player on screen with nothing else to look at.
+  const [previewVideoFailed, setPreviewVideoFailed] = useState(false);
+  const [previewJob, setPreviewJob] = useState<Job | null>(null);
+  const previewRendering = previewJob != null && previewJob.status !== 'done' && previewJob.status !== 'error' && previewJob.status !== 'canceled';
   const previewJobIdRef = useRef<string | null>(null);
-  const latestSeedRef = useRef<number | null>(null);
+  // a generation counter, not the seed itself -- preview() now retries with
+  // several different seeds *inside* one call (see below), so "is this call
+  // still the active one" can't be answered by comparing seed values anymore.
+  const latestGenRef = useRef(0);
 
   const [mining, setMining] = useState(false);
 
@@ -63,11 +72,12 @@ export function ColorwarsStudio() {
   }, [eventId]);
 
   const preview = useCallback(
-    async (seedToUse: number) => {
-      latestSeedRef.current = seedToUse;
+    async (initialSeed: number) => {
+      const myGen = ++latestGenRef.current;
       setChecking(true);
       setCheckError(null);
       setPreviewVideoUrl(null);
+      setPreviewVideoFailed(false);
       // a reroll while the last preview clip was still rendering would
       // otherwise queue up behind it (jobs run one at a time) and waste
       // real render time on a seed nobody's looking at anymore.
@@ -75,29 +85,45 @@ export function ColorwarsStudio() {
         void colorwarsApi.cancelJob(previewJobIdRef.current).catch(() => {});
         previewJobIdRef.current = null;
       }
-      setPreviewRendering(false);
+      setPreviewJob(null);
       try {
-        const cfg = { event_id: eventId, seed: seedToUse, overrides: {}, episode_overrides: {}, finale };
-        const [checkRes, filmRes] = await Promise.all([colorwarsApi.quickCheck(cfg), colorwarsApi.filmstrip(cfg)]);
-        if (latestSeedRef.current !== seedToUse) return; // superseded by a newer reroll while this was in flight
+        // not every seed produces a valid run (Ring of Doom's own design:
+        // no single survivor by the deadline, independent of the config) --
+        // keep trying new seeds automatically instead of leaving the page
+        // dead-ended on whichever seed it happened to land on (found
+        // directly: the default starting seed, 1, isn't always valid, and
+        // the page just sat there with nothing to show). Same thing the
+        // engine's own `find-seed` does on the CLI side.
+        let seedToUse = initialSeed;
+        let checkRes: QuickCheckResult | null = null;
+        let filmRes: FilmstripResult | null = null;
+        for (let attempt = 0; attempt < 15; attempt++) {
+          if (latestGenRef.current !== myGen) return; // superseded by a newer call while this was in flight
+          if (attempt > 0) setSeed(seedToUse);
+          const cfg = { event_id: eventId, seed: seedToUse, overrides: {}, episode_overrides: {}, finale };
+          [checkRes, filmRes] = await Promise.all([colorwarsApi.quickCheck(cfg), colorwarsApi.filmstrip(cfg)]);
+          if (latestGenRef.current !== myGen) return;
+          if (checkRes.valid) break;
+          seedToUse = randomSeed();
+        }
+        if (!checkRes || !filmRes) return;
         setCheck(checkRes);
         setFilmstrip(filmRes);
         if (checkRes.valid) {
-          setPreviewRendering(true);
+          const cfg = { event_id: eventId, seed: seedToUse, overrides: {}, episode_overrides: {}, finale };
           const { job } = await colorwarsApi.createRenderJob({ ...cfg, mode: 'preview' });
-          if (latestSeedRef.current !== seedToUse) {
+          if (latestGenRef.current !== myGen) {
             void colorwarsApi.cancelJob(job.id).catch(() => {});
             return;
           }
           previewJobIdRef.current = job.id;
+          setPreviewJob(job);
           pollJob(job.id, (j) => {
-            if (latestSeedRef.current !== seedToUse) return; // a later reroll already took over
+            if (latestGenRef.current !== myGen) return; // a later reroll already took over
+            setPreviewJob(j);
             if (j.status === 'done') {
               const outDir = (j.result as { out_dir?: string } | null)?.out_dir?.split('/').pop();
               if (outDir) setPreviewVideoUrl(colorwarsMediaUrl(`/media/${outDir}/final.mp4`));
-              setPreviewRendering(false);
-            } else if (j.status === 'error' || j.status === 'canceled') {
-              setPreviewRendering(false);
             }
           });
         }
@@ -181,6 +207,9 @@ export function ColorwarsStudio() {
   const outDirName = result?.out_dir?.split('/').pop();
   const videoUrl = outDirName ? colorwarsMediaUrl(`/media/${outDirName}/final.mp4`) : null;
   const renderPct = job?.total_frames ? Math.round(100 * (job.frames_done / Math.max(1, job.total_frames))) : 0;
+  const previewPct = previewJob?.total_frames
+    ? Math.round(100 * (previewJob.frames_done / Math.max(1, previewJob.total_frames)))
+    : 0;
 
   const drama = check?.drama as { score?: number } | undefined;
 
@@ -191,8 +220,17 @@ export function ColorwarsStudio() {
         <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] border border-[color:var(--color-hairline-strong)] bg-black">
           {videoUrl ? (
             <video src={videoUrl} controls loop autoPlay muted playsInline className="absolute inset-0 h-full w-full object-contain" />
-          ) : previewVideoUrl ? (
-            <video src={previewVideoUrl} controls loop autoPlay muted playsInline className="absolute inset-0 h-full w-full object-contain" />
+          ) : previewVideoUrl && !previewVideoFailed ? (
+            <video
+              src={previewVideoUrl}
+              controls
+              loop
+              autoPlay
+              muted
+              playsInline
+              onError={() => setPreviewVideoFailed(true)}
+              className="absolute inset-0 h-full w-full object-contain"
+            />
           ) : filmstrip?.valid ? (
             <div className="absolute inset-0 grid grid-cols-2 grid-rows-3 gap-px bg-black">
               {filmstrip.frame_urls.map((url, i) => (
@@ -202,12 +240,27 @@ export function ColorwarsStudio() {
             </div>
           ) : (
             <div className="absolute inset-0 grid place-items-center text-[13px] text-[color:var(--color-muted)]">
-              {checking ? 'checking…' : checkError ? 'preview unavailable' : 'loading preview…'}
+              {checking
+                ? 'checking…'
+                : checkError
+                  ? 'preview unavailable'
+                  : check && !check.valid
+                    ? "couldn't find a valid seed — try Randomize again"
+                    : 'loading preview…'}
             </div>
           )}
           {!videoUrl && previewRendering && (
-            <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] text-white">
-              rendering preview clip…
+            <div className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-white">
+                <span>rendering preview…</span>
+                <span className="tabular-nums">{previewPct}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-[color:var(--color-accent)] transition-[width]"
+                  style={{ width: `${previewPct}%` }}
+                />
+              </div>
             </div>
           )}
         </div>

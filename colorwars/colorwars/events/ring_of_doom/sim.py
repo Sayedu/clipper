@@ -75,7 +75,7 @@ class _Ring:
             return
         p0, p1 = self._slot_points(i)
         seg = pymunk.Segment(self.body, p0, p1, self.thickness / 2.0)
-        seg.elasticity = 0.97  # was 0.9 -- matches the balls' own bounciness bump
+        seg.elasticity = 0.99  # was 0.9, then 0.97 -- matches the balls' own bounciness bump
         seg.friction = 0.15
         seg.collision_type = CT_WALL
         self._space.add(seg)
@@ -257,14 +257,14 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
     ring.apply_gaps(gaps)
     next_gap_event_t = gap_cfg["interval_sec"]
     gap_warning_fired = False
-    reverse_at_t = rng.uniform(15.0, 50.0)  # the one random reverse point
+    reverse_at_t = rng.uniform(15.0, 50.0)  # the one random reverse point, if enabled below
+    reverse_enabled = bool(cfg["ring"].get("reverse_once", True))
 
     # ---- hazard schedule state ----
     haz_cfg = cfg["hazards"]
     next_hazard_t = rng.uniform(haz_cfg["interval_min_sec"], haz_cfg["interval_max_sec"])
     hazard_warning_fired = False
     active_hazard = None  # {"kind","body","shape","end_t"}
-    yellow_burst_next = {b.info.id: rng.uniform(4.0, 7.0) for b in balls if b.info.team_id == "yellow"}
 
     teams_by_id = {t.id: t for t in teams}
     crown_team_id = episode.get("crown_team")
@@ -304,8 +304,12 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
             next_gap_event_t = t + interval
             gap_warning_fired = False
 
-        # -- ring reversal (once) --
-        if not ring.reversed_once and t >= reverse_at_t:
+        # -- ring reversal (once), only if the config actually asks for it --
+        # cfg["ring"]["reverse_once"] used to be dead config (the reversal
+        # always fired regardless of this flag) -- fixed to actually gate on
+        # it, since always-reversing is exactly what was reported as "it
+        # just rotates the other way" at the end.
+        if reverse_enabled and not ring.reversed_once and t >= reverse_at_t:
             ring.reverse()
             events.append(SimEvent(i, t, "reverse", {}))
 
@@ -364,16 +368,6 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
                     events.append(SimEvent(i, t, "hazard", {"kind": kind}))
                 next_hazard_t = t + rng.uniform(haz_cfg["interval_min_sec"], haz_cfg["interval_max_sec"])
                 hazard_warning_fired = False
-
-        # -- yellow team random bursts --
-        for b in balls:
-            if not b.alive or b.info.team_id != "yellow":
-                continue
-            due = yellow_burst_next.get(b.info.id)
-            if due is not None and t >= due:
-                ang = rng.uniform(0, TAU)
-                b.body.apply_impulse_at_local_point((500 * math.cos(ang), 500 * math.sin(ang)))
-                yellow_burst_next[b.info.id] = t + rng.uniform(4.0, 7.0)
 
         # -- physics step --
         space.step(dt)

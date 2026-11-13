@@ -51,7 +51,6 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
                event_cfg: dict) -> None:
     w, h = float(settings.width), float(settings.height)
     sim_t = timeline.frame_sim_time[frame_idx]
-    zoom = timeline.frame_zoom[frame_idx]
     step = record.steps[_step_index(record, sim_t)]
     overlays = _active_overlays(timeline, frame_idx)
     overlay_kinds = {o.kind for o in overlays}
@@ -66,46 +65,21 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     ring_center = (float(ring_cfg["center"][0]), float(ring_cfg["center"][1]))
     ring_segments = int(ring_cfg["segments"])
 
-    # -- screen shake: a small, deterministic jitter near a recent elimination --
-    recent_elims = _recent_events(record, sim_t, 0.15, {"elimination"})
-    shake_x = shake_y = 0.0
-    if recent_elims:
-        age = sim_t - recent_elims[-1].t
-        amp = max(0.0, 3.0 * (1.0 - age / 0.15))
-        shake_x = amp * math.sin(frame_idx * 7.3)
-        shake_y = amp * math.cos(frame_idx * 5.1)
-
-    canvas.save()
-    canvas.translate(shake_x, shake_y)
-
     # -- background --
     canvas.clear(_hex_to_color(settings.background_color))
     canvas.drawRect(skia.Rect(0, 0, w, h), _vignette_paint(w, h))
 
     cx, cy = ring_center
 
-    canvas.save()
-    canvas.translate(cx, cy)
-    canvas.scale(zoom, zoom)
-    canvas.translate(-cx, -cy)
-
-    _draw_ring(canvas, step, sim_t, record, overlays, ring_center, ring_radius, ring_segments)
+    _draw_ring(canvas, step, ring_center, ring_radius, ring_segments)
     _draw_particles(canvas, record, sim_t, ring_center)
     _draw_balls(canvas, step, record, teams_by_id, sim_t, ring_center, ring_radius)
-
-    canvas.restore()  # back to un-zoomed, un-shaken-but-still-shaken-outer space
-
-    canvas.restore()  # back to the true screen space (undo shake too, for crisp HUD)
 
     _draw_hud(canvas, settings, record, episode_overlays=overlays, overlay_kinds=overlay_kinds, step=step, teams=teams)
 
 
-def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays, ring_center, ring_radius: float,
-               ring_segments: int) -> None:
+def _draw_ring(canvas, step, ring_center, ring_radius: float, ring_segments: int) -> None:
     cx, cy = ring_center
-    gap_warning_active = any(e.kind == "warning" and e.data.get("about") == "gap" and abs(e.t - sim_t) < 1.0
-                              for e in record.events)
-
     ring_color = "#B8C0CC"
 
     slot_deg = 360.0 / ring_segments
@@ -113,9 +87,16 @@ def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays, ring_center, ri
     ring_angle_deg = math.degrees(step.ring_angle)
 
     wall_paint = skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=10, Color=_hex_to_color(ring_color))
-    warn_paint = skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style, StrokeWidth=12,
-                             Color=_hex_to_color("#FF4D5E", 220))
 
+    # the pulsing red "gap warning" arc used to be drawn here too, directly
+    # over the gap -- it's a continuous arc (addArc) laid over a wall that's
+    # actually built from 96 DISCRETE segments, and the two don't line up
+    # exactly at segment boundaries. Reported directly as "the opening
+    # became a red line" and "it looks open when it isn't" -- removed
+    # rather than reconciled, since the segment loop below is already the
+    # single source of truth for what's actually open (identical formula to
+    # the physics side's own gap check), and needs no warning drawn over it
+    # to stay correct.
     for i in range(ring_segments):
         slot_center_local = (i + 0.5) * slot_deg
         covered = any(abs(((slot_center_local - c + 180) % 360) - 180) <= hw for c, hw in gaps)
@@ -126,17 +107,6 @@ def _draw_ring(canvas, step, sim_t, record: SimRecord, overlays, ring_center, ri
         p0 = (cx + ring_radius * math.cos(a0), cy + ring_radius * math.sin(a0))
         p1 = (cx + ring_radius * math.cos(a1), cy + ring_radius * math.sin(a1))
         canvas.drawLine(p0[0], p0[1], p1[0], p1[1], wall_paint)
-
-    if gap_warning_active:
-        pulse = 0.5 + 0.5 * math.sin(sim_t * 14.0)
-        warn_paint.setColor(_hex_to_color("#FF4D5E", int(120 + 120 * pulse)))
-        for c, hw in gaps:
-            a0 = math.radians(c - hw + ring_angle_deg)
-            a1 = math.radians(c + hw + ring_angle_deg)
-            path = skia.Path()
-            path.addArc(skia.Rect(cx - ring_radius, cy - ring_radius, cx + ring_radius, cy + ring_radius),
-                        math.degrees(a0), math.degrees(a1 - a0))
-            canvas.drawPath(path, warn_paint)
 
 
 def _draw_particles(canvas, record: SimRecord, sim_t: float, ring_center) -> None:
@@ -220,6 +190,8 @@ def _draw_eyes(canvas, bs, r: float, eliminated: bool, widened: bool) -> None:
 
 _LABEL_FONT: skia.Font | None = None
 _HEAVY_FONT: skia.Font | None = None
+_SMALL_LABEL_FONT: skia.Font | None = None
+_ROSTER_TEAM_FONT: skia.Font | None = None
 
 
 def _label_font(settings: Settings) -> skia.Font:
@@ -228,6 +200,20 @@ def _label_font(settings: Settings) -> skia.Font:
         tf = skia.Typeface.MakeFromFile(str(settings.font_label))
         _LABEL_FONT = skia.Font(tf, 22)
     return _LABEL_FONT
+
+
+def _label_font_small() -> skia.Font:
+    # loaded by init_fonts() alongside _LABEL_FONT; falls back to a blank
+    # typeface only if somehow called before that (never happens in a real
+    # render -- init_render() always runs first).
+    return _SMALL_LABEL_FONT or skia.Font(skia.Typeface(), 20)
+
+
+def _roster_team_font() -> skia.Font:
+    # the team-color label under each roster column, deliberately bigger
+    # than the player-name font above it (by request, read clearly at a
+    # glance) -- loaded by init_fonts() alongside the others.
+    return _ROSTER_TEAM_FONT or skia.Font(skia.Typeface(), 25)
 
 
 def _heavy_font(settings: Settings, size: float) -> skia.Font:
@@ -250,9 +236,11 @@ def _draw_label(canvas, bs, r: float, name: str) -> None:
 
 def init_fonts(settings: Settings) -> None:
     """Call once before rendering any frame -- loads the two OFL fonts."""
-    global _LABEL_FONT
+    global _LABEL_FONT, _SMALL_LABEL_FONT, _ROSTER_TEAM_FONT
     tf = skia.Typeface.MakeFromFile(str(settings.font_label))
     _LABEL_FONT = skia.Font(tf, 22)
+    _SMALL_LABEL_FONT = skia.Font(tf, 20)   # was 17 -- the roster's player names, made easier to read
+    _ROSTER_TEAM_FONT = skia.Font(tf, 25)   # the roster's team-color labels, bigger still
 
 
 def _draw_hud(canvas, settings: Settings, record: SimRecord, episode_overlays, overlay_kinds, step, teams) -> None:
@@ -262,7 +250,7 @@ def _draw_hud(canvas, settings: Settings, record: SimRecord, episode_overlays, o
     heavy_mid = _heavy_font(settings, 40)
     heavy_small = _heavy_font(settings, 30)
 
-    showing_card = bool(overlay_kinds & {"winner", "standings", "hook", "storyline"})
+    showing_card = bool(overlay_kinds & {"winner", "standings", "hook"})
 
     if not showing_card:
         # -- top: event title + N LEFT --
@@ -273,23 +261,62 @@ def _draw_hud(canvas, settings: Settings, record: SimRecord, episode_overlays, o
         tw = heavy_mid.measureText(n_left_text)
         canvas.drawString(n_left_text, (x_min + x_max) / 2 - tw / 2, y_min + 95, heavy_mid, title_paint)
 
-        # -- bottom: team strip with alive dots --
-        counts: dict[str, int] = {}
-        for i, bs in enumerate(step.balls):
-            if bs.alive:
-                tid = record.balls[i].team_id
-                counts[tid] = counts.get(tid, 0) + 1
-        strip_y = y_max - 40
-        slot_w = (x_max - x_min) / len(teams)
-        for k, team in enumerate(teams):
-            cx0 = x_min + slot_w * (k + 0.5)
-            alive_n = counts.get(team.id, 0)
-            for d in range(4):
-                dot_color = _hex_to_color(team.color) if d < alive_n else skia.Color(255, 255, 255, 60)
-                canvas.drawCircle(cx0 - 24 + d * 16, strip_y, 6, skia.Paint(AntiAlias=True, Color=dot_color))
+    # -- bottom: a full roster, one column per team, every ball by name,
+    # crossed out the moment it's eliminated -- shown throughout (including
+    # under the winner/standings cards), since it sits below the ring, not
+    # over it, and "who's still in it" stays useful info right to the end.
+    _draw_roster(canvas, x_min, x_max, y_max, record, step, teams)
 
     for o in episode_overlays:
         _draw_overlay(canvas, o, heavy_big, heavy_mid, heavy_small, settings)
+
+
+def _draw_roster(canvas, x_min: float, x_max: float, y_max: float, record: SimRecord, step, teams) -> None:
+    # sized up from an earlier, smaller pass (icon_r 13->16, row_h 44->50,
+    # name font 17->20pt, team-label font a new, bigger 25pt) -- by request,
+    # the whole roster was reading too small. ring.center in config was
+    # also moved up (see ring_of_doom.yaml) to free the extra vertical room
+    # this needs, including a bigger gap above the roster's first row.
+    font = _label_font_small()
+    team_font = _roster_team_font()
+    icon_r = 16.0
+    row_h = 50.0
+    rows = 4
+    name_offset = icon_r + 18.0  # ball-center to name-baseline
+    group_label_gap = 36.0       # name baseline to team-label baseline
+    text_descent_buffer = 8.0    # room for the team label's own descenders
+    top_y = y_max - row_h * (rows - 1) - name_offset - group_label_gap - text_descent_buffer
+    slot_w = (x_max - x_min) / len(teams)
+
+    for k, team in enumerate(teams):
+        col_x = x_min + slot_w * (k + 0.5)
+        ball_idxs = [i for i, b in enumerate(record.balls) if b.team_id == team.id]
+        last_name_y = top_y
+        for row, i in enumerate(ball_idxs[:rows]):
+            info = record.balls[i]
+            bs = step.balls[i]
+            y = top_y + row * row_h
+            color = _hex_to_color(team.color) if bs.alive else _hex_to_color(team.color, 80)
+            canvas.drawCircle(col_x, y, icon_r, skia.Paint(AntiAlias=True, Color=color))
+            if not bs.alive:
+                mark = skia.Paint(AntiAlias=True, Color=skia.ColorWHITE, Style=skia.Paint.kStroke_Style, StrokeWidth=3.2)
+                d = icon_r * 0.6
+                canvas.drawLine(col_x - d, y - d, col_x + d, y + d, mark)
+                canvas.drawLine(col_x - d, y + d, col_x + d, y - d, mark)
+            name = info.name.upper()
+            tw = font.measureText(name)
+            text_color = skia.ColorWHITE if bs.alive else skia.Color(255, 255, 255, 140)
+            name_y = y + name_offset
+            canvas.drawString(name, col_x - tw / 2, name_y, font, skia.Paint(AntiAlias=True, Color=text_color))
+            last_name_y = name_y
+
+        # the team-color label, one per group, under its last ball's name --
+        # e.g. "RED" under the red column -- bigger than the name font and
+        # in the team's own color so it reads clearly at a glance.
+        label = team.name.upper()
+        lw = team_font.measureText(label)
+        canvas.drawString(label, col_x - lw / 2, last_name_y + group_label_gap, team_font,
+                           skia.Paint(AntiAlias=True, Color=_hex_to_color(team.color)))
 
 
 def _wrap_text(text: str, font: skia.Font, max_width: float) -> list[str]:
@@ -330,18 +357,13 @@ def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: 
     center_x = w / 2
 
     if overlay.kind == "hook":
-        text = overlay.data["text"]
-        tw = heavy_big.measureText(text)
-        canvas.drawString(text, center_x - tw / 2, 260, heavy_big, white)
-        if overlay.data.get("chips"):
-            chip_text = "PICK YOUR TEAM"
-            tw2 = heavy_small.measureText(chip_text)
-            canvas.drawString(chip_text, center_x - tw2 / 2, 330, heavy_small, white)
-
-    elif overlay.kind == "storyline":
+        # word-wrapped (not a single drawString) since this line is now a
+        # full sentence ("COMMENT WHICH COLOR WINS") rather than a short
+        # phrase like the old "ONLY 1 SURVIVES" -- a fixed-position single
+        # line would run past the safe area at this font size.
         text = overlay.data["text"]
         max_w = settings.safe_x_max - settings.safe_x_min - 40
-        _draw_wrapped_centered(canvas, text, heavy_small, white, center_x, 400, max_w, 42)
+        _draw_wrapped_centered(canvas, text, heavy_big, white, center_x, 260, max_w, 70)
 
     elif overlay.kind == "toast":
         text = overlay.data["text"]
@@ -362,21 +384,13 @@ def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: 
         tw2 = heavy_mid.measureText(t2)
         canvas.drawString(t2, center_x - tw2 / 2, 870, heavy_mid, white)
 
-    elif overlay.kind == "standings":
-        standings = overlay.data.get("standings", {})
-        teaser = overlay.data.get("teaser", "")
-        title = "STANDINGS"
-        tw = heavy_mid.measureText(title)
-        canvas.drawString(title, center_x - tw / 2, 700, heavy_mid, white)
-        y = 760
-        for team_id, pts in standings.items():
-            line = f"{team_id.upper()}: {pts}"
-            tw2 = heavy_small.measureText(line)
-            canvas.drawString(line, center_x - tw2 / 2, y, heavy_small, white)
-            y += 44
-        if teaser:
-            max_w = settings.safe_x_max - settings.safe_x_min - 40
-            _draw_wrapped_centered(canvas, teaser, heavy_small, white, center_x, y + 30, max_w, 42)
+    # the "standings" overlay (a STANDINGS title, a points line per team, and
+    # a wrapped teaser sentence, all stacked over the ring) used to render
+    # here -- reported directly as "too much going on" inside the circle,
+    # on top of the ring/balls still visibly in motion underneath it. The
+    # "winner" card above already carries the moment that actually matters
+    # (who won, who the MVP was); dropped the rest rather than trim it down,
+    # since any text stacked here runs into the same complaint.
 
 
 def _draw_confetti(canvas, settings: Settings, team_name: str) -> None:

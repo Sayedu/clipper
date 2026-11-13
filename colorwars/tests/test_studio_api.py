@@ -94,8 +94,11 @@ def test_quick_check_known_valid_seed():
     data = client.post("/quick-check", json=body).json()
     assert data["valid"] is True
     assert data["winner"] in ("red", "blue", "green", "yellow")
-    assert data["in_window"] is True
-    assert 61 <= data["duration_sec"] <= 70
+    # Ring of Doom no longer pads out to the 61-70s window (by request: the
+    # video ends ~1.5s after the winner card instead) -- it's expected and
+    # fine for a seed to land well under 61s now.
+    assert data["in_window"] is False
+    assert 1 <= data["duration_sec"] <= 70
 
 
 def test_quick_check_override_changes_ball_count():
