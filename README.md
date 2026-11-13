@@ -202,10 +202,10 @@ npm test          # vitest (scoring, segment, ASS, crop, migration runner, coold
 
 A second, separate section of the same dashboard at **http://localhost:3100/colorwars**
 ("Color Wars" in the top nav) for the `colorwars/` engine — six physics-sim TikTok events
-(Ring of Doom, Shell Shuffle, Disaster Drop, Turf War, Great Escape, Champion Duel). Set up any
-event, lock or randomize settings, preview before rendering, mine hundreds of seeds for the
-most dramatic run, queue full renders, and manage the library/standings/names queue — all from
-the browser.
+(Ring of Doom, Shell Shuffle, Disaster Drop, Turf War, Great Escape, Champion Duel). One page,
+same shape as the other single-game studios (Follow The Ball, Eye Test, …): pick an event,
+Randomize (or "Find a great seed" to mine for a dramatic one), check the preview, hit Render,
+download the finished video.
 
 `npm run dev` starts this too, no second command: it launches a small local FastAPI service
 (`colorwars/colorwars/studio_api`) alongside the worker and the dashboard, bound to

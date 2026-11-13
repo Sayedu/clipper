@@ -87,6 +87,12 @@ class JobStore:
         return self.update(job_id, cancel_requested=True)
 
     def _write(self, job: dict) -> None:
+        # defensive, not just belt-and-suspenders: __init__ only creates this
+        # directory once, at process startup -- found directly when it had
+        # been removed (an out/ cleanup) while a long-running Studio API
+        # process was still up, and every render/mine job creation crashed
+        # with an opaque FileNotFoundError instead of just recreating it.
+        self.jobs_dir.mkdir(parents=True, exist_ok=True)
         path = self._path(job["id"])
         tmp = path.with_suffix(f".tmp{os.getpid()}")
         tmp.write_text(json.dumps(job, indent=2, default=str), encoding="utf-8")

@@ -46,6 +46,13 @@ def _poll_job(job_id: str, timeout_sec: float = 60.0) -> dict:
 
 @pytest.fixture(autouse=True)
 def _clean_studio_dirs():
+    # snapshot what's already in out/ BEFORE this test, so teardown only
+    # ever removes episode dirs this specific test created -- a naming-
+    # pattern match here once deleted a real render a person had just made
+    # through the UI, since real renders use the exact same ep<n>_<jobid>
+    # naming as test ones. Never again: diff against a real before/after
+    # snapshot, regardless of what the directory is named.
+    before = {d.name for d in OUT_DIR.glob("ep*_*") if d.is_dir()}
     yield
     # the module-level JobStore only creates JOBS_DIR once, at import time --
     # rmtree-ing it here without recreating it would break every test after
@@ -53,9 +60,9 @@ def _clean_studio_dirs():
     shutil.rmtree(JOBS_DIR, ignore_errors=True)
     JOBS_DIR.mkdir(parents=True, exist_ok=True)
     shutil.rmtree(SCRATCH_DIR, ignore_errors=True)
-    for d in OUT_DIR.glob("ep*_*"):
-        if d.is_dir() and len(d.name.split("_")[-1]) == 8:  # our job-id-suffixed test dirs only
-            shutil.rmtree(d, ignore_errors=True)
+    after = {d.name for d in OUT_DIR.glob("ep*_*") if d.is_dir()}
+    for name in after - before:
+        shutil.rmtree(OUT_DIR / name, ignore_errors=True)
 
 
 def test_health():

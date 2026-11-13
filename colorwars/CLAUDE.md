@@ -124,24 +124,65 @@ decisions log for the full story, including the one it didn't fully
 solve.
 
 Website Studio: a FastAPI service (`colorwars/studio_api/`) imports the
-engine directly and exposes it as `/colorwars` on the main dashboard --
-Setup (schema-driven form, lock/Randomize/Reroll/Reset, presets), Preview
-(quick check, 6-frame filmstrip, 540x960 preview video), Story director
-(headless mining with story-flag filters), Render (a one-at-a-time disk-
-backed job queue, cancel, Make N), Library (cards with caption/pinned-
-comment copy, render-again, delete), and League (standings, storylines,
-head-to-head, a raw-comment names parser, commit-with-confirm). `npm run
-dev` launches it alongside the worker and the dashboard; the browser never
-talks to it directly (a same-origin Next.js rewrite, same pattern as
-`/worker`). 34 Python tests pass (17 engine + 17 new API tests) and the
-Playwright E2E spec (randomize → quick check → preview → fast render →
-library) passes reliably. Two real bugs were found and fixed by actually
-using the finished UI, not just by building it -- see the decisions log.
+engine directly and exposes it as `/colorwars` on the main dashboard,
+backed by a disk-saved, one-at-a-time render/mine job queue. The page
+itself is deliberately **one page, no tabs** -- pick an event, Randomize
+(or Find a great seed, a one-click mining run with no exposed filters),
+check the preview strip + outcome readout, hit Render, get a video +
+download, same shape as every other single-game studio in this app
+(FollowBallStudio etc.) rather than the much deeper tabbed Setup/Preview/
+Story-director/Render/Library/League design built first and then cut back
+after it proved too complex to actually use comfortably. The full generic
+params schema, presets, locks, mining filters, and the library/league API
+routes still exist server-side (nothing was removed from `studio_api/`)
+-- they're just not surfaced by this simplified page; a future pass could
+expose any of them again behind something less overwhelming than a form
+with 30+ visible fields. `npm run dev` launches the API alongside the
+worker and the dashboard; the browser never talks to it directly (a same-
+origin Next.js rewrite, same pattern as `/worker`). 34 Python tests pass
+(17 engine + 17 API tests) and the Playwright E2E spec (randomize → wait
+for a valid preview → render → confirm it lands in the engine's own
+library) passes reliably. Several real bugs were found and fixed by
+actually using the finished thing, not just by building it -- see the
+decisions log.
 
 ## Decisions log
 
 ### Website Studio
 
+- **The first version of this page was one page too many: a 6-tab Setup/
+  Preview/Story-director/Render/Library/League design, built exactly to
+  the original brief's letter.** Told directly it was too hard to use and
+  should be "one page, easy like the others" (the other single-game
+  studios in this app). Rebuilt as one page, no tabs, modeled directly on
+  `FollowBallStudio.tsx`'s actual shape rather than re-deriving "easy"
+  from first principles -- a small preview column, two or three primary
+  buttons, one render action that shows progress inline then the result
+  in place. The deep version's backend (full params schema, presets,
+  locks, mining filters, library/league routes) was left alone and still
+  works -- only the frontend was cut back, since none of that capability
+  was the problem, the six-tab *surface* was.
+- **`JobStore._write()` crashed with an opaque `FileNotFoundError` if
+  `out/_studio_jobs/` didn't exist at write time** -- it's only created
+  once, in `__init__`, which only ever runs once for the long-running API
+  process. Found for real: an `out/` cleanup mid-session (while the API
+  was still up) removed that directory, and the very next render/mine job
+  creation crashed. The frontend's own `alert()` on that failure made it
+  worse in an automated test specifically -- Playwright auto-dismisses JS
+  dialogs it isn't told to handle, so the real error silently vanished
+  and the test just looked like the render button did nothing. Fixed by
+  making `_write()` recreate the directory defensively on every write,
+  not just trust it was already there.
+- **A test cleanup fixture deleted a real render a person had just made
+  through the UI.** `test_studio_api.py`'s teardown matched episode
+  directories by NAME PATTERN (`ep*_<8-char-id>`) to decide what to
+  delete -- the exact same pattern every real render also uses, since
+  real and test renders are created the same way. Running the pytest
+  suite after a manual render destroyed it. Fixed by snapshotting
+  `out/`'s contents before each test and diffing after, so teardown only
+  ever removes directories that specific test actually created, never a
+  name-pattern guess -- verified directly with a planted fake "real"
+  render that survived a full test run only after the fix.
 - **A real, user-reported bug, found the day this shipped: Ring of Doom
   balls visually passing straight through a "solid" section of the
   wall.** Root cause was structural, not a one-off: `draw_frame()` never

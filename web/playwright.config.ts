@@ -4,7 +4,7 @@ const webPort = process.env.WEB_PORT ?? '3100';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 240_000,
+  timeout: 360_000, // a full-quality render (no fast-test mode on this simplified page) can take a few minutes
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
