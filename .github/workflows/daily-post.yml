@@ -83,7 +83,13 @@ jobs:
         # colorwars/ is a separate Python project (pymunk + skia-python, its
         # own render/audio/league pipeline) from the JS games above — see
         # colorwars/CLAUDE.md. Its own requirements.txt, its own venv.
+        # skia-python's Linux wheel dynamically links libEGL/libGL at import
+        # time (an actual GPU is never used -- CPU rasterization only -- but
+        # the .so still has to resolve), which ubuntu-latest doesn't ship by
+        # default: a first real CI run failed with "libEGL.so.1: cannot open
+        # shared object file".
         run: |
+          sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libglu1-mesa
           python3 -m venv colorwars/.venv
           colorwars/.venv/bin/pip install --quiet -r colorwars/requirements.txt
 
