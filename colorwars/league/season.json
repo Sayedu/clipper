@@ -104,43 +104,69 @@
         "wiped_before_15": false,
         "score": 37.008
       }
+    },
+    {
+      "id": "ep005",
+      "event": "ring_of_doom",
+      "seed": 22,
+      "placements": [
+        "yellow",
+        "red",
+        "blue",
+        "green"
+      ],
+      "mvp": "Bolt",
+      "date": "2026-11-13",
+      "is_finale": false,
+      "duration_sec": 24.116666666666667,
+      "drama": {
+        "lead_changes": 7,
+        "near_misses": 0,
+        "final_two_sec": 4.338,
+        "was_last_after_15": true,
+        "comeback_margin": 1,
+        "crown_team_lost": true,
+        "dead_stretches_over_9s": 0,
+        "wiped_before_15": false,
+        "score": 36.337
+      }
     }
   ],
   "standings": {
     "red": {
-      "points": 31,
+      "points": 37,
       "wins": 3,
-      "podiums": 3,
-      "streak_type": "win",
-      "streak_count": 3
+      "podiums": 4,
+      "streak_type": "loss",
+      "streak_count": 1
     },
     "blue": {
-      "points": 28,
+      "points": 31,
       "wins": 1,
-      "podiums": 4,
+      "podiums": 5,
       "streak_type": "loss",
-      "streak_count": 3
+      "streak_count": 4
     },
     "green": {
-      "points": 15,
+      "points": 16,
       "wins": 0,
       "podiums": 4,
       "streak_type": "loss",
-      "streak_count": 4
+      "streak_count": 5
     },
     "yellow": {
-      "points": 6,
-      "wins": 0,
-      "podiums": 1,
-      "streak_type": "loss",
-      "streak_count": 4
+      "points": 16,
+      "wins": 1,
+      "podiums": 2,
+      "streak_type": "win",
+      "streak_count": 1
     }
   },
   "records": {
     "fastest_win": {
-      "episode_id": "ep002",
-      "team": "red",
-      "sim_seconds": 25.029166666666665
+      "episode_id": "ep005",
+      "team": "yellow",
+      "sim_seconds": 22.6125
     },
     "biggest_comeback": {
       "episode_id": "ep002",
@@ -149,33 +175,33 @@
     },
     "longest_losing_streak": {
       "team": "green",
-      "count": 4
+      "count": 5
     }
   },
   "head_to_head": {
     "blue|red": {
-      "red": 3,
+      "red": 4,
       "blue": 1
     },
     "green|red": {
-      "red": 3,
+      "red": 4,
       "green": 1
     },
     "red|yellow": {
       "red": 3,
-      "yellow": 1
+      "yellow": 2
     },
     "blue|green": {
-      "blue": 4,
+      "blue": 5,
       "green": 0
     },
     "blue|yellow": {
       "blue": 4,
-      "yellow": 0
+      "yellow": 1
     },
     "green|yellow": {
       "green": 4,
-      "yellow": 0
+      "yellow": 1
     }
   }
 }
