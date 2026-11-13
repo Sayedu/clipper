@@ -48,15 +48,19 @@ test('studio: randomize, preview, render, lands in the library', async ({ page, 
   await expect(page.locator('video').first()).toBeVisible();
 
   // --- confirm it actually landed in the engine's own library -----------
-  let newEpisodeDir: string | null = null;
   await expect(async () => {
     const after = await listLibrary(request);
-    const fresh = after.find((c) => !beforeIds.has(c.episode_dir));
-    expect(fresh).toBeTruthy();
-    newEpisodeDir = fresh!.episode_dir;
+    expect(after.some((c) => !beforeIds.has(c.episode_dir))).toBe(true);
   }).toPass({ timeout: 10_000, intervals: [500] });
 
-  if (newEpisodeDir) {
-    await request.delete(`/colorwars-api/library/${newEpisodeDir}`);
+  // cleanup -- the page itself also auto-renders a background preview clip
+  // (on load and on every reroll), which lands its own episode in out/ just
+  // like the final render does; delete everything new, not just the one
+  // the assertion above found, so repeated runs don't pile up.
+  const after = await listLibrary(request);
+  for (const card of after) {
+    if (!beforeIds.has(card.episode_dir)) {
+      await request.delete(`/colorwars-api/library/${card.episode_dir}`);
+    }
   }
 });

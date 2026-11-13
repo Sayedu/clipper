@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { colorwarsApi, colorwarsMediaUrl, pollJob } from '@/lib/colorwarsApi';
 import type { EventInfo, EventSchema, FilmstripResult, Job, QuickCheckResult } from '@/lib/colorwarsTypes';
 import { Button, SegmentedControl, Toggle } from '@/components/ui';
@@ -29,6 +29,15 @@ export function ColorwarsStudio() {
   const [filmstrip, setFilmstrip] = useState<FilmstripResult | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
 
+  // a real, playing preview clip (540x960) -- the filmstrip alone is just
+  // 6 still frames, not something that actually plays; rendered in the
+  // background right after a valid quick check so there's something to
+  // watch while deciding whether to keep this seed.
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+  const [previewRendering, setPreviewRendering] = useState(false);
+  const previewJobIdRef = useRef<string | null>(null);
+  const latestSeedRef = useRef<number | null>(null);
+
   const [mining, setMining] = useState(false);
 
   const [jobId, setJobId] = useState<string | null>(null);
@@ -55,13 +64,43 @@ export function ColorwarsStudio() {
 
   const preview = useCallback(
     async (seedToUse: number) => {
+      latestSeedRef.current = seedToUse;
       setChecking(true);
       setCheckError(null);
+      setPreviewVideoUrl(null);
+      // a reroll while the last preview clip was still rendering would
+      // otherwise queue up behind it (jobs run one at a time) and waste
+      // real render time on a seed nobody's looking at anymore.
+      if (previewJobIdRef.current) {
+        void colorwarsApi.cancelJob(previewJobIdRef.current).catch(() => {});
+        previewJobIdRef.current = null;
+      }
+      setPreviewRendering(false);
       try {
         const cfg = { event_id: eventId, seed: seedToUse, overrides: {}, episode_overrides: {}, finale };
         const [checkRes, filmRes] = await Promise.all([colorwarsApi.quickCheck(cfg), colorwarsApi.filmstrip(cfg)]);
+        if (latestSeedRef.current !== seedToUse) return; // superseded by a newer reroll while this was in flight
         setCheck(checkRes);
         setFilmstrip(filmRes);
+        if (checkRes.valid) {
+          setPreviewRendering(true);
+          const { job } = await colorwarsApi.createRenderJob({ ...cfg, mode: 'preview' });
+          if (latestSeedRef.current !== seedToUse) {
+            void colorwarsApi.cancelJob(job.id).catch(() => {});
+            return;
+          }
+          previewJobIdRef.current = job.id;
+          pollJob(job.id, (j) => {
+            if (latestSeedRef.current !== seedToUse) return; // a later reroll already took over
+            if (j.status === 'done') {
+              const outDir = (j.result as { out_dir?: string } | null)?.out_dir?.split('/').pop();
+              if (outDir) setPreviewVideoUrl(colorwarsMediaUrl(`/media/${outDir}/final.mp4`));
+              setPreviewRendering(false);
+            } else if (j.status === 'error' || j.status === 'canceled') {
+              setPreviewRendering(false);
+            }
+          });
+        }
       } catch (e) {
         setCheckError((e as Error).message);
       } finally {
@@ -152,6 +191,8 @@ export function ColorwarsStudio() {
         <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] border border-[color:var(--color-hairline-strong)] bg-black">
           {videoUrl ? (
             <video src={videoUrl} controls loop autoPlay muted playsInline className="absolute inset-0 h-full w-full object-contain" />
+          ) : previewVideoUrl ? (
+            <video src={previewVideoUrl} controls loop autoPlay muted playsInline className="absolute inset-0 h-full w-full object-contain" />
           ) : filmstrip?.valid ? (
             <div className="absolute inset-0 grid grid-cols-2 grid-rows-3 gap-px bg-black">
               {filmstrip.frame_urls.map((url, i) => (
@@ -162,6 +203,11 @@ export function ColorwarsStudio() {
           ) : (
             <div className="absolute inset-0 grid place-items-center text-[13px] text-[color:var(--color-muted)]">
               {checking ? 'checking…' : checkError ? 'preview unavailable' : 'loading preview…'}
+            </div>
+          )}
+          {!videoUrl && previewRendering && (
+            <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] text-white">
+              rendering preview clip…
             </div>
           )}
         </div>
