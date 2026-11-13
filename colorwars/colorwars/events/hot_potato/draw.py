@@ -92,6 +92,8 @@ def draw_frame(canvas, record: SimRecord, timeline: Timeline, settings: Settings
     _draw_balls(canvas, step, record, teams_by_id, sim_t)
     if holder_id is not None and not showing_winner_card:
         _draw_bomb_holder(canvas, step, holder_id, remaining)
+        if remaining is not None:
+            _draw_bomb_timer(canvas, arena_center, arena_radius, remaining)
 
     _draw_hud(canvas, settings, record, episode_overlays=overlays, overlay_kinds=overlay_kinds, step=step, teams=teams)
 
@@ -156,12 +158,12 @@ def _draw_eyes(canvas, bs, r: float, eliminated: bool) -> None:
 
 
 def _draw_bomb_holder(canvas, step, holder_id: int, remaining: float | None) -> None:
-    """The one thing that makes the mechanic readable: a pulsing ring
-    around whoever's holding it, plus a big countdown number above their
-    head that visibly speeds its pulse up as it nears zero -- this is the
-    entire "why did that ball just explode" question answered on screen,
-    the exact gap that made Ring of Doom's hazards look like nothing
-    touched the ball before they were fixed to draw anything at all."""
+    """The pulsing ring around whoever's holding it -- this is the "why is
+    that ball about to explode" answer, the exact gap that made Ring of
+    Doom's hazards look like nothing touched the ball before they were
+    fixed to draw anything at all. The countdown number itself lives
+    outside the arena now (see _draw_bomb_timer) so it's always readable
+    in one fixed place instead of following the holder around the bowl."""
     if holder_id >= len(step.balls):
         return
     bs = step.balls[holder_id]
@@ -172,12 +174,23 @@ def _draw_bomb_holder(canvas, step, holder_id: int, remaining: float | None) -> 
     pulse = 0.85 + 0.2 * math.sin(remaining * pulse_hz * TAU if remaining is not None else 0.0)
     canvas.drawCircle(bs.x, bs.y, r * 1.5 * pulse, skia.Paint(AntiAlias=True, Style=skia.Paint.kStroke_Style,
                                                                StrokeWidth=6, Color=BOMB_COLOR))
-    if remaining is not None:
-        label = str(max(1, math.ceil(remaining)))
-        font = _countdown_font()
-        tw = font.measureText(label)
-        text_color = skia.Color(255, 60, 40, 255) if remaining < 1.5 else skia.ColorWHITE
-        canvas.drawString(label, bs.x - tw / 2, bs.y - r * 2.2, font, skia.Paint(AntiAlias=True, Color=text_color))
+
+
+def _draw_bomb_timer(canvas, center, radius: float, remaining: float) -> None:
+    """The round countdown, fixed just outside the top of the arena --
+    never moves, always in the same readable spot, with hundredths of a
+    second visibly ticking down (not just whole seconds) so it reads as
+    smooth motion rather than a number that jumps once a second."""
+    cx, cy = center
+    y = cy - radius - 56.0
+    label = f"{max(0.0, remaining):05.2f}"
+    font = _countdown_font()
+    tw = font.measureText(label)
+    text_color = skia.Color(255, 60, 40, 255) if remaining < 1.5 else skia.ColorWHITE
+    outline = skia.Paint(AntiAlias=True, Color=skia.Color(0, 0, 0, 220), Style=skia.Paint.kStroke_Style, StrokeWidth=5)
+    fill = skia.Paint(AntiAlias=True, Color=text_color)
+    canvas.drawString(label, cx - tw / 2, y, font, outline)
+    canvas.drawString(label, cx - tw / 2, y, font, fill)
 
 
 _LABEL_FONT: skia.Font | None = None

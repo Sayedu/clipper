@@ -5,7 +5,9 @@ event:
 arena:
   radius: 420
   center: [540, 800]
-  segments: 96
+  segments: 180   # was 96 -- more, shorter segments approximate the circle's
+                  # curve more smoothly, so a ball rolling along the wall
+                  # doesn't feel a little stutter crossing each seam
   thickness: 10
 
 gravity: 900
@@ -13,8 +15,9 @@ gravity: 900
 balls:
   radius: 30
   per_team: 4
-  elasticity: 0.95
-  friction: 0.15
+  elasticity: 0.97   # was 0.95 -- bounces should stay lively, not settle
+  friction: 0.08      # was 0.15 -- less grip, so contact with the wall reads
+                       # as a real bounce instead of rolling/resting against it
 
 physics:
   step_hz: 240

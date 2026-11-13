@@ -8,6 +8,7 @@ from __future__ import annotations
 import numpy as np
 
 from ...audio import synth
+from ...audio.clips import load_clip
 
 FRAME_WIDTH = 1080.0
 
@@ -48,26 +49,30 @@ def sound_voice(cue, sample_rate: int) -> np.ndarray:
         return _center(mono)
 
     if kind == "boom":
-        # the big "brainrot" payoff: a loud sub-bass boom + a sharp crack up
-        # front, same shape as Disaster Drop's beefed-up crunch, but bigger
-        # and with a cartoonish downward "wah-wah" tail landing the joke.
+        # the big "brainrot" payoff: a short, punchy impact (sub-bass hit +
+        # a sharp crack) immediately followed by a real meme clip laid on
+        # top, by request -- the synthesized hit keeps the physical
+        # "something just got blown up" punch, the clip lands the joke.
         seed_int = int(abs(cue.video_time * 1000)) % (2 ** 31)
-        boom = synth.sine_sweep(160, 30, 0.35, sample_rate)
-        boom = synth.apply_envelope(boom, 0.001, 0.32, sample_rate) * 1.0
-        crack = synth.noise_burst(0.08, sample_rate, seed_int)
-        crack = synth.apply_envelope(crack, 0.001, 0.06, sample_rate) * 0.85
-        n = max(len(boom), len(crack))
-        mono = np.zeros(n, dtype=np.float32)
-        mono[: len(crack)] += crack
-        mono[: len(boom)] += boom
-        wah = synth.sine_sweep(500, 140, 0.3, sample_rate)
-        wah = synth.apply_envelope(wah, 0.02, 0.26, sample_rate) * 0.3
-        start = int(0.1 * sample_rate)
-        end = start + len(wah)
-        if end > len(mono):
-            mono = np.pad(mono, (0, end - len(mono)))
-        mono[start:end] += wah
-        return _center(mono.astype(np.float32))
+        boom = synth.sine_sweep(160, 35, 0.18, sample_rate)
+        boom = synth.apply_envelope(boom, 0.001, 0.16, sample_rate) * 1.0
+        crack = synth.noise_burst(0.07, sample_rate, seed_int)
+        crack = synth.apply_envelope(crack, 0.001, 0.05, sample_rate) * 0.85
+        impact_len = max(len(boom), len(crack))
+        impact = np.zeros(impact_len, dtype=np.float32)
+        impact[: len(crack)] += crack
+        impact[: len(boom)] += boom
+        impact_stereo = _center(impact.astype(np.float32))
+
+        clip = load_clip("dies_of_cringe.wav", sample_rate) * 0.9
+        # starts slightly before the impact sound finishes decaying, so the
+        # two don't read as two separate, disconnected sounds.
+        overlap_start = int(0.05 * sample_rate)
+        n = max(len(impact_stereo), overlap_start + len(clip))
+        mono = np.zeros((n, 2), dtype=np.float32)
+        mono[: len(impact_stereo)] += impact_stereo
+        mono[overlap_start: overlap_start + len(clip)] += clip
+        return mono
 
     if kind == "win_sting":
         mono = synth.major_chord_arpeggio(261.63, sample_rate)
