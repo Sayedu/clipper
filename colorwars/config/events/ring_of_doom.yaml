@@ -35,7 +35,10 @@ hazards:
   interval_min_sec: 9.0
   interval_max_sec: 13.0
   warning_sec: 1.0
-  types: [lightning, center_bumper, spinner_bar]
+  # center_bumper/spinner_bar removed by request -- no obstacle sitting in
+  # the middle of the ring anymore. lightning stays (it strikes a ball
+  # directly, not a fixed thing in the middle).
+  types: [lightning]
   center_bumper_duration_sec: 5.0
   spinner_bar_duration_sec: 6.0
 
