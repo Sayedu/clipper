@@ -15,13 +15,15 @@ gravity: 900
 balls:
   radius: 30
   per_team: 4
-  elasticity: 0.97   # was 0.95 -- bounces should stay lively, not settle
-  friction: 0.08      # was 0.15 -- less grip, so contact with the wall reads
-                       # as a real bounce instead of rolling/resting against it
+  elasticity: 0.99   # was 0.95, then 0.97 -- asked again for harder ball-ball
+                      # bounces; matches Ring of Doom's own tuned ceiling
+  friction: 0.05      # was 0.15, then 0.08 -- as little grip as still stable,
+                       # so almost none of a collision's energy is lost to it
 
 physics:
   step_hz: 240
-  max_speed: 2800
+  max_speed: 3200   # was 2800 -- harder bounces need the cap raised too,
+                     # or they'd just get clamped back down right after
   wall_thickness: 6
 
 bomb:

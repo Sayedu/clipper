@@ -89,8 +89,8 @@ def simulate(seed: int, settings: Settings, cfg: dict, teams: list[Team], episod
         p0 = (arena_radius * math.cos(a0), arena_radius * math.sin(a0))
         p1 = (arena_radius * math.cos(a1), arena_radius * math.sin(a1))
         seg = pymunk.Segment(arena_body, p0, p1, arena_thickness / 2.0)
-        seg.elasticity = 0.98   # was 0.97 -- a touch bouncier, matching the balls' own bump
-        seg.friction = 0.08     # was 0.2 -- less grip so a wall touch reads as a real bounce
+        seg.elasticity = 0.99   # was 0.97, then 0.98 -- matching the balls' own ceiling
+        seg.friction = 0.05     # was 0.2, then 0.08 -- as little grip as still stable
         seg.collision_type = CT_WALL
         space.add(seg)
 
