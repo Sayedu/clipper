@@ -75,8 +75,8 @@ class _Ring:
             return
         p0, p1 = self._slot_points(i)
         seg = pymunk.Segment(self.body, p0, p1, self.thickness / 2.0)
-        seg.elasticity = 0.9
-        seg.friction = 0.3
+        seg.elasticity = 0.97  # was 0.9 -- matches the balls' own bounciness bump
+        seg.friction = 0.15
         seg.collision_type = CT_WALL
         self._space.add(seg)
         self._shapes[i] = seg

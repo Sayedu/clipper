@@ -8,8 +8,8 @@ ring:
   segments: 96
   thickness: 10
   initial_gap_deg: 16
-  rotation_speed: 0.6              # rad/s
-  rotation_speedup_per_phase: 0.04 # +4% speed each gap-widening phase
+  rotation_speed: 1.1               # rad/s -- was 0.6, nearly double for a faster spin
+  rotation_speedup_per_phase: 0.07  # +7% speed each gap-widening phase, was 4%
   reverse_once: true
 
 gravity: 900
@@ -17,8 +17,8 @@ gravity: 900
 balls:
   radius: 30
   per_team: 4
-  elasticity: 0.88
-  friction: 0.4
+  elasticity: 0.96   # was 0.88 -- bouncier, close to a superball (kept under 1.0 for solver stability)
+  friction: 0.15     # was 0.4 -- less friction bleeds off less speed on every bounce
 
 elimination_radius: 440
 
@@ -41,7 +41,7 @@ hazards:
 
 physics:
   step_hz: 240
-  max_speed: 2400
+  max_speed: 3200   # was 2400 -- balls can move noticeably faster now
   wall_thickness: 6
   anti_stuck_distance_px: 30
   anti_stuck_window_sec: 1.5
@@ -50,9 +50,3 @@ timing:
   sim_deadline_sec: 66.0
   video_min_sec: 61.0
   video_max_sec: 70.0
-
-replay:
-  near_miss_window_sec: 1.6
-  near_miss_speed: 0.5
-  final_slowmo_window_sec: 1.8
-  final_slowmo_speed: 0.35

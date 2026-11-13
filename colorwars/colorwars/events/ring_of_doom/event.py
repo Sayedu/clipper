@@ -90,12 +90,6 @@ class RingOfDoomEvent(Event):
                       default=event_cfg["hazards"]["interval_min_sec"], min=3, max=30, group="Hazards"),
             ParamSpec(name="hazards.interval_max_sec", label="Hazard frequency (max sec)", type="float",
                       default=event_cfg["hazards"]["interval_max_sec"], min=3, max=40, group="Hazards"),
-            ParamSpec(name="replay.near_miss_speed", label="Near-miss slow-mo speed", type="float",
-                      default=event_cfg["replay"]["near_miss_speed"], min=0.1, max=1.0, step=0.05,
-                      group="Slow motion", help="Lower = slower. 1.0 = no slowdown."),
-            ParamSpec(name="replay.final_slowmo_speed", label="Final-elimination slow-mo speed", type="float",
-                      default=event_cfg["replay"]["final_slowmo_speed"], min=0.1, max=1.0, step=0.05,
-                      group="Slow motion"),
         ]
         if teams:
             curated += team_trait_params(

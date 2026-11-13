@@ -35,8 +35,12 @@ def sound_voice(cue, sample_rate: int) -> np.ndarray:
         octave = int(progress * 2.4)  # pitch range climbs through the episode
         freq = synth.note_freq(ROOT_HZ, degree, octave)
         vol = max(0.08, min(1.0, impulse / 2200.0))
-        mono = synth.karplus_strong(freq, 0.35, sample_rate, seed_int)
-        mono = synth.apply_envelope(mono, 0.002, 0.3, sample_rate) * vol
+        # a short upward pitch sweep reads as a water-bubble "bloop" rather
+        # than the plucked-string resonance karplus_strong gave it -- snappier
+        # too (0.12s vs 0.35s), which matters more now that bouncier balls
+        # mean collisions happen a lot more often.
+        mono = synth.sine_sweep(freq * 0.55, freq * 1.2, 0.12, sample_rate)
+        mono = synth.apply_envelope(mono, 0.001, 0.09, sample_rate) * vol
         return synth.pan_stereo(mono, _x_to_pan(data.get("x", 540.0)))
 
     if kind == "pop":

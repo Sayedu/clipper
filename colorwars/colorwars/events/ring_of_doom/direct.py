@@ -1,15 +1,16 @@
 """Ring of Doom: the edit. Turns a raw SimRecord into a Timeline -- which
-sim-time to show at which video frame, when to slow down, where the camera
-zooms, what text overlays when. Never re-simulates anything; only ever
-samples the SimRecord that already exists.
+sim-time to show at which video frame, where the camera zooms, what text
+overlays when. Never re-simulates anything; only ever samples the SimRecord
+that already exists.
 
-Duration strategy: a sim run can finish anywhere from ~15s to the 66s
-deadline depending on the seed. To always land the final video in the
-required 61-70s window, the "normal" (non-highlight) stretch of the run
-plays at a computed base speed solved so the total adds up correctly;
-near-misses and the final elimination get an EXTRA slowdown layered on top
-of that, so they still read as more dramatic than the rest even on a seed
-whose raw sim was long.
+Duration strategy: no slow motion anywhere, by request -- the action always
+plays at real speed or faster (never slower). A sim run can finish anywhere
+from ~15s to the 66s deadline depending on the seed, almost always well
+under the required 61-70s video floor; rather than stretch that short
+action out in slow motion to fill the gap (tried first, and explicitly
+asked to be removed), the leftover time replays the action again, from the
+top, at real speed, under the winner/standings card (which has no opaque
+backdrop -- see draw.py -- so the replay is genuinely visible through it).
 """
 
 from __future__ import annotations
@@ -24,22 +25,11 @@ WINNER_CARD_SEC = 3.0
 OUTRO_SEC = 5.0
 HOOK_SEC = 1.0
 STORYLINE_SEC = 2.0
-NEAR_MISS_WINDOW_SEC = 1.6
-NEAR_MISS_SPEED = 0.5
-FINAL_SLOWMO_WINDOW_SEC = 1.8
-FINAL_SLOWMO_SPEED = 0.35
 
 
 def _find_last_elimination(record: SimRecord):
     elims = [e for e in record.events if e.kind == "elimination"]
     return elims[-1] if elims else None
-
-
-def _find_best_near_miss(record: SimRecord):
-    misses = [e for e in record.events if e.kind == "near_miss"]
-    if not misses:
-        return None
-    return max(misses, key=lambda e: e.data.get("peak_r", 0.0))
 
 
 def _two_balls_left_time(record: SimRecord) -> float | None:
@@ -66,60 +56,23 @@ def _best_near_miss_time_in_final_two(record: SimRecord) -> float | None:
 
 def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps: int) -> Timeline:
     sim_total = record.sim_duration_sec()
-    last_elim = _find_last_elimination(record)
-    near_miss = _find_best_near_miss(record)
     two_left_t = _two_balls_left_time(record)
-
-    last_elim_t = last_elim.t if last_elim else sim_total
-
-    # slow-mo amounts live in config (cfg["replay"]) rather than as module
-    # constants, so the Studio page can expose and randomize them per run.
-    rcfg = cfg.get("replay", {})
-    near_miss_window = float(rcfg.get("near_miss_window_sec", NEAR_MISS_WINDOW_SEC))
-    near_miss_speed = float(rcfg.get("near_miss_speed", NEAR_MISS_SPEED))
-    final_slowmo_window = float(rcfg.get("final_slowmo_window_sec", FINAL_SLOWMO_WINDOW_SEC))
-    final_slowmo_speed = float(rcfg.get("final_slowmo_speed", FINAL_SLOWMO_SPEED))
-
-    # -- special (extra-slow) sim-time windows, clamped to the sim's own range --
-    special: list[tuple[float, float, float, str]] = []  # (sim_start, sim_end, speed, label)
-    if near_miss is not None:
-        nm_t = near_miss.t
-        special.append((max(0.0, nm_t - near_miss_window * 0.5), min(sim_total, nm_t + near_miss_window * 0.5),
-                         near_miss_speed, "near_miss"))
-    final_start = max(0.0, last_elim_t - final_slowmo_window)
-    special.append((final_start, last_elim_t, final_slowmo_speed, "final"))
-    special.sort(key=lambda s: s[0])
-    # drop/merge accidental overlaps (keeps things simple and still correct)
-    merged: list[tuple[float, float, float, str]] = []
-    for seg in special:
-        if merged and seg[0] <= merged[-1][1]:
-            s0, _, spd, lab = merged[-1]
-            merged[-1] = (s0, max(merged[-1][1], seg[1]), min(spd, seg[2]), lab + "+" + seg[3])
-        else:
-            merged.append(seg)
-    special = merged
-
-    special_sim_time = sum(e - s for s, e, _, _ in special)
-    special_video_time = sum((e - s) / spd for s, e, spd, _ in special)
-    normal_sim_time = max(0.0, sim_total - special_sim_time)
 
     fixed_sec = FREEZE_SEC + WINNER_CARD_SEC + OUTRO_SEC
     target_total = (settings.duration_min_sec + settings.duration_max_sec) / 2.0
-    normal_video_budget = max(1.0, target_total - fixed_sec - special_video_time)
-    base_speed = normal_sim_time / normal_video_budget if normal_video_budget > 0 else 1.0
-    base_speed = max(0.05, min(4.0, base_speed))  # keep it sane even on a pathological seed
+    normal_video_budget = max(1.0, target_total - fixed_sec)
+    base_speed = sim_total / normal_video_budget if normal_video_budget > 0 else 1.0
+    # never slower than real time -- can still speed up a long sim to help
+    # it fit, but the action itself is never stretched into slow motion.
+    # A short raw sim (typical: ~10-35s against a 61-70s video) just means
+    # more replay time later, not a slower-looking run.
+    base_speed = max(1.0, min(4.0, base_speed))
 
     # -- walk sim time from 0 -> sim_total, building the video frame array --
     frame_sim_time: list[float] = []
     frame_speed: list[float] = []
     frame_zoom: list[float] = []
     dt_video = 1.0 / fps
-
-    def speed_at(sim_t: float) -> float:
-        for s, e, spd, _ in special:
-            if s <= sim_t <= e:
-                return spd
-        return base_speed
 
     def zoom_at(sim_t: float) -> float:
         return 1.25 if (two_left_t is not None and sim_t >= two_left_t) else 1.0
@@ -129,10 +82,9 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
     guard = 0
     while sim_t < sim_total and guard < 200_000:
         frame_sim_time.append(sim_t)
-        spd = speed_at(sim_t)
-        frame_speed.append(spd)
+        frame_speed.append(base_speed)
         frame_zoom.append(zoom_at(sim_t))
-        sim_t += dt_video * spd
+        sim_t += dt_video * base_speed
         guard += 1
     if not frame_sim_time:
         frame_sim_time = [0.0]
@@ -180,9 +132,19 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
             total_frames = len(frame_sim_time)
     elif total_frames < min_frames:
         pad = min_frames - total_frames
-        frame_sim_time.extend([sim_total] * pad)
-        frame_speed.extend([0.0] * pad)
-        frame_zoom.extend([1.0] * pad)
+        # replay the action again (from the top, real speed) rather than
+        # freezing on the final instant for the rest of the video -- no
+        # slow motion anywhere, and a frozen hold that could run past 30s
+        # on a short raw sim is just as boring in a different way. The
+        # winner/standings text has no opaque backdrop (draw.py), so the
+        # replay stays genuinely visible underneath it.
+        replay_time = frame_sim_time[:action_frames] or [sim_total]
+        replay_speed = frame_speed[:action_frames] or [1.0]
+        replay_zoom = frame_zoom[:action_frames] or [1.0]
+        n = len(replay_time)
+        frame_sim_time.extend(replay_time[i % n] for i in range(pad))
+        frame_speed.extend(replay_speed[i % n] for i in range(pad))
+        frame_zoom.extend(replay_zoom[i % n] for i in range(pad))
         total_frames = len(frame_sim_time)
 
     # -- overlays --
