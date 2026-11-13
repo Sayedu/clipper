@@ -43,11 +43,28 @@ def sound_voice(cue, sample_rate: int) -> np.ndarray:
         return _center(mono)
 
     if kind == "crunch":
+        # a loud, punchy "brainrot" hit on elimination -- a fast sub-bass
+        # downward sweep (the boom) plus a sharp noise crack up front (the
+        # hit), with a short comedic upward "boing" chirp right after so it
+        # reads as a little funny/slapstick, not just a dramatic thud. By
+        # request: eliminations should grab attention and get a laugh.
         seed_int = int(abs(cue.video_time * 1000)) % (2 ** 31)
-        noise = synth.noise_burst(0.35, sample_rate, seed_int)
-        thud = synth.sine(50, 0.35, sample_rate)
-        mono = synth.apply_envelope((noise * 0.6 + thud * 0.6).astype(np.float32), 0.002, 0.3, sample_rate)
-        return _center(mono)
+        boom = synth.sine_sweep(150, 35, 0.3, sample_rate)
+        boom = synth.apply_envelope(boom, 0.001, 0.28, sample_rate) * 0.95
+        crack = synth.noise_burst(0.06, sample_rate, seed_int)
+        crack = synth.apply_envelope(crack, 0.001, 0.05, sample_rate) * 0.8
+        n = max(len(boom), len(crack))
+        mono = np.zeros(n, dtype=np.float32)
+        mono[: len(crack)] += crack
+        mono[: len(boom)] += boom
+        boing = synth.sine_sweep(300, 700, 0.1, sample_rate)
+        boing = synth.apply_envelope(boing, 0.01, 0.08, sample_rate) * 0.35
+        start = int(0.08 * sample_rate)
+        end = start + len(boing)
+        if end > len(mono):
+            mono = np.pad(mono, (0, end - len(mono)))
+        mono[start:end] += boing
+        return _center(mono.astype(np.float32))
 
     if kind == "finish_blip":
         mono = synth.sine_sweep(520, 900, 0.18, sample_rate)

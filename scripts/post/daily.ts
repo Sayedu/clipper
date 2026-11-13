@@ -1,16 +1,16 @@
 /**
- * The daily autonomous poster. Renders ALL 4 rotation games, in a random
+ * The daily autonomous poster. Renders ALL 5 rotation games, in a random
  * order picked fresh each run — ONE AT A TIME, fully publishing and posting
- * each one before starting the next, rather than rendering all 4 first and
+ * each one before starting the next, rather than rendering all 5 first and
  * posting at the end. For each game, in order:
  *
- *   1. renders it. Three of the four (colorwar/followball/eyetest) go
+ *   1. renders it. Three of the five (colorwar/followball/eyetest) go
  *      through the SAME dashboard pipeline (runPipeline) so their caption/
  *      hashtags/render settings never drift out of sync with the app.
- *      ringofdoom is different: it's the Python colorwars engine (a
- *      separate project living at colorwars/, not the JS game renderer),
- *      invoked via its own CLI (mine -> render --best -> commit) — see
- *      renderRingOfDoom() below for why and how.
+ *      ringofdoom/disasterdrop are different: they're the Python colorwars
+ *      engine (a separate project living at colorwars/, not the JS game
+ *      renderer), invoked via its own CLI (mine -> render --best ->
+ *      commit) — see renderColorwarsEvent() below for why and how.
  *   2. commits its mp4 into a small PUBLIC hand-off repo and serves it via
  *      GitHub Pages (Buffer needs a public, direct, no-auth video URL with a
  *      real video/* content-type — see developers.buffer.com/guides/
@@ -88,12 +88,19 @@ const OUTPUT_REPO_TOKEN = need('OUTPUT_REPO_TOKEN'); // a PAT with repo scope on
 
 // the daily rotation — add to this list to add another game later.
 // lasernationsDuel was removed and replaced with ringofdoom by request.
-const ROTATION = ['colorwar', 'ringofdoom', 'followball', 'eyetest'] as const;
+// disasterdrop added by request too -- colorwars/ ships 6 events total
+// (ring_of_doom, shell_shuffle, disaster_drop, turf_war, great_escape,
+// champion_duel) sharing one render/audio/league pipeline, but only
+// ring_of_doom had ever actually been wired into this rotation; disaster
+// drop (an obstacle race with a crusher chasing the pack) was fully built
+// and tested, just never posted.
+const ROTATION = ['colorwar', 'ringofdoom', 'disasterdrop', 'followball', 'eyetest'] as const;
 type Rotation = (typeof ROTATION)[number];
+type ColorwarsKind = Extract<Rotation, 'ringofdoom' | 'disasterdrop'>;
 
-// ringofdoom doesn't go through the JS pipeline/Settings at all (see
-// renderRingOfDoom), so this only ever needs to handle the other three.
-function settingsFor(kind: Exclude<Rotation, 'ringofdoom'>): Settings {
+// ringofdoom/disasterdrop don't go through the JS pipeline/Settings at all
+// (see renderColorwarsEvent), so this only ever needs to handle the rest.
+function settingsFor(kind: Exclude<Rotation, ColorwarsKind>): Settings {
   const base: Settings = { ...DEFAULT_SETTINGS, clipsPerRun: 1 };
   if (kind === 'colorwar') {
     // 'random' picks one of the four ~41-44s wild-duel boards (never SPRINT's
@@ -137,7 +144,8 @@ interface RenderedPost {
 }
 
 function renderOne(kind: Rotation): Promise<RenderedPost> {
-  if (kind === 'ringofdoom') return renderRingOfDoom();
+  if (kind === 'ringofdoom') return renderColorwarsEvent('ring_of_doom', 'ringofdoom');
+  if (kind === 'disasterdrop') return renderColorwarsEvent('disaster_drop', 'disasterdrop');
 
   console.log(`\n=== rendering ${kind} ===`);
   const job = createJob({ settings: settingsFor(kind) });
@@ -166,9 +174,9 @@ const COLORWARS_PYTHON = join(COLORWARS_DIR, '.venv', 'bin', 'python');
 // against (Phase 4's decisions log) and takes well under a minute (pure
 // physics, no browser/render involved) — generous without eating much of
 // the job's time budget.
-const RING_OF_DOOM_MINE_RUNS = 300;
+const COLORWARS_MINE_RUNS = 300;
 
-interface RingOfDoomRenderMeta {
+interface ColorwarsRenderMeta {
   out_dir: string;
   episode_id: string;
   seed: number;
@@ -177,26 +185,28 @@ interface RingOfDoomRenderMeta {
   duration_sec: number;
 }
 
-/** Ring of Doom lives in colorwars/ — a separate Python engine (pymunk +
- *  skia, its own render/audio/league pipeline), not the JS game renderer
- *  the other 3 rotation games use. Mirrors the Studio page's own flow
- *  (mine for a great seed -> render the top one) via the CLI instead of
- *  HTTP, since there's no running studio_api server in this job. */
-async function renderRingOfDoom(): Promise<RenderedPost> {
-  console.log(`\n=== rendering ringofdoom (mining ${RING_OF_DOOM_MINE_RUNS} seeds for a great one) ===`);
+/** ring_of_doom and disaster_drop both live in colorwars/ — a separate
+ *  Python engine (pymunk + skia, its own render/audio/league pipeline),
+ *  not the JS game renderer the other 3 rotation games use. Mirrors the
+ *  Studio page's own flow (mine for a great seed -> render the top one)
+ *  via the CLI instead of HTTP, since there's no running studio_api
+ *  server in this job. Shared across both events -- same pipeline,
+ *  just a different --event flag and caption-less finale. */
+async function renderColorwarsEvent(eventId: string, kind: ColorwarsKind): Promise<RenderedPost> {
+  console.log(`\n=== rendering ${kind} (mining ${COLORWARS_MINE_RUNS} seeds for a great one) ===`);
   const mined = await pexec(COLORWARS_PYTHON, [
-    '-m', 'colorwars', 'mine', '--event', 'ring_of_doom', '--runs', String(RING_OF_DOOM_MINE_RUNS), '--top', '5',
+    '-m', 'colorwars', 'mine', '--event', eventId, '--runs', String(COLORWARS_MINE_RUNS), '--top', '5',
   ], { cwd: COLORWARS_DIR });
   console.log(mined.stdout.trim());
 
   const rendered = await pexec(COLORWARS_PYTHON, [
-    '-m', 'colorwars', 'render', '--event', 'ring_of_doom', '--best', '--json',
+    '-m', 'colorwars', 'render', '--event', eventId, '--best', '--json',
   ], { cwd: COLORWARS_DIR });
   const lastLine = rendered.stdout.trim().split('\n').at(-1);
   if (!lastLine) throw new Error('colorwars render --json produced no output');
-  const meta = JSON.parse(lastLine) as RingOfDoomRenderMeta;
+  const meta = JSON.parse(lastLine) as ColorwarsRenderMeta;
   console.log(
-    `[ringofdoom] seed ${meta.seed} — winner ${meta.winner}, MVP ${meta.mvp}, ` +
+    `[${kind}] seed ${meta.seed} — winner ${meta.winner}, MVP ${meta.mvp}, ` +
     `${meta.duration_sec.toFixed(1)}s (episode ${meta.episode_id})`,
   );
 
@@ -204,7 +214,7 @@ async function renderRingOfDoom(): Promise<RenderedPost> {
   const caption = (await readFile(join(meta.out_dir, 'caption.txt'), 'utf-8')).trim();
 
   return {
-    kind: 'ringofdoom',
+    kind,
     videoPath,
     text: caption,
     // Commit AFTER a successful Buffer post, not before or unconditionally —
@@ -212,17 +222,17 @@ async function renderRingOfDoom(): Promise<RenderedPost> {
     // fails) shouldn't advance the season. Matches the engine's own "never
     // commit automatically" rule (see colorwars/CLAUDE.md): this IS the
     // human-equivalent approval step, the same way posting is for the other
-    // 3 games, which have no review step either.
+    // games, which have no review step either.
     onPosted: async () => {
-      await pexec(COLORWARS_PYTHON, ['-m', 'colorwars', 'commit', meta.episode_id, '--event', 'ring_of_doom'], { cwd: COLORWARS_DIR });
-      console.log(`[ringofdoom] committed ${meta.episode_id} to league/season.json`);
+      await pexec(COLORWARS_PYTHON, ['-m', 'colorwars', 'commit', meta.episode_id, '--event', eventId], { cwd: COLORWARS_DIR });
+      console.log(`[${kind}] committed ${meta.episode_id} to league/season.json`);
     },
   };
 }
 
 async function main() {
   // FORCE_PICK lets a manual workflow_dispatch test one specific game instead of
-  // the full 4-game rotation — useful for isolating a slow/broken game.
+  // the full 5-game rotation — useful for isolating a slow/broken game.
   const forced = process.env.FORCE_PICK;
   let order: Rotation[];
   if (forced) {

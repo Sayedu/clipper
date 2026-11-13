@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       force_pick:
-        description: "Force one game instead of the random pick (colorwar / ringofdoom / followball / eyetest) — leave blank for normal behavior"
+        description: "Force one game instead of the random pick (colorwar / ringofdoom / disasterdrop / followball / eyetest) — leave blank for normal behavior"
         required: false
         type: string
 
@@ -29,14 +29,15 @@ permissions:
 jobs:
   post:
     runs-on: ubuntu-latest
-    # This run renders ALL 4 rotation games back to back, not just one.
+    # This run renders ALL 5 rotation games back to back, not just one.
     # Measured in CI: Follow The Ball ~8min, Eye Test ~14min (3 rounds of real
-    # physics is heavier than it looks), Color War ~15min. Ring of Doom
-    # (replaced Laser Nations Duel) mines 300 seeds first (pure physics, no
-    # browser — well under a minute even on a shared 2-vCPU runner) then
-    # renders whichever one scored best; real CI duration not yet measured,
-    # budgeted generously here like the others. The repo is public, so
-    # Actions minutes are unlimited — generous headroom costs nothing.
+    # physics is heavier than it looks), Color War ~15min. Ring of Doom and
+    # Disaster Drop (the colorwars/ engine, two of its six built events) each
+    # mine 300 seeds first (pure physics, no browser — well under a minute
+    # even on a shared 2-vCPU runner) then render whichever scored best; real
+    # CI duration not yet measured for either, budgeted generously here like
+    # the others. The repo is public, so Actions minutes are unlimited —
+    # generous headroom costs nothing.
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +80,7 @@ jobs:
           python3 -m venv python/.venv
           python/.venv/bin/pip install --quiet numpy soundfile scipy
 
-      - name: Set up the colorwars venv (Ring of Doom's own engine)
+      - name: Set up the colorwars venv (Ring of Doom + Disaster Drop's engine)
         # colorwars/ is a separate Python project (pymunk + skia-python, its
         # own render/audio/league pipeline) from the JS games above — see
         # colorwars/CLAUDE.md. Its own requirements.txt, its own venv.
@@ -106,14 +107,15 @@ jobs:
           # overrides it to the apt-installed one already on PATH here.
           COLORWARS_FFMPEG_PATH: ffmpeg
 
-      - name: Persist Ring of Doom's season state (if it posted today)
-        # `colorwars commit` (run by daily.ts's ringofdoom step, after a
-        # successful Buffer post) only updates these files on THIS runner's
-        # local checkout -- nothing pushes that back to the repo on its own.
-        # Without this, the season would never actually advance: every run
-        # would see the same un-committed season.json and keep rendering
-        # "ep001" forever. A no-op is expected and fine on days ringofdoom
-        # wasn't in the rotation, or failed before its commit step.
+      - name: Persist the colorwars season state (if it posted today)
+        # `colorwars commit` (run by daily.ts's ringofdoom/disasterdrop step,
+        # after a successful Buffer post) only updates these files on THIS
+        # runner's local checkout -- nothing pushes that back to the repo on
+        # its own. Without this, the season would never actually advance:
+        # every run would see the same un-committed season.json and keep
+        # rendering "ep001" forever. A no-op is expected and fine on days
+        # neither colorwars event was in the rotation, or it failed before
+        # its commit step.
         # config/names.txt was missing from this list -- found directly:
         # every run consumed the SAME front-of-queue names (the "comment
         # your name for a ball" feature never actually advanced) because
