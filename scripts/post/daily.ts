@@ -1,16 +1,16 @@
 /**
- * The daily autonomous poster. Renders ALL 4 rotation games, in a random
+ * The daily autonomous poster. Renders ALL 5 rotation games, in a random
  * order picked fresh each run — ONE AT A TIME, fully publishing and posting
- * each one before starting the next, rather than rendering all 4 first and
+ * each one before starting the next, rather than rendering all 5 first and
  * posting at the end. For each game, in order:
  *
- *   1. renders it. Three of the four (colorwar/followball/eyetest) go
+ *   1. renders it. Three of the five (colorwar/followball/eyetest) go
  *      through the SAME dashboard pipeline (runPipeline) so their caption/
  *      hashtags/render settings never drift out of sync with the app.
- *      ringofdoom is different: it's the Python colorwars engine (a
- *      separate project living at colorwars/, not the JS game renderer),
- *      invoked via its own CLI (mine -> render --best -> commit) — see
- *      renderColorwarsEvent() below for why and how.
+ *      ringofdoom/hotpotato are different: they're the Python colorwars
+ *      engine (a separate project living at colorwars/, not the JS game
+ *      renderer), invoked via its own CLI (mine -> render --best ->
+ *      commit) — see renderColorwarsEvent() below for why and how.
  *   2. commits its mp4 into a small PUBLIC hand-off repo and serves it via
  *      GitHub Pages (Buffer needs a public, direct, no-auth video URL with a
  *      real video/* content-type — see developers.buffer.com/guides/
@@ -88,12 +88,14 @@ const OUTPUT_REPO_TOKEN = need('OUTPUT_REPO_TOKEN'); // a PAT with repo scope on
 
 // the daily rotation — add to this list to add another game later.
 // lasernationsDuel was removed and replaced with ringofdoom by request.
-// disasterdrop was tried here too, then reverted on request: it's an
-// already-built, never-posted colorwars event, not an actually new
-// simulation, which is specifically what was asked for instead.
-const ROTATION = ['colorwar', 'ringofdoom', 'followball', 'eyetest'] as const;
+// disasterdrop was tried here too, then reverted: it's an already-built,
+// never-posted colorwars event, not an actually new simulation. hotpotato
+// is a real new one -- 16 balls bouncing in a static bowl, one holds a
+// "bomb" that passes hands on contact, a shrinking per-round timer
+// eliminates whoever's holding it when it hits zero.
+const ROTATION = ['colorwar', 'ringofdoom', 'hotpotato', 'followball', 'eyetest'] as const;
 type Rotation = (typeof ROTATION)[number];
-type ColorwarsKind = Extract<Rotation, 'ringofdoom'>;
+type ColorwarsKind = Extract<Rotation, 'ringofdoom' | 'hotpotato'>;
 
 // ringofdoom doesn't go through the JS pipeline/Settings at all (see
 // renderColorwarsEvent), so this only ever needs to handle the rest.
@@ -142,6 +144,7 @@ interface RenderedPost {
 
 function renderOne(kind: Rotation): Promise<RenderedPost> {
   if (kind === 'ringofdoom') return renderColorwarsEvent('ring_of_doom', 'ringofdoom');
+  if (kind === 'hotpotato') return renderColorwarsEvent('hot_potato', 'hotpotato');
 
   console.log(`\n=== rendering ${kind} ===`);
   const job = createJob({ settings: settingsFor(kind) });
@@ -181,13 +184,14 @@ interface ColorwarsRenderMeta {
   duration_sec: number;
 }
 
-/** ring_of_doom lives in colorwars/ — a separate Python engine (pymunk +
- *  skia, its own render/audio/league pipeline), not the JS game renderer
- *  the other 3 rotation games use. Mirrors the Studio page's own flow
- *  (mine for a great seed -> render the top one) via the CLI instead of
- *  HTTP, since there's no running studio_api server in this job. Takes
- *  eventId as a parameter (not hardcoded) so a future real new colorwars
- *  event can reuse this same function instead of duplicating it. */
+/** ring_of_doom and hot_potato both live in colorwars/ — a separate
+ *  Python engine (pymunk + skia, its own render/audio/league pipeline),
+ *  not the JS game renderer the other 3 rotation games use. Mirrors the
+ *  Studio page's own flow (mine for a great seed -> render the top one)
+ *  via the CLI instead of HTTP, since there's no running studio_api
+ *  server in this job. Takes eventId as a parameter (not hardcoded) so
+ *  both events -- and any future colorwars event -- share this one
+ *  function instead of duplicating it. */
 async function renderColorwarsEvent(eventId: string, kind: ColorwarsKind): Promise<RenderedPost> {
   console.log(`\n=== rendering ${kind} (mining ${COLORWARS_MINE_RUNS} seeds for a great one) ===`);
   const mined = await pexec(COLORWARS_PYTHON, [
@@ -228,7 +232,7 @@ async function renderColorwarsEvent(eventId: string, kind: ColorwarsKind): Promi
 
 async function main() {
   // FORCE_PICK lets a manual workflow_dispatch test one specific game instead of
-  // the full 4-game rotation — useful for isolating a slow/broken game.
+  // the full 5-game rotation — useful for isolating a slow/broken game.
   const forced = process.env.FORCE_PICK;
   let order: Rotation[];
   if (forced) {

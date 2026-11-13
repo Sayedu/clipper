@@ -21,6 +21,7 @@ import skia
 
 from colorwars.engine.config import REPO_ROOT, Settings, load_episode, load_event_config, load_teams
 from colorwars.events.disaster_drop.event import DisasterDropEvent
+from colorwars.events.hot_potato.event import HotPotatoEvent
 from colorwars.events.ring_of_doom.event import RingOfDoomEvent
 from colorwars.events.shell_shuffle.event import ShellShuffleEvent
 from colorwars.events.champion_duel.event import ChampionDuelEvent
@@ -30,6 +31,7 @@ from colorwars.events.turf_war.event import TurfWarEvent
 KNOWN_VALID_SEED = 2
 SHELL_SHUFFLE_SEED = 1  # every seed is valid by construction (scripted, not simulated-to-failure); 1 is just stable to pin
 DISASTER_DROP_SEED = 1  # checked once via `find-seed --event disaster_drop`
+HOT_POTATO_SEED = 1  # checked once via `find-seed --event hot_potato`
 TURF_WAR_SEED = 1  # checked once via `find-seed --event turf_war`
 GREAT_ESCAPE_SEED = 1  # checked once via `find-seed --event great_escape`
 CHAMPION_DUEL_SEED = 1  # checked once via `find-seed --event champion_duel`
@@ -86,6 +88,62 @@ def test_render_three_seconds_twice_matches_by_hash():
 
     assert len(hashes_a) == n_frames
     assert hashes_a == hashes_b
+
+
+def test_hot_potato_simulate_is_deterministic():
+    settings, teams, cfg, episode = _load("hot_potato")
+    event = HotPotatoEvent()
+
+    r1 = event.simulate(HOT_POTATO_SEED, settings, cfg, teams, episode)
+    r2 = event.simulate(HOT_POTATO_SEED, settings, cfg, teams, episode)
+
+    assert len(r1.steps) == len(r2.steps)
+    assert r1.placements == r2.placements
+    assert r1.winner_team_id == r2.winner_team_id
+    assert r1.mvp_name == r2.mvp_name
+    assert len(r1.events) == len(r2.events)
+    for s1, s2 in zip(r1.steps, r2.steps):
+        for b1, b2 in zip(s1.balls, s2.balls):
+            assert b1.x == b2.x and b1.y == b2.y and b1.vx == b2.vx and b1.vy == b2.vy and b1.alive == b2.alive
+
+
+def test_hot_potato_render_three_seconds_twice_matches_by_hash():
+    settings, teams, cfg, episode = _load("hot_potato")
+    event = HotPotatoEvent()
+
+    record = event.simulate(HOT_POTATO_SEED, settings, cfg, teams, episode)
+    assert event.is_valid(record)
+    timeline = event.direct(record, settings, cfg, episode, settings.preview_fps)
+
+    n_frames = min(settings.preview_fps * 3, timeline.total_frames)
+
+    def render_hashes() -> list[str]:
+        event.init_render(settings)
+        surface = skia.Surface(settings.preview_width, settings.preview_height)
+        hashes = []
+        for frame_idx in range(n_frames):
+            with surface as canvas:
+                event.draw_frame(canvas, record, timeline, settings, teams, frame_idx, cfg)
+            img = surface.makeImageSnapshot()
+            hashes.append(hashlib.sha256(img.tobytes()).hexdigest())
+        return hashes
+
+    hashes_a = render_hashes()
+    hashes_b = render_hashes()
+
+    assert len(hashes_a) == n_frames
+    assert hashes_a == hashes_b
+
+
+def test_hot_potato_bomb_passes_hands_at_least_once():
+    """A real check that the tag mechanic actually fires, not just that the
+    sim runs -- a seed where the bomb never changes hands would still be
+    technically "valid" (one holder just keeps getting eliminated every
+    round) but would mean the pass-detection code never engaged at all."""
+    settings, teams, cfg, episode = _load("hot_potato")
+    event = HotPotatoEvent()
+    record = event.simulate(HOT_POTATO_SEED, settings, cfg, teams, episode)
+    assert any(e.kind == "bomb_pass" for e in record.events)
 
 
 def test_shell_shuffle_simulate_is_deterministic():

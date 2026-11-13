@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from .event import Event
 
-KNOWN_EVENT_IDS = ["ring_of_doom", "shell_shuffle", "disaster_drop", "turf_war", "great_escape", "champion_duel"]
+KNOWN_EVENT_IDS = ["ring_of_doom", "hot_potato", "shell_shuffle", "disaster_drop", "turf_war", "great_escape", "champion_duel"]
 
 
 def get_event(event_id: str) -> Event:
@@ -16,6 +16,10 @@ def get_event(event_id: str) -> Event:
         from ..events.ring_of_doom.event import RingOfDoomEvent
 
         return RingOfDoomEvent()
+    if event_id == "hot_potato":
+        from ..events.hot_potato.event import HotPotatoEvent
+
+        return HotPotatoEvent()
     if event_id == "shell_shuffle":
         from ..events.shell_shuffle.event import ShellShuffleEvent
 

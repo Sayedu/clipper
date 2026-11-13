@@ -69,10 +69,10 @@ def test_health():
     assert client.get("/health").json() == {"ok": True}
 
 
-def test_list_events_has_all_six():
+def test_list_events_has_all_seven():
     data = client.get("/events").json()
     ids = {e["id"] for e in data["events"]}
-    assert ids == {"ring_of_doom", "shell_shuffle", "disaster_drop", "turf_war", "great_escape", "champion_duel"}
+    assert ids == {"ring_of_doom", "hot_potato", "shell_shuffle", "disaster_drop", "turf_war", "great_escape", "champion_duel"}
 
 
 def test_event_schema_shape():

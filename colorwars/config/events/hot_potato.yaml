@@ -1,0 +1,34 @@
+event:
+  id: hot_potato
+  name: "Hot Potato"
+
+arena:
+  radius: 420
+  center: [540, 800]
+  segments: 96
+  thickness: 10
+
+gravity: 900
+
+balls:
+  radius: 30
+  per_team: 4
+  elasticity: 0.95
+  friction: 0.15
+
+physics:
+  step_hz: 240
+  max_speed: 2800
+  wall_thickness: 6
+
+bomb:
+  round_sec_start: 4.0        # was 6.0 -- the whole point is a quick, snappy video
+  round_sec_min: 1.2          # was 2.0
+  round_sec_decay: 0.78       # was 0.85 -- each round's own duration = max(round_sec_min, prev * this)
+  pass_cooldown_sec: 0.15     # a prolonged single touch can't ping-pong the bomb every physics step
+  warning_sec: 1.2            # ticking cues (see direct.py) lead up to this many seconds before a deadline
+
+timing:
+  sim_deadline_sec: 60.0
+  video_min_sec: 61.0         # vestigial: enforce_duration_window=False means this is never checked
+  video_max_sec: 70.0         # still used as a safety-trim ceiling in direct.py

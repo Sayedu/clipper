@@ -25,6 +25,7 @@ END_CARD_SEC = 2.0
 
 EVENT_HASHTAGS = {
     "ring_of_doom": ["ringofdoom", "lastballstanding"],
+    "hot_potato": ["hotpotato", "dontgetcaught"],
     "shell_shuffle": ["shellshuffle", "findtheball"],
     "disaster_drop": ["disasterdrop", "marblerace"],
     "turf_war": ["turfwar", "territory"],
@@ -197,13 +198,17 @@ def run_render(
     return meta
 
 
+SIMPLE_CAPTION_EVENTS = {"ring_of_doom", "hot_potato"}
+
+
 def _write_caption(out_dir: Path, event_id: str, episode: dict, record: SimRecord, meta: dict) -> None:
     ep_num = episode.get("number", "?")
     event_title = "Ring of Doom" if event_id == "ring_of_doom" else event_id.replace("_", " ").title()
 
-    if event_id == "ring_of_doom":
-        # simplified by request -- no hook line, no MVP shoutout, no
-        # hashtags, just this exact two-line caption.
+    if event_id in SIMPLE_CAPTION_EVENTS:
+        # simplified by request (originally for ring_of_doom, kept
+        # consistent across the Color Wars League brand) -- no hook line,
+        # no MVP shoutout, no hashtags, just this exact two-line caption.
         body = f"{event_title}, Episode {ep_num}\n\nComment Who Will Win"
     else:
         hook = episode.get("hook_line", "")
