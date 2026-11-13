@@ -1,67 +1,102 @@
 {
   "season_number": 1,
-  "episodes": [],
+  "episodes": [
+    {
+      "id": "ep001",
+      "event": "ring_of_doom",
+      "seed": 157,
+      "placements": [
+        "blue",
+        "green",
+        "yellow",
+        "red"
+      ],
+      "mvp": "Echo",
+      "date": "2026-11-13",
+      "is_finale": false,
+      "duration_sec": 27.55,
+      "drama": {
+        "lead_changes": 6,
+        "near_misses": 0,
+        "final_two_sec": 8.896,
+        "was_last_after_15": true,
+        "comeback_margin": 1,
+        "crown_team_lost": true,
+        "dead_stretches_over_9s": 0,
+        "wiped_before_15": false,
+        "score": 37.896
+      }
+    }
+  ],
   "standings": {
     "red": {
-      "points": 0,
+      "points": 1,
       "wins": 0,
       "podiums": 0,
-      "streak_type": null,
-      "streak_count": 0
+      "streak_type": "loss",
+      "streak_count": 1
     },
     "blue": {
-      "points": 0,
-      "wins": 0,
-      "podiums": 0,
-      "streak_type": null,
-      "streak_count": 0
+      "points": 10,
+      "wins": 1,
+      "podiums": 1,
+      "streak_type": "win",
+      "streak_count": 1
     },
     "green": {
-      "points": 0,
+      "points": 6,
       "wins": 0,
-      "podiums": 0,
-      "streak_type": null,
-      "streak_count": 0
+      "podiums": 1,
+      "streak_type": "loss",
+      "streak_count": 1
     },
     "yellow": {
-      "points": 0,
+      "points": 3,
       "wins": 0,
-      "podiums": 0,
-      "streak_type": null,
-      "streak_count": 0
+      "podiums": 1,
+      "streak_type": "loss",
+      "streak_count": 1
     }
   },
   "records": {
-    "fastest_win": null,
-    "biggest_comeback": null,
+    "fastest_win": {
+      "episode_id": "ep001",
+      "team": "blue",
+      "sim_seconds": 26.041666666666668
+    },
+    "biggest_comeback": {
+      "episode_id": "ep001",
+      "team": "blue",
+      "margin": 1
+    },
     "longest_losing_streak": {
-      "team": null,
-      "count": 0
+      "team": "red",
+      "count": 1
     }
   },
   "head_to_head": {
     "blue|red": {
       "red": 0,
-      "blue": 0
+      "blue": 1
     },
     "green|red": {
       "red": 0,
-      "green": 0
+      "green": 1
     },
     "red|yellow": {
       "red": 0,
-      "yellow": 0
+      "yellow": 1
     },
     "blue|green": {
-      "blue": 0,
+      "blue": 1,
       "green": 0
     },
     "blue|yellow": {
-      "blue": 0,
+      "blue": 1,
       "yellow": 0
     },
     "green|yellow": {
-      "green": 0,
+      "green": 1,
       "yellow": 0
     }
   }
