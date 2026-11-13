@@ -64,7 +64,7 @@ def sound_voice(cue, sample_rate: int) -> np.ndarray:
         impact[: len(boom)] += boom
         impact_stereo = _center(impact.astype(np.float32))
 
-        clip = load_clip("dies_of_cringe.wav", sample_rate) * 0.9
+        clip = load_clip("dies_of_cringe.wav", sample_rate) * 0.45  # was 0.9 -- too loud over the impact
         # starts slightly before the impact sound finishes decaying, so the
         # two don't read as two separate, disconnected sounds.
         overlap_start = int(0.05 * sample_rate)
