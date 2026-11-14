@@ -42,77 +42,129 @@
         "wiped_before_15": false,
         "score": 38.754
       }
+    },
+    {
+      "id": "ep003",
+      "event": "ring_of_doom",
+      "seed": 202,
+      "placements": [
+        "red",
+        "green",
+        "blue",
+        "yellow"
+      ],
+      "mvp": "Red 4",
+      "date": "2026-11-14",
+      "is_finale": false,
+      "duration_sec": 31.683333333333334,
+      "drama": {
+        "lead_changes": 8,
+        "near_misses": 0,
+        "final_two_sec": 6.938,
+        "was_last_after_15": true,
+        "comeback_margin": 0,
+        "crown_team_lost": true,
+        "dead_stretches_over_9s": 0,
+        "wiped_before_15": false,
+        "score": 41.938
+      }
+    },
+    {
+      "id": "ep004",
+      "event": "hot_potato",
+      "seed": 107,
+      "placements": [
+        "blue",
+        "red",
+        "green",
+        "yellow"
+      ],
+      "mvp": "Blue 1",
+      "date": "2026-11-14",
+      "is_finale": false,
+      "duration_sec": 28.5,
+      "drama": {
+        "lead_changes": 7,
+        "near_misses": 0,
+        "final_two_sec": 1.204,
+        "was_last_after_15": true,
+        "comeback_margin": 2,
+        "crown_team_lost": true,
+        "dead_stretches_over_9s": 0,
+        "wiped_before_15": false,
+        "score": 33.204
+      }
     }
   ],
   "standings": {
     "red": {
-      "points": 9,
-      "wins": 0,
-      "podiums": 2,
+      "points": 25,
+      "wins": 1,
+      "podiums": 4,
       "streak_type": "loss",
-      "streak_count": 2
+      "streak_count": 1
     },
     "blue": {
-      "points": 4,
-      "wins": 0,
-      "podiums": 1,
-      "streak_type": "loss",
-      "streak_count": 2
-    },
-    "green": {
-      "points": 11,
+      "points": 17,
       "wins": 1,
-      "podiums": 1,
+      "podiums": 3,
       "streak_type": "win",
       "streak_count": 1
     },
+    "green": {
+      "points": 20,
+      "wins": 1,
+      "podiums": 3,
+      "streak_type": "loss",
+      "streak_count": 2
+    },
     "yellow": {
-      "points": 16,
+      "points": 18,
       "wins": 1,
       "podiums": 2,
       "streak_type": "loss",
-      "streak_count": 1
+      "streak_count": 3
     }
   },
   "records": {
     "fastest_win": {
-      "episode_id": "ep001",
-      "team": "yellow",
-      "sim_seconds": 28.1
+      "episode_id": "ep004",
+      "team": "blue",
+      "sim_seconds": 24.9875
     },
     "biggest_comeback": {
-      "episode_id": "ep002",
-      "team": "green",
-      "margin": 1
+      "episode_id": "ep004",
+      "team": "blue",
+      "margin": 2
     },
     "longest_losing_streak": {
-      "team": "red",
-      "count": 2
+      "team": "blue",
+      "count": 3
     }
   },
   "head_to_head": {
     "blue|red": {
-      "red": 2,
-      "blue": 0
+      "red": 3,
+      "blue": 1
     },
     "green|red": {
-      "red": 1,
+      "red": 3,
       "green": 1
     },
     "red|yellow": {
-      "red": 0,
+      "red": 2,
       "yellow": 2
     },
     "blue|green": {
-      "blue": 1,
-      "green": 1
+      "blue": 2,
+      "green": 2
     },
     "blue|yellow": {
-      "blue": 0,
+      "blue": 2,
       "yellow": 2
     },
     "green|yellow": {
-      "green": 1,
+      "green": 3,
       "yellow": 1
     }
   }
