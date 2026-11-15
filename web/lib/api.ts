@@ -42,11 +42,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ seed, mode }),
     }),
-  findTheCatRender: (seed: number, rounds: number, theme: string) =>
+  findTheCatRender: (seed: number, o: FindTheCatOptions) =>
     req<{ jobId: string; seed: number; rounds: number; theme: string }>('/findthecat/render', {
       method: 'POST',
-      body: JSON.stringify({ seed, rounds, theme }),
+      body: JSON.stringify({ seed, ...o }),
     }),
+  findTheCatBatch: (count: number, o: FindTheCatOptions) =>
+    req<{ jobIds: string[] }>('/findthecat/batch', { method: 'POST', body: JSON.stringify({ count, ...o }) }),
   eyetestRender: (seed: number, ballsPerRound: number[], shuffleSec: number) =>
     req<{ jobId: string; seed: number; ballsPerRound: number[]; shuffleSec: number }>('/eyetest/render', {
       method: 'POST',
@@ -115,6 +117,9 @@ export const api = {
     ),
 };
 
+export type FindTheCatOptions = { rounds: number; theme: string; hook: string; hookSec: number; label: string; twists: boolean };
+/** extra per-render files (Find The Cat: sfx.0.mp4, cover.0.png, postkit.0.txt) */
+export const jobExtraUrl = (jobId: string, name: string) => `${BASE}/jobs/${jobId}/extra/${name}`;
 export const candidatePreviewUrl = (jobId: string, index: number) => `${BASE}/jobs/${jobId}/preview/${index}`;
 export const candidateThumbUrl = (jobId: string, index: number) => `${BASE}/jobs/${jobId}/thumb/${index}`;
 export const jobDownloadUrl = (jobId: string, index = 0) => `${BASE}/jobs/${jobId}/download/${index}`;

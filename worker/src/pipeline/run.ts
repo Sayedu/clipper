@@ -50,6 +50,7 @@ import { runLaserDuel } from './steps/lasernationsDuel.ts';
 import { runColorWar } from './steps/colorwar.ts';
 import { runFollowBall } from './steps/followball.ts';
 import { runFindTheCat } from './steps/findthecat.ts';
+import { buildPostKit } from '../../../scripts/findthecat/postkit.mjs';
 import { runEyeTest } from './steps/eyetest.ts';
 import { runPauseGame } from './steps/pausegame.ts';
 import { runQuotes } from './steps/quotes.ts';
@@ -499,18 +500,15 @@ async function runColorWarPost(ctx: StepContext, jobId: string): Promise<RunOutc
 async function runFindTheCatPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
   skipStepsExcept(ctx, ['render']);
   const { render, game } = await stage(ctx, 'render', () => runFindTheCat(ctx));
-  const roundsLine =
-    game.roundCount > 1
-      ? `${game.roundCount} rounds — it gets harder each one (more cups, faster shuffles)`
-      : `${game.cups[0]} cups shuffling`;
+  // same wording as the CLI's post-kit txt (scripts/findthecat/postkit.mjs):
+  // keyword first, a real question, 3-5 relevant hashtags, no dashes
+  const kit = buildPostKit(game);
   const draft: DraftText = {
-    hook: 'Find the cat 🐱 watch closely!',
+    hook: kit.hook,
     overlays: [game.roundCount > 1 ? `${game.roundCount} rounds` : `Cup ${game.answers[0]}`],
-    caption:
-      `Find the cat 🐱 watch closely, then call the cup before it reveals.\n\n` +
-      `${roundsLine} — keep your eyes locked on the right one.\n\n` +
-      `Comment your ${game.roundCount > 1 ? 'guesses' : 'guess'} 👇`,
-    hashtags: ['findthecat', 'shellgame', 'catsoftiktok', 'watchtillend', 'fyp'],
+    caption: kit.caption,
+    hashtags: kit.hashtags,
+    pinnedComment: kit.pinnedComment,
   };
   return finishPost(ctx, jobId, render, {
     hookTitle: `answers ${game.answers.join('-')}`,

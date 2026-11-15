@@ -61,7 +61,7 @@ export type ColorRaceMap = 'random' | 'zigzag' | 'pegstorm' | 'spinner' | 'fork'
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
 export type FollowBallMode = 'sprint' | 'classic' | 'insane' | 'random';
 export type FollowBallVariant = 'classic' | 'findthecat';
-export type FindTheCatTheme = 'candy' | 'neon' | 'sunset';
+export type FindTheCatTheme = 'candy' | 'neon' | 'sunset' | 'colorblind' | 'random';
 
 export const COLOR_RACE_MAPS: Array<{ id: ColorRaceMap; name: string; tag: string }> = [
   { id: 'random', name: 'Surprise me', tag: 'A different course every generation' },
@@ -150,6 +150,10 @@ export interface Settings {
   followBallVariant: FollowBallVariant;
   findTheCatRounds: number;
   findTheCatTheme: FindTheCatTheme;
+  findTheCatHook: string;
+  findTheCatHookSec: number;
+  findTheCatLabel: string;
+  findTheCatTwists: boolean;
   findTheCatSeed?: number;
   eyeTestBallsPerRound: number[];
   eyeTestShuffleSec: number;
@@ -269,6 +273,7 @@ export interface DraftText {
   overlays: string[];
   caption?: string;
   hashtags?: string[];
+  pinnedComment?: string;
 }
 
 export type InputRequest =

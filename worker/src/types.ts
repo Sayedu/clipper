@@ -138,7 +138,9 @@ export const FOLLOW_BALL_MODES: Array<{ id: FollowBallMode; name: string; tag: s
 export type FollowBallVariant = 'classic' | 'findthecat';
 
 /** Find The Cat's color palette. */
-export type FindTheCatTheme = 'candy' | 'neon' | 'sunset';
+/** Find The Cat's palette. 'random' = a seeded pick from candy/neon/sunset;
+ *  'colorblind' is an Okabe-Ito based accessibility palette. */
+export type FindTheCatTheme = 'candy' | 'neon' | 'sunset' | 'colorblind' | 'random';
 
 /** Which Color War board mode runs. 'random' = a fresh pick each generation. */
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
@@ -314,6 +316,14 @@ export interface Settings {
   findTheCatRounds: number;
   /** Find The Cat's color palette. */
   findTheCatTheme: FindTheCatTheme;
+  /** The big opening hook line (frame 1). Default "FIND THE CAT". */
+  findTheCatHook: string;
+  /** How long the hook line stays up, 1-3 seconds. */
+  findTheCatHookSec: number;
+  /** Optional on-screen series label, e.g. "Find The Cat S1 E3". */
+  findTheCatLabel: string;
+  /** Per-round visual twists from round 2 on (fakeout / colorshift). */
+  findTheCatTwists: boolean;
   /** Pin the sim to an exact seed (the preview studio's "render this seed").
    *  0 / undefined = a fresh random seed each render. */
   findTheCatSeed?: number;
@@ -462,7 +472,11 @@ export const DEFAULT_SETTINGS: Settings = {
   followBallMode: 'sprint',
   followBallVariant: 'classic',
   findTheCatRounds: 3,
-  findTheCatTheme: 'candy',
+  findTheCatTheme: 'random',
+  findTheCatHook: 'FIND THE CAT',
+  findTheCatHookSec: 2,
+  findTheCatLabel: '',
+  findTheCatTwists: true,
   eyeTestBallsPerRound: [8, 8, 8],
   eyeTestShuffleSec: 6,
   pauseGameTargetDeg: 9,
@@ -502,6 +516,8 @@ export interface DraftText {
   caption?: string;
   /** Lowercase, no leading '#'. */
   hashtags?: string[];
+  /** A suggested comment to pin under the post (content types that write one). */
+  pinnedComment?: string;
 }
 
 export interface Job {

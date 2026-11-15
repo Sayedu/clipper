@@ -96,7 +96,11 @@ const settingsSchema = z
     followBallSeed: z.number().int().positive().optional(),
     followBallVariant: z.enum(['classic', 'findthecat']),
     findTheCatRounds: z.number().int().min(1).max(6),
-    findTheCatTheme: z.enum(['candy', 'neon', 'sunset']),
+    findTheCatTheme: z.enum(['candy', 'neon', 'sunset', 'colorblind', 'random']),
+    findTheCatHook: z.string().max(28),
+    findTheCatHookSec: z.number().min(1).max(3),
+    findTheCatLabel: z.string().max(40),
+    findTheCatTwists: z.boolean(),
     findTheCatSeed: z.number().int().positive().optional(),
     eyeTestBallsPerRound: z.array(z.number().int().min(4).max(10)).min(1).max(6),
     eyeTestShuffleSec: z.number().min(3).max(15),
@@ -306,27 +310,54 @@ export function buildRouter(): Router {
   // Find The Cat preview studio — the Follow The Ball alt-variant, same
   // shape as /followball/render; still contentType 'followball' under the
   // hood (followBallVariant picks which game actually renders).
+  // the Find The Cat options shared by the single-render and batch routes
+  const findTheCatOptions = {
+    rounds: z.number().int().min(1).max(6).default(3),
+    theme: z.enum(['candy', 'neon', 'sunset', 'colorblind', 'random']).default('random'),
+    hook: z.string().max(28).default('FIND THE CAT'),
+    hookSec: z.number().min(1).max(3).default(2),
+    label: z.string().max(40).default(''),
+    twists: z.boolean().default(true),
+  };
+  const findTheCatSettings = (o: { rounds: number; theme: Settings['findTheCatTheme']; hook: string; hookSec: number; label: string; twists: boolean }, seed?: number): Settings => ({
+    ...getSettings(),
+    contentType: 'followball',
+    followBallVariant: 'findthecat',
+    findTheCatRounds: o.rounds,
+    findTheCatTheme: o.theme,
+    findTheCatHook: o.hook,
+    findTheCatHookSec: o.hookSec,
+    findTheCatLabel: o.label,
+    findTheCatTwists: o.twists,
+    findTheCatSeed: seed,
+    clipsPerRun: 1,
+  });
+
+  // Find The Cat preview studio — the Follow The Ball alt-variant, same
+  // shape as /followball/render; still contentType 'followball' under the
+  // hood (followBallVariant picks which game actually renders). The seed is
+  // pinned: this is the exact video the user just previewed.
   r.post('/findthecat/render', async ({ req, res }) => {
-    const body = z
-      .object({
-        seed: z.number().int().positive(),
-        rounds: z.number().int().min(1).max(6).default(3),
-        theme: z.enum(['candy', 'neon', 'sunset']).default('candy'),
-      })
-      .parse(await readJson(req));
+    const body = z.object({ seed: z.number().int().positive(), ...findTheCatOptions }).parse(await readJson(req));
     const { createJob } = await import('./db.ts');
-    const settings: Settings = {
-      ...getSettings(),
-      contentType: 'followball',
-      followBallVariant: 'findthecat',
-      findTheCatRounds: body.rounds,
-      findTheCatTheme: body.theme,
-      findTheCatSeed: body.seed,
-      clipsPerRun: 1,
-    };
-    const job = createJob({ settings });
+    const job = createJob({ settings: findTheCatSettings(body, body.seed) });
     queue.enqueue(job.id);
     sendJson(res, 201, { jobId: job.id, seed: body.seed, rounds: body.rounds, theme: body.theme });
+  });
+
+  // Render N variants at once. No seed is pinned, so each job picks a fresh
+  // one and render.mjs's variety check steers it away from any look used in
+  // the last 10 renders. The queue runs them one after another.
+  r.post('/findthecat/batch', async ({ req, res }) => {
+    const body = z.object({ count: z.number().int().min(1).max(20), ...findTheCatOptions }).parse(await readJson(req));
+    const { createJob } = await import('./db.ts');
+    const jobIds: string[] = [];
+    for (let i = 0; i < body.count; i++) {
+      const job = createJob({ settings: findTheCatSettings(body) });
+      queue.enqueue(job.id);
+      jobIds.push(job.id);
+    }
+    sendJson(res, 201, { jobIds });
   });
 
   // Eye Test preview studio — same shape as /colorwar/render / /followball/render,
@@ -531,7 +562,7 @@ export function buildRouter(): Router {
       : job && s?.contentType === 'colorwar'
       ? `colorwar-${s.colorWarMode}${s.colorWarSeed ? '-' + s.colorWarSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'followball' && s.followBallVariant === 'findthecat'
-      ? `findthecat-${s.findTheCatRounds}r${s.findTheCatSeed ? '-' + s.findTheCatSeed : ''}-${job.id}.mp4`
+      ? `findthecat-${s.findTheCatRounds >= 4 ? 'long' : s.findTheCatRounds <= 1 ? 'short' : 'custom'}-${s.findTheCatRounds}r${s.findTheCatSeed ? '-seed' + s.findTheCatSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'followball'
       ? `followball-${s.followBallMode}${s.followBallSeed ? '-' + s.followBallSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'eyetest'
@@ -546,6 +577,13 @@ export function buildRouter(): Router {
       ? `lasernations-${s.laserNationsMatchSec}s-${job.id}.mp4`
       : `clip-${ctx.params.id}.mp4`;
     serveFile(ctx, jobCandidateFile(ctx.params.id!, Number(ctx.params.index ?? 0), 'video'), { download: name });
+  });
+  // the extra per-render files some content types write next to final.N.mp4
+  // (Find The Cat: an SFX-only mp4, a cover PNG and a post-kit txt)
+  r.get('/jobs/:id/extra/:name', (ctx) => {
+    const name = ctx.params.name!;
+    if (!/^(sfx|cover|postkit)\.\d+\.(mp4|png|txt)$/.test(name)) return sendJson(ctx.res, 404, { error: 'not found' });
+    serveFile(ctx, resolve(jobWorkDir(ctx.params.id!), name), { download: `${ctx.params.id}-${name}` });
   });
   // flagged frames for the review pause
   r.get('/jobs/:id/screen/:name', (ctx) =>
