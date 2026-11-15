@@ -53,6 +53,11 @@ render/quotes/_result.json
 render/pausegame/out/
 render/pausegame/_frames/
 render/pausegame/_result.json
+render/findthecat/out/
+render/findthecat/samples/
+render/findthecat/_frames/
+render/findthecat/_result.json
+render/findthecat/render-log.jsonl
 
 # os / editor
 .DS_Store

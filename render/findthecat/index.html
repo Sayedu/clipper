@@ -31,10 +31,10 @@
     -webkit-font-smoothing:antialiased;
   }
   html:not(.rmode) body{ overflow:auto; padding:16px; }
-  html:not(.rmode) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
+  html:not(.rmode):not(.frame) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
   @media (max-width:760px){
     html:not(.rmode) body{ flex-direction:column; }
-    html:not(.rmode) #stage{ height:auto; width:min(94vw, 52dvh); }
+    html:not(.rmode):not(.frame) #stage{ height:auto; width:min(94vw, 52dvh); }
     #studio{ width:min(94vw, 420px) !important; }
   }
 
@@ -47,24 +47,26 @@
   @media (max-aspect-ratio:9/16){ #stage{height:auto;width:98vw} }
   #c{display:block;width:100%;height:100%}
 
-  /* ── HUD (DOM overlay on top of the canvas) — README §"Layout" ── */
+  /* ── HUD (DOM overlay on top of the canvas) ── */
   #hud{position:absolute;left:0;right:0;top:4cqh;
     display:flex;flex-direction:column;gap:1.2cqw;
     padding:0 4.4cqw 0;box-sizing:border-box;pointer-events:none}
   #hudTop{display:flex;align-items:baseline;justify-content:space-between;
     font-family:"Chakra Petch",monospace;font-weight:600;font-size:2.9cqw;letter-spacing:.2em;text-transform:uppercase}
   #roundLabel{color:rgba(255,255,255,.7)}
-  #diffChip{padding:.6cqw 1.8cqw;border-radius:40px;font-size:2.4cqw;border:2px solid currentColor}
+  #diffChip{padding:.6cqw 1.8cqw;border-radius:40px;font-size:2.4cqw;border:2px solid #fff}
   #pips{display:flex;gap:1.2cqw;margin-top:.6cqh}
   #pips > i{display:block;flex:1;height:1.2cqw;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
   #pips > i > b{display:block;height:100%;border-radius:99px}
 
   #titleWrap{position:absolute;left:0;right:0;top:17cqh;
     display:flex;flex-direction:column;align-items:center;gap:1cqw;pointer-events:none}
+  /* big, bold, high contrast: white on a dark stroke + glow */
   #titleText{font-weight:700;font-size:9.4cqw;line-height:.98;text-align:center;letter-spacing:-.02em;
-    text-shadow:0 0 3.2cqw currentColor, 0 .6cqw 0 rgba(0,0,0,.35)}
-  #titleSub{font-family:"Chakra Petch",monospace;font-weight:500;font-size:2.6cqw;letter-spacing:.3em;
-    opacity:.75;text-transform:uppercase}
+    -webkit-text-stroke:.35cqw rgba(0,0,0,.55); paint-order:stroke fill;
+    text-shadow:0 0 3.2cqw currentColor, 0 .6cqw 0 rgba(0,0,0,.45)}
+  #titleSub{font-family:"Chakra Petch",monospace;font-weight:600;font-size:2.8cqw;letter-spacing:.28em;
+    opacity:.85;text-transform:uppercase;text-shadow:0 .3cqw .6cqw rgba(0,0,0,.6)}
 
   #cdWrap{position:absolute;left:50%;top:33cqh;transform:translateX(-50%);
     width:16cqw;height:16cqw;display:none;align-items:center;justify-content:center;pointer-events:none}
@@ -73,31 +75,43 @@
 
   #caption{position:absolute;left:0;right:0;top:79cqh;text-align:center;
     font-weight:700;font-size:4.3cqw;letter-spacing:-.01em;pointer-events:none}
+  /* optional series label, e.g. "Find The Cat S1 E3" — kept in the lower
+     part of the stage, clear of TikTok's top bar */
+  #seriesLabel{position:absolute;left:0;right:0;top:86cqh;display:none;text-align:center;
+    font-family:"Chakra Petch",monospace;font-weight:600;font-size:2.7cqw;letter-spacing:.24em;
+    text-transform:uppercase;color:rgba(255,255,255,.62);pointer-events:none}
 
   #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
     font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
 
-  /* render mode: condensed safe box, matches every other game's TikTok framing */
-  html.rmode{ background:#000; --safe-w:70vw; --safe-top:8vh; }
-  html.rmode body{ background:#000; }
-  html.rmode #stage{
+  /* render mode (and the preview's "frame" view): the game sits in a
+     condensed safe box on pure black — TikTok lays its top bar, right-hand
+     buttons and bottom caption over the video, so everything important
+     stays inside x <= 85%, 10% <= y <= 80% of the 1080x1920 frame. */
+  html.rmode, html.frame{ background:#000; --safe-w:70vw; --safe-top:8vh; }
+  html.rmode body, html.frame body{ background:#000; }
+  html.rmode #stage, html.frame #stage{
     position:absolute; left:50%; transform:translateX(-50%);
     top:var(--safe-top); width:var(--safe-w); height:auto; aspect-ratio:9/16;
     max-width:none; border-radius:0; box-shadow:none;
   }
-  #subq{ display:none; }
-  html.rmode #subq{
-    display:block; position:absolute; left:0; right:0;
-    top:calc(var(--safe-top) + var(--safe-w) * 16 / 9 + 2.6vh);
-    text-align:center; white-space:nowrap;
-    font:700 3.5vw/1 "Chakra Petch","DIN Alternate",system-ui,sans-serif;
-    letter-spacing:.04em; color:rgba(255,255,255,.9);
-    text-shadow:0 0 2.4vw rgba(180,80,255,.32);
-  }
+  html.frame body{ padding:0; }
+  html.frame #studio{ display:none; }
 
+  /* debug: TikTok UI zones (top 10%, bottom 20%, right 15%) */
+  #safezone{display:none;position:fixed;inset:0;pointer-events:none;z-index:60}
+  html.safezone #safezone{display:block}
+  #safezone i{position:absolute;background:rgba(255,30,80,.32);border:2px dashed #ff2d55}
+  #safezone .sz-top{left:0;right:0;top:0;height:10%}
+  #safezone .sz-bottom{left:0;right:0;bottom:0;height:20%}
+  #safezone .sz-right{right:0;top:10%;bottom:20%;width:15%}
+  #safezone span{position:absolute;left:2%;bottom:21%;font:600 1.6vh/1.2 "Chakra Petch",monospace;
+    color:#ff8aa4;letter-spacing:.08em;text-transform:uppercase}
+
+  /* preview studio — never rendered, hidden when embedded */
   html.rmode #studio, html.embed #studio{ display:none; }
   html.embed body{ padding:0; overflow:hidden; }
-  html.embed #stage{ height:100dvh; max-width:100vw; }
+  html.embed:not(.frame) #stage{ height:100dvh; max-width:100vw; }
   #studio{
     width:340px; flex:none; align-self:center;
     max-height:94dvh; overflow-y:auto;
@@ -116,10 +130,9 @@
   #studio button.big{ padding:14px; font-size:15px; letter-spacing:.1em; }
   #studio button.big small{ display:block; font-weight:500; font-size:10px; letter-spacing:.14em; opacity:.55; margin-top:2px; }
   #studio button.primary{ background:rgba(255,210,63,.12); border-color:rgba(255,210,63,.5); color:#FFD23F; }
-  #studio button.primary:hover{ background:rgba(255,210,63,.2); }
   #studio .row{ display:flex; align-items:center; gap:8px; }
   #studio .lbl{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.42); width:62px; flex:none; }
-  #studio input[type=text]{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
+  #studio input[type=text], #studio select{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
     background:#141422; border:1px solid #2a2a3e; border-radius:9px; padding:8px 10px; font-size:13px; }
   #studio .seg{ display:flex; gap:4px; flex:1; }
   #studio .seg button{ flex:1; padding:7px 0; font-size:12px; }
@@ -138,16 +151,14 @@
   <canvas id="c" width="720" height="1280"></canvas>
   <div id="hud">
     <div id="hudTop">
-      <span id="roundLabel">ROUND 1/5</span>
-      <span id="diffChip">EASY · 5 CUPS</span>
+      <span id="roundLabel">ROUND 1/3</span>
+      <span id="diffChip">EASY · 3 CUPS</span>
     </div>
-    <div id="pips">
-      <i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i>
-    </div>
+    <div id="pips"></div>
   </div>
   <div id="titleWrap">
     <div id="titleText">FIND THE CAT</div>
-    <div id="titleSub">READY?</div>
+    <div id="titleSub">CUP GAME</div>
   </div>
   <div id="cdWrap">
     <svg width="100%" height="100%" viewBox="0 0 190 190">
@@ -157,8 +168,9 @@
     <div id="cdNum">3</div>
   </div>
   <div id="caption">Can you follow the cat?</div>
+  <div id="seriesLabel"></div>
 </div>
-<div id="subq">Can you follow the cat? 😼</div>
+<div id="safezone"><i class="sz-top"></i><i class="sz-right"></i><i class="sz-bottom"></i><span>TikTok UI zones · keep clear</span></div>
 
 <div id="studio">
   <div class="hd">Find The Cat · Preview</div>
@@ -171,8 +183,15 @@
   </div>
   <div class="row">
     <span class="lbl">Theme</span>
-    <div class="seg" id="themeSeg">
-      <button data-v="candy" class="on">Candy</button><button data-v="neon">Neon</button><button data-v="sunset">Sunset</button>
+    <select id="themeIn">
+      <option value="random">Surprise me</option><option value="candy">Candy</option><option value="neon">Neon</option>
+      <option value="sunset">Sunset</option><option value="colorblind">Colorblind safe</option>
+    </select>
+  </div>
+  <div class="row">
+    <span class="lbl">Length</span>
+    <div class="seg" id="lengthSeg">
+      <button data-v="1">Short</button><button data-v="4">Long</button>
     </div>
   </div>
   <div class="row">
@@ -183,6 +202,10 @@
     </div>
   </div>
   <div class="row">
+    <span class="lbl">Hook</span>
+    <input type="text" id="hookIn" value="FIND THE CAT" maxlength="28" spellcheck="false" />
+  </div>
+  <div class="row">
     <span class="lbl">Speed</span>
     <div class="seg" id="speedSeg">
       <button data-s="0.5">0.5×</button><button data-s="1" class="on">1×</button>
@@ -190,8 +213,8 @@
     </div>
   </div>
   <div class="row">
-    <span class="lbl">Sound</span>
-    <label class="sw"><input type="checkbox" id="chkSound"> play audio</label>
+    <label class="sw"><input type="checkbox" id="chkTwists" checked> twists</label>
+    <label class="sw"><input type="checkbox" id="chkSafe"> safe zone</label>
   </div>
   <div id="readout">…</div>
   <button id="btnRender" class="big primary">▶ RENDER THIS SEED</button>
@@ -208,6 +231,7 @@
   });
   window.addEventListener('unhandledrejection', (e) => { window.__FTC_ERROR = String((e.reason && e.reason.stack) || e.reason); });
 </script>
+<script src="./plan.js"></script>
 <script src="./game.js"></script>
 
 <script>
@@ -233,10 +257,13 @@ if (!document.documentElement.classList.contains('rmode')
   $('btnAgain').onclick = () => FTB.again();
   $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) FTB.replay(v); };
   seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
-  wireSeg('themeSeg', (v) => FTB.setTheme(v));
+  $('themeIn').onchange = (e) => FTB.setTheme(e.target.value);
+  wireSeg('lengthSeg', (v) => FTB.setRounds(+v));
   wireSeg('roundsSeg', (v) => FTB.setRounds(+v));
   wireSeg('speedSeg', (v) => FTB.setSpeed(+v));
-  $('chkSound').onchange = (e) => FTB.setSound(e.target.checked);
+  $('hookIn').oninput = (e) => FTB.setOptions({ hook: e.target.value });
+  $('chkTwists').onchange = (e) => FTB.setOptions({ twists: e.target.checked });
+  $('chkSafe').onchange = (e) => FTB.setSafeZone(e.target.checked);
 
   const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -245,7 +272,10 @@ if (!document.documentElement.classList.contains('rmode')
     const r = FTB.readout();
     clearInterval(pollT);
     try {
-      const resp = await post('/render', { seed: r.seed, rounds: r.roundCount, theme: r.theme });
+      const resp = await post('/render', {
+        seed: r.seed, rounds: r.roundCount, theme: r.theme,
+        hook: $('hookIn').value, twists: $('chkTwists').checked,
+      });
       if (!resp.ok) throw new Error(await resp.text());
       const j = await resp.json();
       say(`rendering ${j.file}…`, 60000);
@@ -267,13 +297,10 @@ if (!document.documentElement.classList.contains('rmode')
     const r = FTB.readout();
     if (document.activeElement !== seedIn) seedIn.value = r.seed;
     [...$('roundsSeg').children].forEach((b) => b.classList.toggle('on', +b.dataset.v === r.roundCount));
-    if (r.done) {
-      readout.innerHTML = `<b style="color:#FFD23F">Cup ${r.win}!</b>`
-        + `<br><span class="dim">Round ${r.round}/${r.roundCount} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
-    } else {
-      readout.innerHTML = `${r.phase} · ${r.t.toFixed(1)}s / ${r.totalSec.toFixed(1)}s`
-        + `<br><span class="dim">Round ${r.round}/${r.roundCount} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
-    }
+    [...$('lengthSeg').children].forEach((b) => b.classList.toggle('on', +b.dataset.v === r.roundCount));
+    const dim = `<br><span class="dim">Round ${r.round}/${r.roundCount} · ${r.difficulty} · ${r.cups} cups · ${r.theme} · twist ${r.twist} · seed ${r.seed}</span>`;
+    readout.innerHTML = r.done ? `<b style="color:#FFD23F">Cup ${r.win}!</b>${dim}`
+      : `${r.phase} · ${r.t.toFixed(1)}s / ${r.totalSec.toFixed(1)}s${dim}`;
   }, 110);
 })();
 </script>
