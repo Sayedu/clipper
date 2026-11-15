@@ -194,11 +194,80 @@ def run_render(
 
     _write_caption(out_dir, event.id, episode, record, meta)
     _write_pinned_comment(out_dir, teams)
+    if event.id in POST_KIT and not preview:
+        _write_post_kit(out_dir, event.id, episode, meta, settings.ffmpeg_path, cover_path)
 
     return meta
 
 
 SIMPLE_CAPTION_EVENTS = {"ring_of_doom", "hot_potato"}
+
+# The post kit for the events that actually get posted (the daily rotation's
+# ring_of_doom + hot_potato): a postkit.txt with a ready caption (topic
+# keyword first, then a real question, then 3-5 relevant hashtags, no
+# dashes) and a suggested pinned comment, plus cover_hook.png -- the
+# event's own cover frame with the hook text burned in. caption.txt (the
+# exact two-line caption the daily poster posts, by an earlier request) is
+# left exactly as it was; this is an extra file next to it, not a change to
+# what gets auto-posted.
+POST_KIT = {
+    "ring_of_doom": {
+        "caption": "Ring of Doom Episode {n} \U0001F534\U0001F535\U0001F7E2\U0001F7E1 Which color do you think survives the spinning ring? Comment your pick before the last ball falls.",
+        "hashtags": ["ringofdoom", "colorwars", "simulation", "satisfying", "physics"],
+        "pinned": "Which color did you pick? Comment your team and a name to get a ball in the next episode!",
+        "hook": "RING OF DOOM",
+        "sub": "EPISODE {n} · WHO SURVIVES?",
+    },
+    "hot_potato": {
+        "caption": "Hot Potato Episode {n} \U0001F4A3 Which color is still standing when the last bomb goes off? Comment your pick before it blows.",
+        "hashtags": ["hotpotato", "colorwars", "simulation", "satisfying", "physics"],
+        "pinned": "Which color did you pick? Comment your team and a name to get a ball in the next episode!",
+        "hook": "HOT POTATO",
+        "sub": "EPISODE {n} · DON'T GET CAUGHT",
+    },
+}
+COVER_FONT = Path(__file__).resolve().parents[2] / "assets" / "fonts" / "Anton-Regular.ttf"
+
+
+def _length_mode(duration_sec: float) -> str:
+    return "long" if duration_sec > 60 else "short" if duration_sec <= 30 else "custom"
+
+
+def _write_post_kit(out_dir: Path, event_id: str, episode: dict, meta: dict, ffmpeg_path: str, cover_path: Path) -> None:
+    import subprocess
+    import tempfile
+
+    kit = POST_KIT[event_id]
+    n = episode.get("number", "?")
+    caption = kit["caption"].format(n=n)
+    caption = caption.replace("\u2014", ",").replace("\u2013", ",").replace("-", " ")
+    hook, sub = kit["hook"], kit["sub"].format(n=n)
+    duration = float(meta.get("duration_sec", 0))
+    mode = _length_mode(duration)
+    lines = [
+        "CAPTION", caption, "", " ".join(f"#{t}" for t in kit["hashtags"]), "",
+        "PINNED COMMENT", kit["pinned"], "",
+        "RENDER",
+        f"{event_id} · episode {n} · {mode} · {duration:.1f}s · seed {meta.get('seed')} · winner {meta.get('winner')}",
+        "", "FILES", "video: final.mp4", "cover: cover_hook.png", "auto-post caption: caption.txt",
+    ]
+    (out_dir / "postkit.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # the hook text over the event's own most dramatic frame, in a dark box
+    # near the upper middle (clear of TikTok's top bar, inside its 3:4 grid crop)
+    with tempfile.TemporaryDirectory() as tmp:
+        hook_file, sub_file = Path(tmp) / "hook.txt", Path(tmp) / "sub.txt"
+        hook_file.write_text(hook, encoding="utf-8")
+        sub_file.write_text(sub, encoding="utf-8")
+        vf = ",".join([
+            "scale=1080:1920:flags=lanczos",
+            f"drawtext=fontfile={COVER_FONT}:textfile={hook_file}:fontsize=128:fontcolor=white:borderw=6:"
+            "bordercolor=black@0.9:box=1:boxcolor=black@0.85:boxborderw=26:x=(w-text_w)/2:y=h*0.2",
+            f"drawtext=fontfile={COVER_FONT}:textfile={sub_file}:fontsize=54:fontcolor=0xFFD23F:box=1:"
+            "boxcolor=black@0.85:boxborderw=16:x=(w-text_w)/2:y=h*0.2+190",
+        ])
+        subprocess.run([ffmpeg_path, "-y", "-v", "error", "-i", str(cover_path), "-vf", vf, str(out_dir / "cover_hook.png")],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
 def _write_caption(out_dir: Path, event_id: str, episode: dict, record: SimRecord, meta: dict) -> None:

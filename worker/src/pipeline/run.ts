@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getJob, recordUsedVideo, setVideoOutcome, updateJob } from '../db.ts';
 import { fetchTopComments, fetchTrending } from '../youtube.ts';
@@ -17,7 +17,7 @@ import {
   type Transcript,
 } from '../types.ts';
 import { CanceledError, createContext, type Broadcaster, type StepContext } from './context.ts';
-import { appendEndCard, ffprobe } from './ffmpeg.ts';
+import { FFMPEG, appendEndCard, ffprobe } from './ffmpeg.ts';
 import { paths } from '../paths.ts';
 import { shiftTranscript } from './ytTranscript.ts';
 import { search } from './steps/search.ts';
@@ -50,7 +50,7 @@ import { runLaserDuel } from './steps/lasernationsDuel.ts';
 import { runColorWar } from './steps/colorwar.ts';
 import { runFollowBall } from './steps/followball.ts';
 import { runFindTheCat } from './steps/findthecat.ts';
-import { buildPostKit } from '../../../scripts/findthecat/postkit.mjs';
+import { buildPostKit, writeCover } from '../../../scripts/findthecat/postkit.mjs';
 import { runEyeTest } from './steps/eyetest.ts';
 import { runPauseGame } from './steps/pausegame.ts';
 import { runQuotes } from './steps/quotes.ts';
@@ -283,8 +283,24 @@ async function finishPost(
   ctx: StepContext,
   jobId: string,
   render: RenderResult,
-  opts: { hookTitle: string; reason: string; draft: DraftText },
+  opts: {
+    hookTitle: string;
+    reason: string;
+    draft: DraftText;
+    /** Write cover.0.png (a gameplay frame with this hook text burned in)
+     *  + postkit.0.txt next to the video. Set for the games that get posted. */
+    kit?: { hook: string; sub: string; coverAtSec: number };
+  },
 ): Promise<RunOutcome> {
+  if (opts.kit) {
+    // before the end card is appended, so the cover is always real gameplay
+    await writeCover({ ffmpeg: FFMPEG, video: render.videoPath, atSec: opts.kit.coverAtSec, out: ctx.file('cover.0.png'), hook: opts.kit.hook, sub: opts.kit.sub });
+    const d = opts.draft;
+    writeFileSync(ctx.file('postkit.0.txt'), [
+      'CAPTION', d.caption ?? '', '', (d.hashtags ?? []).map((t) => `#${t}`).join(' '), '',
+      'PINNED COMMENT', d.pinnedComment ?? '', '', 'RENDER', opts.reason, '',
+    ].join('\n'));
+  }
   // the branded follow/CTA card, held for its own full length at the end
   // of every finished video -- by request. finishPost is the one place
   // every content type's own render step converges before the job is
@@ -464,30 +480,32 @@ async function runColorWarPost(ctx: StepContext, jobId: string): Promise<RunOutc
   const episode = ctx.settings.colorWarEpisodeIndex;
   const totalEpisodes = ctx.settings.colorWarTotalEpisodes;
 
+  // keyword first, then a real question, then 3-5 relevant hashtags, no dashes
   const draft: DraftText = season && episode
     ? {
         hook: `Season ${season} · Episode ${episode} of ${totalEpisodes} 👀`,
         overlays: [`SEASON ${season} · EPISODE ${episode} OF ${totalEpisodes}`],
         caption:
-          `Season ${season} · Episode ${episode} of ${totalEpisodes} 🏆\n\n` +
-          `${c1} vs ${c2} — 4 colours fight for the grid.` +
-          (race.isComeback ? ` ${race.winner} was almost finished before storming all the way back to win.` : ` ${race.winner} takes it in a nail-biter.`) +
-          ` \n\nNext episode tomorrow — comment your pick for Ep. ${episode + 1} 👇`,
-        hashtags: ['colorwar', 'colorwarseason', 'satisfying', 'simulation', 'fyp'],
+          `Color war Season ${season} Episode ${episode} of ${totalEpisodes} 🏆 Which color takes the grid this time? ` +
+          `It comes down to ${c1} and ${c2}` +
+          (race.isComeback ? `, and ${race.winner} was almost finished before storming all the way back.` : `, and ${race.winner} takes it in a nail biter.`) +
+          ` Comment your pick for Episode ${episode + 1} 👇`,
+        hashtags: ['colorwar', 'colorwarseason', 'simulation', 'satisfying', 'physics'],
+        pinnedComment: `Which color are you backing for Episode ${episode + 1}? 🎨`,
       }
     : {
         hook: 'Which colour wins the war? 👀',
         overlays: [race.colors.join('  vs  ')],
         caption:
-          `Which colour wins? 👀 WATCH TILL THE END — the last 1v1 is insane.\n\n` +
-          `${c1} vs ${c2} — 4 colours fight for the grid. Every hit paints a stripe, ` +
-          `paint bombs blow holes in the map, and whoever gets squeezed out is gone. ` +
-          `Down to two, each one gets wiped to almost nothing and storms back — over and over.\n\n` +
-          `Comment your colour before it ends 👇`,
-        hashtags: ['colorwar', 'satisfying', 'simulation', 'watchtillend', 'fyp'],
+          `Color war simulation 🎨 Which color do you think takes the whole grid? ` +
+          `Every hit paints a stripe, paint bombs blow holes in the map, and it ends in a wild 1v1 between ${c1} and ${c2}. ` +
+          `Comment your color before it ends 👇`,
+        hashtags: ['colorwar', 'colorbattle', 'simulation', 'satisfying', 'physics'],
+        pinnedComment: 'Which color did you pick before the end? 🎨',
       };
   return finishPost(ctx, jobId, render, {
     hookTitle: season && episode ? `S${season}E${episode} · ${race.winner} wins` : `${race.winner} wins`,
+    kit: { hook: 'COLOR WAR', sub: season && episode ? `SEASON ${season} · EPISODE ${episode}` : 'WHO TAKES THE GRID?', coverAtSec: Math.max(1, render.durationSec - 2.5) },
     reason: season && episode
       ? `Season ${season} · Episode ${episode}/${totalEpisodes} · ${race.modeName} · ${race.colors.join(' vs ')} → ${race.winner} (${race.winnerPct}%)${race.isComeback ? ' · COMEBACK' : ''} · seed ${race.seed}`
       : `${race.modeName} · ${race.colors.join(' vs ')} → ${race.winner} (${race.winnerPct}%) · seed ${race.seed}`,
@@ -522,22 +540,19 @@ async function runFollowBallPost(ctx: StepContext, jobId: string): Promise<RunOu
   if (ctx.settings.followBallVariant === 'findthecat') return runFindTheCatPost(ctx, jobId);
   skipStepsExcept(ctx, ['render']);
   const { render, game } = await stage(ctx, 'render', () => runFollowBall(ctx));
-  const modeLine =
-    game.mode === 'sprint'
-      ? `${game.rounds} rounds, the cups shuffle faster each one`
-      : `${game.rounds} rounds of pure focus — ${game.mode === 'insane' ? 'brutal' : 'it ramps hard'}`;
   const draft: DraftText = {
     hook: 'Follow the ball 👀 how many can you get?',
     overlays: [`${game.rounds} rounds`],
     caption:
-      `Follow the ball 👀 how many can you get?\n\n` +
-      `${modeLine}. Call the cup out loud before it reveals — then check the score card at the end.\n\n` +
-      `Comment your score 👇`,
-    hashtags: ['followtheball', 'shellgame', 'focustest', 'watchtillend', 'fyp'],
+      `Follow the ball shell game 👀 How many of the ${game.rounds} rounds can you get right? ` +
+      `The cups shuffle faster every round, so call the cup out loud before each reveal and check the score card at the end.`,
+    hashtags: ['followtheball', 'shellgame', 'cupgame', 'eyetest', 'focustest'],
+    pinnedComment: `How many did you get out of ${game.rounds}? Drop your score 👇`,
   };
   return finishPost(ctx, jobId, render, {
     hookTitle: `answers ${game.answers.join('-')}`,
     reason: `${game.modeName} · ${game.rounds} rounds · answers ${game.answers.join(' ')} · seed ${game.seed}`,
+    kit: { hook: 'FOLLOW THE BALL', sub: `${game.rounds} ROUNDS · CAN YOU KEEP UP?`, coverAtSec: Math.max(1, render.durationSec - 2.8) },
     draft,
   });
 }
@@ -546,23 +561,19 @@ async function runFollowBallPost(ctx: StepContext, jobId: string): Promise<RunOu
 async function runEyeTestPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
   skipStepsExcept(ctx, ['render']);
   const { render, game } = await stage(ctx, 'render', () => runEyeTest(ctx));
-  const roundsLine =
-    game.rounds > 1
-      ? `${game.rounds} rounds — ${game.ballsPerRound.join('/')} balls, ${game.shuffleSec}s of real physics every round`
-      : `${game.ballsPerRound[0]} balls, ${game.shuffleSec}s of real physics`;
   const draft: DraftText = {
     hook: 'Dynamic vision test 👀 can you actually track it?',
     overlays: [game.rounds > 1 ? `${game.rounds} rounds` : `ball #${game.answers[0]}`],
     caption:
-      `Dynamic vision test 👀 focus on the gold ball, then don't blink.\n\n` +
-      `${roundsLine} — every ball bounces off each other for real, the whole arena spins, and then it freezes. ` +
-      `Lock in your guess before each reveal.\n\n` +
-      `Comment your ${game.rounds > 1 ? 'scores' : 'number'} 👇`,
-    hashtags: ['eyetest', 'visiontest', 'canyoutrackit', 'watchtillend', 'fyp'],
+      `Eye test 👀 Can you keep track of the gold ball${game.rounds > 1 ? ` through all ${game.rounds} rounds` : ''}? ` +
+      `Every ball really bounces off the others and the whole arena spins before it freezes, so lock in your guess before each reveal.`,
+    hashtags: ['eyetest', 'visiontest', 'trackingtest', 'focustest', 'canyoutrackit'],
+    pinnedComment: game.rounds > 1 ? `How many rounds did you get right out of ${game.rounds}? 👇` : 'Which number did you land on? 👇',
   };
   return finishPost(ctx, jobId, render, {
     hookTitle: `answers ${game.answers.join('-')}`,
     reason: `${game.rounds} round(s) (${game.ballsPerRound.join('/')} balls) · answers ${game.answers.join(' ')} · shuffle ${game.shuffleSec}s · seed ${game.seed}`,
+    kit: { hook: 'EYE TEST', sub: 'TRACK THE GOLD BALL', coverAtSec: Math.max(1, render.durationSec - 3) },
     draft,
   });
 }
