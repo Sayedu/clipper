@@ -135,7 +135,7 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
   const needsScale = game.frameWidth !== game.width || game.frameHeight !== game.height;
   const vf = [
     needsScale ? `scale=${game.width}:${game.height}:flags=lanczos+accurate_rnd+full_chroma_int` : null,
-    'unsharp=3:3:0.3:3:3:0.0',
+    'unsharp=3:3:0.6:3:3:0.0',   // was 0.3 -- asked for sharper
     'format=yuv420p',
   ].filter(Boolean).join(',');
   await runFfmpeg(

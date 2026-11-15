@@ -181,7 +181,7 @@ const mux = async (result, seed) => {
   const needsScale = result.frameWidth !== result.width || result.frameHeight !== result.height;
   const vf = [
     needsScale ? `scale=${result.width}:${result.height}:flags=lanczos+accurate_rnd+full_chroma_int` : null,
-    'unsharp=3:3:0.3:3:3:0.0', 'format=yuv420p',
+    'unsharp=3:3:0.6:3:3:0.0', 'format=yuv420p',   // was 0.3 -- asked for sharper
   ].filter(Boolean).join(',');
   await pexec(FFMPEG, ['-y', '-framerate', String(result.fps), '-start_number', '1',
     '-i', join(framesDir, 'f_%05d.png'), '-i', finalWav, '-map', '0:v', '-map', '1:a', '-vf', vf,

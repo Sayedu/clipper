@@ -171,7 +171,7 @@ def main():
                 cp = int((at + 0.08) * SR)
                 ce = min(n, cp + len(clip))
                 if cp < n and ce > cp:
-                    clip_bus[cp:ce] += clip[: ce - cp] * 0.5  # was 0.85 -- too loud right as the cat is shown
+                    clip_bus[cp:ce] += clip[: ce - cp] * 0.2  # was 0.85, then 0.5, then 0.3 -- still too loud
         if i % 20 == 0:
             progress(0.05 + 0.85 * (i / max(1, len(events))), "synthesising voices")
 
