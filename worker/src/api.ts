@@ -94,6 +94,12 @@ const settingsSchema = z
     colorWarScoresBefore: z.tuple([z.number().int().min(0), z.number().int().min(0), z.number().int().min(0), z.number().int().min(0)]).optional(),
     followBallMode: z.enum(['sprint', 'classic', 'insane', 'random']),
     followBallSeed: z.number().int().positive().optional(),
+    followBallVariant: z.enum(['classic', 'findthecat']),
+    findTheCatCups: z.number().int().min(3).max(5),
+    findTheCatDifficulty: z.enum(['easy', 'medium', 'hard']),
+    findTheCatRound: z.number().int().min(1).max(5),
+    findTheCatTheme: z.enum(['candy', 'neon', 'sunset']),
+    findTheCatSeed: z.number().int().positive().optional(),
     eyeTestBallsPerRound: z.array(z.number().int().min(4).max(10)).min(1).max(6),
     eyeTestShuffleSec: z.number().min(3).max(15),
     eyeTestSeed: z.number().int().positive().optional(),
@@ -299,6 +305,36 @@ export function buildRouter(): Router {
     sendJson(res, 201, { jobId: job.id, seed: body.seed, mode: body.mode });
   });
 
+  // Find The Cat preview studio — the Follow The Ball alt-variant, same
+  // shape as /followball/render; still contentType 'followball' under the
+  // hood (followBallVariant picks which game actually renders).
+  r.post('/findthecat/render', async ({ req, res }) => {
+    const body = z
+      .object({
+        seed: z.number().int().positive(),
+        cups: z.number().int().min(3).max(5).default(5),
+        difficulty: z.enum(['easy', 'medium', 'hard']).default('easy'),
+        round: z.number().int().min(1).max(5).default(1),
+        theme: z.enum(['candy', 'neon', 'sunset']).default('candy'),
+      })
+      .parse(await readJson(req));
+    const { createJob } = await import('./db.ts');
+    const settings: Settings = {
+      ...getSettings(),
+      contentType: 'followball',
+      followBallVariant: 'findthecat',
+      findTheCatCups: body.cups,
+      findTheCatDifficulty: body.difficulty,
+      findTheCatRound: body.round,
+      findTheCatTheme: body.theme,
+      findTheCatSeed: body.seed,
+      clipsPerRun: 1,
+    };
+    const job = createJob({ settings });
+    queue.enqueue(job.id);
+    sendJson(res, 201, { jobId: job.id, seed: body.seed, cups: body.cups, difficulty: body.difficulty, round: body.round, theme: body.theme });
+  });
+
   // Eye Test preview studio — same shape as /colorwar/render / /followball/render,
   // plus the user-authored round plan (no more preset modes).
   r.post('/eyetest/render', async ({ req, res }) => {
@@ -403,18 +439,19 @@ export function buildRouter(): Router {
     const clean = relPath.replace(/\.\.+/g, '').replace(/^\/+/, '');
     const abs = resolve(paths.repoRoot, clean);
     if (!abs.startsWith(paths.repoRoot) ||
-        !/^(render\/(colorwar|followball|eyetest|lasernations|pausegame|quotes)\/|assets\/fonts\/)/.test(clean)) {
+        !/^(render\/(colorwar|followball|findthecat|eyetest|lasernations|pausegame|quotes)\/|assets\/fonts\/)/.test(clean)) {
       return sendJson(ctx.res, 403, { error: 'forbidden' });
     }
     if (!existsSync(abs)) return sendJson(ctx.res, 404, { error: 'not found' });
     const ext = abs.slice(abs.lastIndexOf('.'));
     const type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-      '.ttf': 'font/ttf', '.woff2': 'font/woff2' }[ext] ?? 'application/octet-stream';
+      '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.png': 'image/png' }[ext] ?? 'application/octet-stream';
     ctx.res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
     createReadStream(abs).pipe(ctx.res);
   };
   r.get('/render/colorwar/:file', (ctx) => staticFile(`render/colorwar/${ctx.params.file}`, ctx));
   r.get('/render/followball/:file', (ctx) => staticFile(`render/followball/${ctx.params.file}`, ctx));
+  r.get('/render/findthecat/:file', (ctx) => staticFile(`render/findthecat/${ctx.params.file}`, ctx));
   r.get('/render/eyetest/:file', (ctx) => staticFile(`render/eyetest/${ctx.params.file}`, ctx));
   r.get('/render/pausegame/:file', (ctx) => staticFile(`render/pausegame/${ctx.params.file}`, ctx));
   r.get('/render/lasernations/:file', (ctx) => staticFile(`render/lasernations/${ctx.params.file}`, ctx));
@@ -499,6 +536,8 @@ export function buildRouter(): Router {
       ? `ColorWars_S${s.colorWarSeasonNumber}_Ep${String(s.colorWarEpisodeIndex).padStart(2, '0')}.mp4`
       : job && s?.contentType === 'colorwar'
       ? `colorwar-${s.colorWarMode}${s.colorWarSeed ? '-' + s.colorWarSeed : ''}-${job.id}.mp4`
+      : job && s?.contentType === 'followball' && s.followBallVariant === 'findthecat'
+      ? `findthecat-${s.findTheCatDifficulty}${s.findTheCatSeed ? '-' + s.findTheCatSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'followball'
       ? `followball-${s.followBallMode}${s.followBallSeed ? '-' + s.followBallSeed : ''}-${job.id}.mp4`
       : job && s?.contentType === 'eyetest'

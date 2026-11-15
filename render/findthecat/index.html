@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Find The Cat</title>
+
+<script>
+  var _q = new URLSearchParams(location.search);
+  if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
+</script>
+
+<style>
+  /* relative paths so the page works both from the render server (rooted at the
+     repo) and from the worker's /render/findthecat/ + /assets/fonts/ routes. */
+  @font-face{ font-family:"Chakra Petch"; font-weight:500; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Medium.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:600; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+  @font-face{ font-family:"Chakra Petch"; font-weight:700; font-display:block;
+    src:url("../../assets/fonts/ChakraPetch-Bold.ttf") format("truetype"); }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    margin:0; color:#fff;
+    background:radial-gradient(120% 80% at 50% 0%, #1A0838 0%, #06060c 60%), #06060c;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    overflow:hidden; display:flex; align-items:center; justify-content:center; gap:22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  html:not(.rmode) body{ overflow:auto; padding:16px; }
+  html:not(.rmode) #stage{ height:min(94dvh, calc((100vw - 380px) * 16 / 9)); }
+  @media (max-width:760px){
+    html:not(.rmode) body{ flex-direction:column; }
+    html:not(.rmode) #stage{ height:auto; width:min(94vw, 52dvh); }
+    #studio{ width:min(94vw, 420px) !important; }
+  }
+
+  #stage{
+    position:relative; container-type:size;
+    aspect-ratio:9/16; height:98dvh; max-width:98vw;
+    border-radius:26px; overflow:hidden; background:#05050b;
+    box-shadow:0 0 0 1px #2a1a4a, 0 0 60px rgba(180,80,255,.14), 0 30px 90px rgba(0,0,0,.7);
+  }
+  @media (max-aspect-ratio:9/16){ #stage{height:auto;width:98vw} }
+  #c{display:block;width:100%;height:100%}
+
+  /* ── HUD (DOM overlay on top of the canvas) — README §"Layout" ── */
+  #hud{position:absolute;left:0;right:0;top:4cqh;
+    display:flex;flex-direction:column;gap:1.2cqw;
+    padding:0 4.4cqw 0;box-sizing:border-box;pointer-events:none}
+  #hudTop{display:flex;align-items:baseline;justify-content:space-between;
+    font-family:"Chakra Petch",monospace;font-weight:600;font-size:2.9cqw;letter-spacing:.2em;text-transform:uppercase}
+  #roundLabel{color:rgba(255,255,255,.7)}
+  #diffChip{padding:.6cqw 1.8cqw;border-radius:40px;font-size:2.4cqw;border:2px solid currentColor}
+  #pips{display:flex;gap:1.2cqw;margin-top:.6cqh}
+  #pips > i{display:block;flex:1;height:1.2cqw;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
+  #pips > i > b{display:block;height:100%;border-radius:99px}
+
+  #titleWrap{position:absolute;left:0;right:0;top:17cqh;
+    display:flex;flex-direction:column;align-items:center;gap:1cqw;pointer-events:none}
+  #titleText{font-weight:700;font-size:9.4cqw;line-height:.98;text-align:center;letter-spacing:-.02em;
+    text-shadow:0 0 3.2cqw currentColor, 0 .6cqw 0 rgba(0,0,0,.35)}
+  #titleSub{font-family:"Chakra Petch",monospace;font-weight:500;font-size:2.6cqw;letter-spacing:.3em;
+    opacity:.75;text-transform:uppercase}
+
+  #cdWrap{position:absolute;left:50%;top:33cqh;transform:translateX(-50%);
+    width:16cqw;height:16cqw;display:none;align-items:center;justify-content:center;pointer-events:none}
+  #cdWrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+  #cdNum{position:relative;font-weight:700;font-size:8.4cqw}
+
+  #caption{position:absolute;left:0;right:0;top:79cqh;text-align:center;
+    font-weight:700;font-size:4.3cqw;letter-spacing:-.01em;pointer-events:none}
+
+  #err{position:fixed;inset:0;display:none;padding:16px;background:#140808;color:#ff8080;
+    font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99}
+
+  /* render mode: condensed safe box, matches every other game's TikTok framing */
+  html.rmode{ background:#000; --safe-w:70vw; --safe-top:5vh; }
+  html.rmode body{ background:#000; }
+  html.rmode #stage{
+    position:absolute; left:50%; transform:translateX(-50%);
+    top:var(--safe-top); width:var(--safe-w); height:auto; aspect-ratio:9/16;
+    max-width:none; border-radius:0; box-shadow:none;
+  }
+  #subq{ display:none; }
+  html.rmode #subq{
+    display:block; position:absolute; left:0; right:0;
+    top:calc(var(--safe-top) + var(--safe-w) * 16 / 9 + 2.6vh);
+    text-align:center; white-space:nowrap;
+    font:700 3.5vw/1 "Chakra Petch","DIN Alternate",system-ui,sans-serif;
+    letter-spacing:.04em; color:rgba(255,255,255,.9);
+    text-shadow:0 0 2.4vw rgba(180,80,255,.32);
+  }
+
+  html.rmode #studio, html.embed #studio{ display:none; }
+  html.embed body{ padding:0; overflow:hidden; }
+  html.embed #stage{ height:100dvh; max-width:100vw; }
+  #studio{
+    width:340px; flex:none; align-self:center;
+    max-height:94dvh; overflow-y:auto;
+    background:#0b0b14; border:1px solid #2a1a4a; border-radius:20px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6);
+    padding:18px; display:flex; flex-direction:column; gap:12px;
+    font-family:"Chakra Petch","DIN Alternate",system-ui,sans-serif;
+  }
+  #studio .hd{ font-weight:700; letter-spacing:.28em; font-size:11px; color:#FFD23F; text-transform:uppercase; }
+  #studio button{
+    font-family:inherit; font-weight:700; color:#fff; cursor:pointer;
+    background:#141422; border:1px solid #2a2a3e; border-radius:10px;
+    padding:9px 12px; font-size:13px; letter-spacing:.06em;
+  }
+  #studio button:hover{ border-color:#FFD23F88; background:#191926; }
+  #studio button.big{ padding:14px; font-size:15px; letter-spacing:.1em; }
+  #studio button.big small{ display:block; font-weight:500; font-size:10px; letter-spacing:.14em; opacity:.55; margin-top:2px; }
+  #studio button.primary{ background:rgba(255,210,63,.12); border-color:rgba(255,210,63,.5); color:#FFD23F; }
+  #studio button.primary:hover{ background:rgba(255,210,63,.2); }
+  #studio .row{ display:flex; align-items:center; gap:8px; }
+  #studio .lbl{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.42); width:62px; flex:none; }
+  #studio input[type=text]{ font-family:inherit; font-weight:700; color:#fff; flex:1; min-width:0;
+    background:#141422; border:1px solid #2a2a3e; border-radius:9px; padding:8px 10px; font-size:13px; }
+  #studio .seg{ display:flex; gap:4px; flex:1; }
+  #studio .seg button{ flex:1; padding:7px 0; font-size:12px; }
+  #studio .seg button.on{ background:rgba(255,210,63,.14); border-color:rgba(255,210,63,.5); color:#FFD23F; }
+  #studio label.sw{ display:flex; align-items:center; gap:7px; font-size:12px; letter-spacing:.06em; color:rgba(255,255,255,.8); cursor:pointer; }
+  #studio label.sw input{ accent-color:#FFD23F; width:15px; height:15px; }
+  #studio #readout{ background:#141422; border:1px solid #2a2a3e; border-radius:10px;
+    padding:11px 12px; font-size:13px; line-height:1.5; min-height:56px; font-variant-numeric:tabular-nums; }
+  #studio #readout .dim{ color:rgba(255,255,255,.4); font-size:11px; letter-spacing:.04em; }
+  #studio #toast{ font-size:11px; line-height:1.5; color:#FFD23F; word-break:break-all;
+    font-family:ui-monospace,Menlo,monospace; min-height:0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="720" height="1280"></canvas>
+  <div id="hud">
+    <div id="hudTop">
+      <span id="roundLabel">ROUND 1/5</span>
+      <span id="diffChip">EASY · 5 CUPS</span>
+    </div>
+    <div id="pips">
+      <i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i>
+    </div>
+  </div>
+  <div id="titleWrap">
+    <div id="titleText">FIND THE CAT</div>
+    <div id="titleSub">READY?</div>
+  </div>
+  <div id="cdWrap">
+    <svg width="100%" height="100%" viewBox="0 0 190 190">
+      <circle cx="95" cy="95" r="84" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.15)" stroke-width="10" />
+      <circle id="cdRing" cx="95" cy="95" r="84" fill="none" stroke="#FFD23F" stroke-width="10" stroke-linecap="round" />
+    </svg>
+    <div id="cdNum">3</div>
+  </div>
+  <div id="caption">Can you follow the cat?</div>
+</div>
+<div id="subq">Can you follow the cat? 😼</div>
+
+<div id="studio">
+  <div class="hd">Find The Cat · Preview</div>
+  <button id="btnReplay" class="big primary">↻ REPLAY<small>fresh random seed</small></button>
+  <div class="row">
+    <button id="btnAgain" style="flex:1">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
+    <label class="sw"><input type="checkbox" id="chkAuto"> auto</label>
+  </div>
+  <div class="row">
+    <span class="lbl">Seed</span>
+    <input type="text" id="seedIn" inputmode="numeric" spellcheck="false" />
+    <button id="btnSeed">set</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Cups</span>
+    <div class="seg" id="cupsSeg">
+      <button data-v="3">3</button><button data-v="4">4</button><button data-v="5" class="on">5</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Difficulty</span>
+    <div class="seg" id="diffSeg">
+      <button data-v="easy" class="on">Easy</button><button data-v="medium">Med</button><button data-v="hard">Hard</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Theme</span>
+    <div class="seg" id="themeSeg">
+      <button data-v="candy" class="on">Candy</button><button data-v="neon">Neon</button><button data-v="sunset">Sunset</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Round</span>
+    <div class="seg" id="roundSeg">
+      <button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button>
+      <button data-v="4">4</button><button data-v="5">5</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <div class="seg" id="speedSeg">
+      <button data-s="0.5">0.5×</button><button data-s="1" class="on">1×</button>
+      <button data-s="2">2×</button><button data-s="4">4×</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="lbl">Sound</span>
+    <label class="sw"><input type="checkbox" id="chkSound"> play audio</label>
+  </div>
+  <div id="readout">…</div>
+  <button id="btnRender" class="big primary">▶ RENDER THIS SEED</button>
+  <div id="toast"></div>
+</div>
+
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent += ((e.error && e.error.stack) || e.message) + '\n'; }
+    window.__FTC_ERROR = (e.error && e.error.stack) || e.message;
+  });
+  window.addEventListener('unhandledrejection', (e) => { window.__FTC_ERROR = String((e.reason && e.reason.stack) || e.reason); });
+</script>
+<script src="./game.js"></script>
+
+<script>
+/* ── preview studio wiring — only for the standalone preview page ── */
+if (!document.documentElement.classList.contains('rmode')
+    && !document.documentElement.classList.contains('embed')) (function () {
+  const FTB = window.FTB;
+  const $ = (id) => document.getElementById(id);
+  const seedIn = $('seedIn'), readout = $('readout'), toast = $('toast');
+
+  let toastT = 0;
+  const say = (msg, ms = 3500) => { toast.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => (toast.textContent = ''), ms); };
+
+  const wireSeg = (id, onPick) => {
+    $(id).addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      [...$(id).children].forEach((x) => x.classList.toggle('on', x === b));
+      onPick(b.dataset.v !== undefined ? b.dataset.v : b.dataset.s);
+    });
+  };
+
+  $('btnReplay').onclick = () => FTB.replay();
+  $('btnAgain').onclick = () => FTB.again();
+  $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) FTB.replay(v); };
+  seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
+  wireSeg('cupsSeg', (v) => FTB.setCups(+v));
+  wireSeg('diffSeg', (v) => FTB.setDifficulty(v));
+  wireSeg('themeSeg', (v) => FTB.setTheme(v));
+  wireSeg('roundSeg', (v) => FTB.setRound(+v));
+  wireSeg('speedSeg', (v) => FTB.setSpeed(+v));
+  $('chkAuto').onchange = (e) => FTB.setAutoReplay(e.target.checked);
+  $('chkSound').onchange = (e) => FTB.setSound(e.target.checked);
+
+  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  let pollT = 0;
+  $('btnRender').onclick = async () => {
+    const r = FTB.readout();
+    clearInterval(pollT);
+    try {
+      const resp = await post('/render', { seed: r.seed, cups: r.cups, difficulty: r.difficulty, round: r.round, theme: r.theme });
+      if (!resp.ok) throw new Error(await resp.text());
+      const j = await resp.json();
+      say(`rendering ${j.file}…`, 60000);
+      pollT = setInterval(async () => {
+        try {
+          const s = await (await fetch('/render-status?id=' + j.id)).json();
+          const p = s.progress ? ` ${Math.round(s.progress.pct * 100)}% ${s.progress.msg}` : '';
+          if (s.state === 'done') { clearInterval(pollT); say(`✅ ${s.file} → render/findthecat/out/`, 12000); }
+          else if (s.state === 'failed') { clearInterval(pollT); say(`❌ render failed — see terminal`, 8000); }
+          else say(`rendering ${s.file}…${p}`, 60000);
+        } catch { clearInterval(pollT); }
+      }, 700);
+    } catch {
+      say('no studio server — render via scripts/findthecat/render.mjs', 8000);
+    }
+  };
+
+  setInterval(() => {
+    const r = FTB.readout();
+    if (document.activeElement !== seedIn) seedIn.value = r.seed;
+    if (r.done) {
+      readout.innerHTML = `<b style="color:#FFD23F">Cup ${r.win}!</b>`
+        + `<br><span class="dim">${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+    } else {
+      readout.innerHTML = `${r.phase} · ${r.t.toFixed(1)}s / ${r.totalSec.toFixed(1)}s`
+        + `<br><span class="dim">${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+    }
+  }, 110);
+})();
+</script>
+</body>
+</html>

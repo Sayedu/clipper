@@ -129,6 +129,17 @@ export const FOLLOW_BALL_MODES: Array<{ id: FollowBallMode; name: string; tag: s
   { id: 'random', name: 'Surprise me', tag: 'A different mode each run' },
 ];
 
+/** Which Follow-the-ball variant runs. 'findthecat' is the same shell-game
+ *  mechanic with a cat-face ball, a single fixed-length shuffle round, and
+ *  its own look/sound — see worker/src/pipeline/steps/findthecat.ts. */
+export type FollowBallVariant = 'classic' | 'findthecat';
+
+/** Find The Cat's difficulty — picks a swap COUNT (13/19/27), not a round plan. */
+export type FindTheCatDifficulty = 'easy' | 'medium' | 'hard';
+
+/** Find The Cat's color palette. */
+export type FindTheCatTheme = 'candy' | 'neon' | 'sunset';
+
 /** Which Color War board mode runs. 'random' = a fresh pick each generation. */
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
 
@@ -294,6 +305,21 @@ export interface Settings {
   /** Pin the sim to an exact seed (the preview studio's "render this seed").
    *  0 / undefined = a fresh random seed each render. */
   followBallSeed?: number;
+  /** 'classic' (the multi-round cup-shuffle game above) or 'findthecat' (the
+   *  cat-face-ball alt-variant, worker/src/pipeline/steps/findthecat.ts). */
+  followBallVariant: FollowBallVariant;
+  /** Find The Cat's cup count (3-5). */
+  findTheCatCups: number;
+  /** Find The Cat's difficulty — picks the swap count (13/19/27). */
+  findTheCatDifficulty: FindTheCatDifficulty;
+  /** Find The Cat's "ROUND r/5" HUD label — cosmetic only, every render is
+   *  one self-contained shuffle regardless of this number. */
+  findTheCatRound: number;
+  /** Find The Cat's color palette. */
+  findTheCatTheme: FindTheCatTheme;
+  /** Pin the sim to an exact seed (the preview studio's "render this seed").
+   *  0 / undefined = a fresh random seed each render. */
+  findTheCatSeed?: number;
 
   // --- Eye Test ("Ghost Object Tracker" visual focus test) ---
   // Fully user-authored, no preset modes: each round runs the same 3s
@@ -437,6 +463,11 @@ export const DEFAULT_SETTINGS: Settings = {
   colorWarShape: 'circle',
   colorWarFlipSound: 'bubble',
   followBallMode: 'sprint',
+  followBallVariant: 'classic',
+  findTheCatCups: 5,
+  findTheCatDifficulty: 'easy',
+  findTheCatRound: 1,
+  findTheCatTheme: 'candy',
   eyeTestBallsPerRound: [8, 8, 8],
   eyeTestShuffleSec: 6,
   pauseGameTargetDeg: 9,

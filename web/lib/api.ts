@@ -42,6 +42,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ seed, mode }),
     }),
+  findTheCatRender: (seed: number, cups: number, difficulty: string, round: number, theme: string) =>
+    req<{ jobId: string; seed: number; cups: number; difficulty: string; round: number; theme: string }>(
+      '/findthecat/render',
+      { method: 'POST', body: JSON.stringify({ seed, cups, difficulty, round, theme }) },
+    ),
   eyetestRender: (seed: number, ballsPerRound: number[], shuffleSec: number) =>
     req<{ jobId: string; seed: number; ballsPerRound: number[]; shuffleSec: number }>('/eyetest/render', {
       method: 'POST',
@@ -116,6 +121,7 @@ export const jobDownloadUrl = (jobId: string, index = 0) => `${BASE}/jobs/${jobI
 export const colorwarPreviewSrc = (shape: 'circle' | 'square' = 'circle', flipsound: 'pluck' | 'bubble' = 'bubble') =>
   `/worker/render/colorwar/index.html?embed=1&shape=${shape}&flipsound=${flipsound}`;
 export const followballPreviewSrc = '/worker/render/followball/index.html?embed=1';
+export const findthecatPreviewSrc = '/worker/render/findthecat/index.html?embed=1';
 export const eyetestPreviewSrc = '/worker/render/eyetest/index.html?embed=1';
 export const pausegamePreviewSrc = '/worker/render/pausegame/index.html?embed=1';
 export const quotesPreviewSrc = '/worker/render/quotes/index.html?embed=1';

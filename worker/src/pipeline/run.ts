@@ -49,6 +49,7 @@ import { runLaserNations } from './steps/lasernations.ts';
 import { runLaserDuel } from './steps/lasernationsDuel.ts';
 import { runColorWar } from './steps/colorwar.ts';
 import { runFollowBall } from './steps/followball.ts';
+import { runFindTheCat } from './steps/findthecat.ts';
 import { runEyeTest } from './steps/eyetest.ts';
 import { runPauseGame } from './steps/pausegame.ts';
 import { runQuotes } from './steps/quotes.ts';
@@ -493,8 +494,30 @@ async function runColorWarPost(ctx: StepContext, jobId: string): Promise<RunOutc
   });
 }
 
+/** 'findthecat' — the Follow The Ball alt-variant: same shell-game mechanic,
+ *  a cat-face ball, one fixed-length shuffle round. No source, no LLM. */
+async function runFindTheCatPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
+  skipStepsExcept(ctx, ['render']);
+  const { render, game } = await stage(ctx, 'render', () => runFindTheCat(ctx));
+  const draft: DraftText = {
+    hook: 'Find the cat 🐱 watch closely!',
+    overlays: [`Cup ${game.win}`],
+    caption:
+      `Find the cat 🐱 watch closely, then call the cup before it reveals.\n\n` +
+      `${game.difficulty} difficulty, ${game.cups} cups shuffling — keep your eyes locked on the right one.\n\n` +
+      `Comment your guess 👇`,
+    hashtags: ['findthecat', 'shellgame', 'catsoftiktok', 'watchtillend', 'fyp'],
+  };
+  return finishPost(ctx, jobId, render, {
+    hookTitle: `cup ${game.win}`,
+    reason: `${game.difficulty} · ${game.cups} cups · cup ${game.win} · seed ${game.seed}`,
+    draft,
+  });
+}
+
 /** 'followball' — a shell-game "call the cup" ability test. No source, no LLM. */
 async function runFollowBallPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
+  if (ctx.settings.followBallVariant === 'findthecat') return runFindTheCatPost(ctx, jobId);
   skipStepsExcept(ctx, ['render']);
   const { render, game } = await stage(ctx, 'render', () => runFollowBall(ctx));
   const modeLine =

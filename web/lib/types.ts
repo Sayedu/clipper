@@ -60,6 +60,9 @@ export type ClipContentStyle = 'any' | 'talking' | 'gaming';
 export type ColorRaceMap = 'random' | 'zigzag' | 'pegstorm' | 'spinner' | 'fork' | 'bumper';
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
 export type FollowBallMode = 'sprint' | 'classic' | 'insane' | 'random';
+export type FollowBallVariant = 'classic' | 'findthecat';
+export type FindTheCatDifficulty = 'easy' | 'medium' | 'hard';
+export type FindTheCatTheme = 'candy' | 'neon' | 'sunset';
 
 export const COLOR_RACE_MAPS: Array<{ id: ColorRaceMap; name: string; tag: string }> = [
   { id: 'random', name: 'Surprise me', tag: 'A different course every generation' },
@@ -145,6 +148,12 @@ export interface Settings {
   colorWarScoresBefore?: [number, number, number, number];
   followBallMode: FollowBallMode;
   followBallSeed?: number;
+  followBallVariant: FollowBallVariant;
+  findTheCatCups: number;
+  findTheCatDifficulty: FindTheCatDifficulty;
+  findTheCatRound: number;
+  findTheCatTheme: FindTheCatTheme;
+  findTheCatSeed?: number;
   eyeTestBallsPerRound: number[];
   eyeTestShuffleSec: number;
   eyeTestSeed?: number;
