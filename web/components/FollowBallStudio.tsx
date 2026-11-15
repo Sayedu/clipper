@@ -23,18 +23,18 @@ type ClassicApi = {
   };
 };
 
-// Find The Cat is a single fixed-length (~20.9s) shuffle round, not a
-// multi-round game — its FTB readout shape is correspondingly simpler.
+// Find The Cat is a single fixed-length shuffle round, not a multi-round
+// game -- its FTB readout shape is correspondingly simpler. Round (1-5)
+// drives difficulty itself now (more cups, harder swap count as it climbs,
+// see ROUND_PRESETS in game.js) rather than cups/difficulty being picked
+// independently, so there's no setCups/setDifficulty here.
 type FtcApi = {
   replay: (seed?: number | string) => void;
   again: () => void;
-  setCups: (n: number) => void;
-  setDifficulty: (d: string) => void;
   setRound: (r: number) => void;
   setTheme: (t: string) => void;
   setSpeed: (s: number) => void;
   setSound: (on: boolean) => void;
-  setAutoReplay: (on: boolean) => void;
   getSeed: () => number;
   readout: () => {
     seed: number; cups: number; difficulty: string; round: number; theme: string;
@@ -49,16 +49,6 @@ const MODES = [
   { id: 'random', label: 'Surprise me' },
 ];
 
-const FTC_CUPS: Array<{ value: '3' | '4' | '5'; label: string }> = [
-  { value: '3', label: '3' },
-  { value: '4', label: '4' },
-  { value: '5', label: '5' },
-];
-const FTC_DIFFS: Array<{ value: 'easy' | 'medium' | 'hard'; label: string }> = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'hard', label: 'Hard' },
-];
 const FTC_THEMES: Array<{ value: 'candy' | 'neon' | 'sunset'; label: string }> = [
   { value: 'candy', label: 'Candy' },
   { value: 'neon', label: 'Neon' },
@@ -87,8 +77,6 @@ export function FollowBallStudio() {
 
   const [seed, setSeed] = useState(0);
   const [mode, setMode] = useState('sprint');
-  const [cups, setCupsState] = useState<'3' | '4' | '5'>('5');
-  const [difficulty, setDifficultyState] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [round, setRoundState] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [theme, setThemeState] = useState<'candy' | 'neon' | 'sunset'>('candy');
   const [speed, setSpeed] = useState<'0.5' | '1' | '2' | '4'>('1');
@@ -118,7 +106,7 @@ export function FollowBallStudio() {
       // FTB also has `.replay`, so without this shape check we can grab the
       // wrong game's API mid-switch (readout() shapes differ: classic has no
       // `.t`, findthecat has no `.mode`) and crash on the first poll tick.
-      const isFindTheCat = typeof ftb?.setCups === 'function';
+      const isFindTheCat = typeof ftb?.setTheme === 'function';
       if (ftb?.replay && isFindTheCat === (variant === 'findthecat')) {
         if (variant === 'findthecat') {
           const api2 = ftb as FtcApi;
@@ -178,14 +166,6 @@ export function FollowBallStudio() {
     setMode(m);
     fbRef.current?.setMode(m);
   };
-  const onCups = (v: '3' | '4' | '5') => {
-    setCupsState(v);
-    ftcRef.current?.setCups(Number(v));
-  };
-  const onDifficulty = (v: 'easy' | 'medium' | 'hard') => {
-    setDifficultyState(v);
-    ftcRef.current?.setDifficulty(v);
-  };
   const onTheme = (v: 'candy' | 'neon' | 'sunset') => {
     setThemeState(v);
     ftcRef.current?.setTheme(v);
@@ -202,9 +182,11 @@ export function FollowBallStudio() {
     setSound(v);
     (variant === 'findthecat' ? ftcRef.current : fbRef.current)?.setSound(v);
   };
+  // classic only -- findthecat always auto-loops into the next (harder)
+  // round on its own, there's nothing to toggle.
   const onAuto = (v: boolean) => {
     setAuto(v);
-    (variant === 'findthecat' ? ftcRef.current : fbRef.current)?.setAutoReplay(v);
+    fbRef.current?.setAutoReplay(v);
   };
 
   const render = useCallback(async () => {
@@ -307,7 +289,7 @@ export function FollowBallStudio() {
             )}
             <div className="mt-0.5 text-[11px] text-[color:var(--color-faint)]">
               {variant === 'findthecat'
-                ? `${ftcReadout?.difficulty ?? difficulty} · ${ftcReadout?.cups ?? cups} cups · seed ${ftcReadout?.seed ?? seed}`
+                ? `Round ${ftcReadout?.round ?? round} · ${ftcReadout?.difficulty ?? ''} · ${ftcReadout?.cups ?? ''} cups · seed ${ftcReadout?.seed ?? seed}`
                 : `${classicReadout?.modeName ?? mode} · seed ${classicReadout?.seed ?? seed}`}
             </div>
           </div>
@@ -364,44 +346,30 @@ export function FollowBallStudio() {
             ) : (
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
-                  Difficulty
+                  Theme
                 </span>
-                <SegmentedControl<'easy' | 'medium' | 'hard'> value={difficulty} onChange={onDifficulty} options={FTC_DIFFS} />
+                <SegmentedControl<'candy' | 'neon' | 'sunset'> value={theme} onChange={onTheme} options={FTC_THEMES} />
               </label>
             )}
           </div>
 
           {variant === 'findthecat' && (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
-                  Cups
-                </span>
-                <SegmentedControl<'3' | '4' | '5'> value={cups} onChange={onCups} options={FTC_CUPS} />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
-                  Theme
-                </span>
-                <SegmentedControl<'candy' | 'neon' | 'sunset'> value={theme} onChange={onTheme} options={FTC_THEMES} />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
-                  Round label
-                </span>
-                <SegmentedControl<'1' | '2' | '3' | '4' | '5'>
-                  value={String(round) as '1' | '2' | '3' | '4' | '5'}
-                  onChange={onRound}
-                  options={[
-                    { value: '1', label: '1' },
-                    { value: '2', label: '2' },
-                    { value: '3', label: '3' },
-                    { value: '4', label: '4' },
-                    { value: '5', label: '5' },
-                  ]}
-                />
-              </label>
-            </div>
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
+                Round — more cups &amp; harder as it climbs
+              </span>
+              <SegmentedControl<'1' | '2' | '3' | '4' | '5'>
+                value={String(round) as '1' | '2' | '3' | '4' | '5'}
+                onChange={onRound}
+                options={[
+                  { value: '1', label: '1' },
+                  { value: '2', label: '2' },
+                  { value: '3', label: '3' },
+                  { value: '4', label: '4' },
+                  { value: '5', label: '5' },
+                ]}
+              />
+            </label>
           )}
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -421,7 +389,7 @@ export function FollowBallStudio() {
               />
             </label>
             <Toggle checked={sound} onChange={onSound} label="Sound" />
-            <Toggle checked={auto} onChange={onAuto} label="Auto-reroll" />
+            {variant === 'classic' && <Toggle checked={auto} onChange={onAuto} label="Auto-reroll" />}
           </div>
 
           <div className="rounded-[var(--radius)] border border-[color:var(--color-hairline-strong)] bg-[color:var(--color-surface)] p-4">
@@ -448,7 +416,7 @@ export function FollowBallStudio() {
                 <div className="mb-2 flex items-center justify-between text-[13px]">
                   <span>
                     Rendering seed <b className="tabular-nums">{variant === 'findthecat' ? ftcReadout?.seed : classicReadout?.seed}</b>
-                    {variant === 'classic' ? ` (${mode})` : ` (${difficulty})`}…
+                    {variant === 'classic' ? ` (${mode})` : ` (round ${ftcReadout?.round}, ${ftcReadout?.difficulty})`}…
                   </span>
                   <span className="tabular-nums text-[color:var(--color-muted)]">
                     {Math.round(renderPct * 100)}%

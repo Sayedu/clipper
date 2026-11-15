@@ -23,7 +23,7 @@ const readJson = (req) => new Promise((res) => {
 });
 const sendJson = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const parseSeed = (v) => (parseInt(String(v ?? '').match(/\d+/)?.[0] ?? '', 10) >>> 0) || 0;
-const parseCups = (v) => Math.max(3, Math.min(5, parseInt(v, 10) || 5));
+const parseCups = (v) => Math.max(3, Math.min(6, parseInt(v, 10) || 5));
 const parseDifficulty = (v) => (DIFFICULTIES.has(String(v).toLowerCase()) ? String(v).toLowerCase() : 'easy');
 const parseRound = (v) => Math.max(1, Math.min(5, parseInt(v, 10) || 1));
 const parseTheme = (v) => (THEMES.has(String(v).toLowerCase()) ? String(v).toLowerCase() : 'candy');
@@ -77,7 +77,7 @@ async function onRequest(req, res, url) {
 const { port } = await startServer(Number(process.argv[2]) || 5191, onRequest);
 await mkdir(join(REPO, 'render/findthecat/out'), { recursive: true });
 const previewUrl = `http://127.0.0.1:${port}/render/findthecat/index.html`;
-console.log(`\n  Find The Cat preview studio\n  ${previewUrl}\n  render a starred combo later:  node scripts/findthecat/render.mjs --seed <n> --cups <3-5> --difficulty <easy|medium|hard> --theme <candy|neon|sunset> --mux\n`);
+console.log(`\n  Find The Cat preview studio\n  ${previewUrl}\n  render a specific round later:  node scripts/findthecat/render.mjs --seed <n> --round <1-5> --theme <candy|neon|sunset> --mux\n`);
 
 const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
 spawn(opener, [previewUrl], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' }).on('error', () => {});

@@ -163,26 +163,11 @@
 <div id="studio">
   <div class="hd">Find The Cat · Preview</div>
   <button id="btnReplay" class="big primary">↻ REPLAY<small>fresh random seed</small></button>
-  <div class="row">
-    <button id="btnAgain" style="flex:1">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
-    <label class="sw"><input type="checkbox" id="chkAuto"> auto</label>
-  </div>
+  <button id="btnAgain">AGAIN <span style="opacity:.5;font-weight:500">same seed</span></button>
   <div class="row">
     <span class="lbl">Seed</span>
     <input type="text" id="seedIn" inputmode="numeric" spellcheck="false" />
     <button id="btnSeed">set</button>
-  </div>
-  <div class="row">
-    <span class="lbl">Cups</span>
-    <div class="seg" id="cupsSeg">
-      <button data-v="3">3</button><button data-v="4">4</button><button data-v="5" class="on">5</button>
-    </div>
-  </div>
-  <div class="row">
-    <span class="lbl">Difficulty</span>
-    <div class="seg" id="diffSeg">
-      <button data-v="easy" class="on">Easy</button><button data-v="medium">Med</button><button data-v="hard">Hard</button>
-    </div>
   </div>
   <div class="row">
     <span class="lbl">Theme</span>
@@ -248,12 +233,9 @@ if (!document.documentElement.classList.contains('rmode')
   $('btnAgain').onclick = () => FTB.again();
   $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) FTB.replay(v); };
   seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
-  wireSeg('cupsSeg', (v) => FTB.setCups(+v));
-  wireSeg('diffSeg', (v) => FTB.setDifficulty(v));
   wireSeg('themeSeg', (v) => FTB.setTheme(v));
   wireSeg('roundSeg', (v) => FTB.setRound(+v));
   wireSeg('speedSeg', (v) => FTB.setSpeed(+v));
-  $('chkAuto').onchange = (e) => FTB.setAutoReplay(e.target.checked);
   $('chkSound').onchange = (e) => FTB.setSound(e.target.checked);
 
   const post = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -284,12 +266,15 @@ if (!document.documentElement.classList.contains('rmode')
   setInterval(() => {
     const r = FTB.readout();
     if (document.activeElement !== seedIn) seedIn.value = r.seed;
+    // the preview auto-loops through rounds (escalating difficulty) on its
+    // own -- keep the Round segmented control's highlight following along.
+    [...$('roundSeg').children].forEach((b) => b.classList.toggle('on', +b.dataset.v === r.round));
     if (r.done) {
       readout.innerHTML = `<b style="color:#FFD23F">Cup ${r.win}!</b>`
-        + `<br><span class="dim">${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+        + `<br><span class="dim">Round ${r.round} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
     } else {
       readout.innerHTML = `${r.phase} · ${r.t.toFixed(1)}s / ${r.totalSec.toFixed(1)}s`
-        + `<br><span class="dim">${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+        + `<br><span class="dim">Round ${r.round} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
     }
   }, 110);
 })();

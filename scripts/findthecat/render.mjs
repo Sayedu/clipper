@@ -41,8 +41,12 @@ const THEMES = new Set(['candy', 'neon', 'sunset']);
 
 const opts = {
   seed: numArg('seed', Math.floor(Math.random() * 1e9), true) >>> 0,
-  cups: Math.max(3, Math.min(5, numArg('cups', 5, true))),
-  difficulty: DIFFICULTIES.has(String(arg('difficulty', 'easy')).toLowerCase()) ? String(arg('difficulty', 'easy')).toLowerCase() : 'easy',
+  // undefined unless explicitly passed -- round alone already drives cups +
+  // difficulty via game.js's own ROUND_PRESETS; these are overrides only
+  // (e.g. to reproduce an exact dashboard-previewed combo).
+  cups: arg('cups', undefined) === undefined ? undefined : Math.max(3, Math.min(6, numArg('cups', 5, true))),
+  difficulty: arg('difficulty', undefined) === undefined ? undefined
+    : (DIFFICULTIES.has(String(arg('difficulty')).toLowerCase()) ? String(arg('difficulty')).toLowerCase() : 'easy'),
   round: Math.max(1, Math.min(5, numArg('round', 1, true))),
   theme: THEMES.has(String(arg('theme', 'candy')).toLowerCase()) ? String(arg('theme', 'candy')).toLowerCase() : 'candy',
   fps: numArg('fps', 60, true),
@@ -92,9 +96,11 @@ const renderOne = async (seed, cups, difficulty, round, theme) => {
   page.on('pageerror', (e) => log('  [pageerror] ' + e.message));
 
   const url = `http://127.0.0.1:${port}/render/findthecat/index.html`
-    + `?render=1&seed=${seed}&cups=${cups}&difficulty=${difficulty}&round=${round}&theme=${theme}`
+    + `?render=1&seed=${seed}&round=${round}&theme=${theme}`
+    + (cups !== undefined ? `&cups=${cups}` : '')
+    + (difficulty !== undefined ? `&difficulty=${difficulty}` : '')
     + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`;
-  log(`\n━━ FIND THE CAT · seed ${seed} · ${cups} cups · ${difficulty} · theme ${theme} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
+  log(`\n━━ FIND THE CAT · seed ${seed} · round ${round}${cups !== undefined ? ` · ${cups} cups` : ''}${difficulty !== undefined ? ` · ${difficulty}` : ''} · theme ${theme} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the game');
   await page.goto(url, { waitUntil: 'load' });
 
@@ -141,7 +147,7 @@ const renderOne = async (seed, cups, difficulty, round, theme) => {
     JSON.stringify({ fps: meta.fps, durationSec: result.durationSec, events: allEvents }),
   );
 
-  log(`   seed ${seed} → cup ${result.win} · ${result.frames} frames · ${allEvents.length} sound events`);
+  log(`   seed ${seed} → ${result.difficulty} · ${result.cups} cups · cup ${result.win} · ${result.frames} frames · ${allEvents.length} sound events`);
   progress(1, 'frames done');
 
   await browser.close();
@@ -151,12 +157,14 @@ const renderOne = async (seed, cups, difficulty, round, theme) => {
 
 /* synthesise audio + ffmpeg-mux a finished mp4 (studio "RENDER THIS" path).
    Mirrors worker/src/pipeline/steps/findthecat.ts. */
-const mux = async (result, seed, difficulty) => {
+const mux = async (result, seed) => {
   await mkdir(opts.muxDir, { recursive: true });
   const framesDir = opts.outFrames;
   const rawWav = join(framesDir, '_audio_raw.wav');
   const finalWav = join(framesDir, '_audio_final.wav');
-  const outMp4 = join(opts.muxDir, `findthecat-${difficulty}-${seed}.mp4`);
+  // result.difficulty, not opts.difficulty -- the latter is undefined unless
+  // explicitly overridden on the command line (see opts.cups/difficulty above)
+  const outMp4 = join(opts.muxDir, `findthecat-${result.difficulty}-${seed}.mp4`);
 
   progress(0.9, 'scoring the sound');
   await pexec(PY, [join(REPO, 'python/findthecat_audio.py'),
@@ -195,7 +203,7 @@ const mux = async (result, seed, difficulty) => {
 
 const main = async () => {
   const result = await renderOne(opts.seed, opts.cups, opts.difficulty, opts.round, opts.theme);
-  const mp4 = opts.mux ? await mux(result, opts.seed, opts.difficulty) : null;
+  const mp4 = opts.mux ? await mux(result, opts.seed) : null;
   process.stdout.write(JSON.stringify(mp4 ? { ...result, mp4 } : result));
 };
 

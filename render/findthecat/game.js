@@ -3,16 +3,21 @@
 /* ═══════════════════════════════════════════════════════════════
    FIND THE CAT — a "Follow The Ball" alt-variant content type.
 
-   A 1:1 port of the "Find The Cat" design handoff (design_handoff_
-   find_the_cat/README.md + shell-game.jsx) — the SAME shell-game mechanic
-   as Follow The Ball, but the ball is a cat-face "ball", the whole clip is
-   a single fixed-length (~20.9s) loop (not a multi-round, adaptive-length
-   game), and difficulty picks a swap COUNT (13/19/27) rather than a
-   round plan. buildSchedule / cupMotion are ported verbatim from the
-   handoff's shell-game.jsx (the design's own "source of truth" — see its
-   README) since the whole piece is a pure function of elapsed time T, not
-   a frame-stepped state machine: every visual quantity below is computed
-   fresh from T each frame, exactly like the design's React component did.
+   Based on the "Find The Cat" design handoff (design_handoff_find_the_cat/
+   README.md + shell-game.jsx) — the SAME shell-game mechanic as Follow The
+   Ball, but the ball is a cat-face "ball", and each render is a single
+   fixed-length shuffle round rather than a multi-round, adaptive-length
+   game. buildSchedule (the accelerating weighted swap timing + biased-pair
+   selection) is ported verbatim from the handoff's shell-game.jsx, since
+   it's a pure function of (cups, swap count, seed) -- every visual
+   quantity is computed fresh from elapsed time T each frame, not a
+   frame-stepped state machine. ROUND (1-5) now actually drives difficulty
+   via ROUND_PRESETS (more cups + a harder swap count as it climbs) instead
+   of being a cosmetic label; the live preview loops continuously through
+   rounds 1->5->1 with a fresh shuffle each time rather than freezing on
+   the empty outro stage. The single-swap VISUAL style (cupMotion) was
+   simplified away from the handoff's own scale/rotate/dim/ghost-trail
+   version to classic Follow The Ball's cleaner flat-arc smoothstep motion.
 
    Render plumbing (invisible, same contract as render/followball/game.js):
    FTB.step/meta/result frame API; swap/tick/reveal become an event log
@@ -32,9 +37,14 @@ const ctx = cv.getContext('2d');
 const el = (id) => document.getElementById(id);
 
 /* ── CUES: the handoff's own scene durations (Find The Ball.dc.html
-   OM_SCENES) turned into cumulative start times. The whole clip is a fixed
-   20.9s loop — duration is NOT adaptive the way Follow The Ball's is. ── */
-const SCENE_DUR = { intro: 2.0, show: 2.6, shuffle: 9.0, guess: 3.5, reveal: 3.0, outro: 0.8 };
+   OM_SCENES), tuned from the original 9.0/3.0/0.8 shuffle/reveal/outro --
+   shuffle shortened for a denser/faster feel, but reveal is sized to let
+   the cat-laugh-meme-1.wav clip (fires 0.38s into reveal, runs ~3.24s)
+   finish playing before the cut, then a quick outro to the next round
+   rather than a long lingering one. Turned into cumulative start times;
+   the whole clip is a fixed-length loop — duration is NOT adaptive the way
+   Follow The Ball's is. ── */
+const SCENE_DUR = { intro: 2.0, show: 2.6, shuffle: 7.0, guess: 3.5, reveal: 3.7, outro: 0.4 };
 const I = 0;
 const S = I + SCENE_DUR.intro;
 const Sh = S + SCENE_DUR.show;
@@ -49,6 +59,22 @@ const THEMES = {
   sunset: { bg: '#2A0B10', ray: '#40141B', floor: '#561C24', cup: '#FFB020', light: '#FFE39A', dark: '#B85E00', rim: '#FFF5DA', ball: '#3DF2FF', glow: 'rgba(61,242,255,.75)', accent: '#FF4D6D' },
 };
 const DIFF = { easy: { swaps: 13, name: 'EASY', color: '#3DFF8B' }, medium: { swaps: 19, name: 'MEDIUM', color: '#FFD23F' }, hard: { swaps: 27, name: 'HARD', color: '#FF4D6D' } };
+
+/* ── "ROUND r/5" now actually drives difficulty (more cups, harder swap
+   count) instead of being a cosmetic label only the creator sets -- matches
+   how classic Follow The Ball's own MODES.rounds escalate. cups goes up to
+   6 (same ceiling classic's own INSANE mode already uses, not a new
+   untested extreme for this layout math). An explicit ?cups=/?difficulty=
+   query param still overrides a round's preset (the dashboard's "render
+   this seed" reproduces exactly what was just previewed by passing the
+   live readout's values straight through). ── */
+const ROUND_PRESETS = [
+  { cups: 3, difficulty: 'easy' },
+  { cups: 4, difficulty: 'easy' },
+  { cups: 4, difficulty: 'medium' },
+  { cups: 5, difficulty: 'medium' },
+  { cups: 6, difficulty: 'hard' },
+];
 
 /* ── easing (hand-rolled, ported from the handoff's animations-v3.jsx) ── */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -99,20 +125,25 @@ function buildSchedule(n, count, seed, t0, t1) {
   return { swaps, finalSlots: slots };
 }
 
-function cupMotion(c, T, swaps, slotX, spacing) {
+/* Deliberately NOT the handoff's own cupMotion (which scaled/rotated/dimmed
+   cups by how far they'd travelled, plus a 3-ghost motion-trail in draw()) --
+   by request, swapped for the exact same clean smoothstep-position +
+   sine-arc motion classic Follow The Ball's own cup swap uses: a flat 150px
+   arc, no rotation, no scale pulse, no trail. Reuses this game's own
+   schedule (buildSchedule's accelerating weighted timing + biased-pair
+   selection) -- only the single-swap VISUAL style changed, not the pacing. */
+function cupMotion(c, T, swaps, slotX) {
   let slot = c;
   for (const sw of swaps) {
     if (T >= sw.end) { if (sw.ca === c) slot = sw.b; else if (sw.cb === c) slot = sw.a; continue; }
     if (T >= sw.start && (sw.ca === c || sw.cb === c)) {
-      const p = MOTION.glide(cl((T - sw.start) / (sw.end - sw.start)));
+      const p = Math.min(1, (T - sw.start) / (sw.end - sw.start));
+      const sm = p * p * (3 - 2 * p);   // smoothstep
       const mine = sw.ca === c, from = mine ? sw.a : sw.b, to = mine ? sw.b : sw.a;
-      const front = mine === sw.frontA, s = Math.sin(Math.PI * p);
-      const xa = slotX(from), xb = slotX(to), dist = Math.min(Math.abs(xb - xa) / spacing, 2.2);
-      return {
-        x: xa + (xb - xa) * p, y: front ? (34 * dist - 40) * s : (-70 * dist - 40) * s,
-        sc: 1 + (front ? 0.14 : -0.13) * s, rot: Math.sign(xb - xa) * 12 * s, z: front ? 30 : 10,
-        dim: front ? 0 : 0.3 * s, moving: true, dur: sw.end - sw.start,
-      };
+      const xa = slotX(from), xb = slotX(to);
+      const arc = Math.sin(p * Math.PI);
+      const front = mine === sw.frontA, dir = front ? 1 : -1;
+      return { x: xa + (xb - xa) * sm, y: -arc * 150 * dir, sc: 1, rot: 0, z: front ? 30 : 10, dim: 0, moving: true, dur: sw.end - sw.start };
     }
     break;
   }
@@ -137,11 +168,12 @@ let catImg = null, fontsReady = false;
 function cupSpacing(n) { return Math.min(340, 1050 / n); }
 function slotXFor(n) { const spacing = cupSpacing(n); return (i) => 540 + (i - (n - 1) / 2) * spacing; }
 
-function reset(seed, cups, difficulty, round, theme) {
-  const n = clamp(Math.round(cups ?? (W_ ? W_.cups : 5)), 3, 5);
-  const diffKey = difficulty ?? (W_ ? W_.diffKey : 'easy');
-  const diff = DIFF[diffKey] || DIFF.easy;
+function reset(seed, round, theme, cupsOverride, difficultyOverride) {
   const roundN = clamp(Math.round(round ?? (W_ ? W_.round : 1)), 1, 5);
+  const preset = ROUND_PRESETS[roundN - 1];
+  const n = clamp(Math.round(cupsOverride ?? preset.cups), 3, 6);
+  const diffKey = difficultyOverride ?? preset.difficulty;
+  const diff = DIFF[diffKey] || DIFF.easy;
   const themeKey = theme ?? (W_ ? W_.themeKey : 'candy');
   const s = (seed >>> 0) || 1;
 
@@ -178,8 +210,12 @@ function extra(c, slot, T) {
     sq *= squash(T - S - 2.12);
   }
   if (T >= G && T < R + 0.3) dy += -16 * Math.abs(Math.sin((T - G) * 5 + slot * 0.9)) * cl((T - G) / 0.3);
-  if (slot === w.win) { const e = MOTION.enter(cl((T - R - 0.3) / 0.5)); dy += -380 * e; rot += 12 * e; }
-  dy += -1700 * fall((T - O - slot * 0.06) / 0.55);
+  // quick, clean pop-up on reveal (no rotation) -- matches classic's own
+  // snappy ~0.26s winning-cup lift rather than a slower, tilting one
+  if (slot === w.win) { const e = MOTION.enter(cl((T - R - 0.3) / 0.25)); dy += -380 * e; }
+  // shrunk + less staggered so even a 6-cup round fully completes inside
+  // the now-short 0.4s outro (worst case: 5*0.02 + 0.3 = 0.4s)
+  dy += -1700 * fall((T - O - slot * 0.02) / 0.3);
   return { dy, rot, sq };
 }
 
@@ -303,7 +339,6 @@ function draw(T) {
   ctx.fillStyle = fg; ctx.fillRect(-200, 1040, 1480, 1080);
 
   // horizon line + pulse
-  const done = w.swaps.filter((s) => s.end <= T).length;
   const lastEnd = w.swaps.filter((s) => s.end <= T).pop();
   const pulse = lastEnd && T < G ? Math.exp(-(T - lastEnd.end) * 7) : 0;
   ctx.save();
@@ -321,26 +356,20 @@ function draw(T) {
   ctx.beginPath(); ctx.ellipse(540, TABLE_Y, 500, 110, 0, 0, 6.283); ctx.fill();
   ctx.restore();
 
-  // per-cup motion/extra, built once for this frame
-  const active = w.swaps.find((s) => T >= s.start && T < s.end);
+  // per-cup motion/extra, built once for this frame. No motion-trail ghosts
+  // (removed by request -- read as "blur", not polish) -- clean solid cups
+  // only, same as classic Follow The Ball.
   const entries = [];
   for (let c = 0; c < n; c++) {
-    const m = cupMotion(c, T, w.swaps, slotX, spacing);
+    const m = cupMotion(c, T, w.swaps, slotX);
     const slotNow = m.moving ? -1 : (T >= G ? w.finalSlots.indexOf(c) : m.slot);
     const ex = extra(c, slotNow, T);
     const dimLosers = T > R + 0.5 && T < O && slotNow !== w.win ? 0.35 * cl((T - R - 0.5) / 0.3) : 0;
-    entries.push({ c, m, ex, slotNow, dim: m.dim + dimLosers, ghost: false });
-    if (m.moving && m.dur < 0.55) {
-      [0.03, 0.06, 0.09].forEach((dt, k) => {
-        const g2 = cupMotion(c, T - dt, w.swaps, slotX, spacing);
-        if (g2.moving) entries.push({ c, m: { ...g2, z: m.z - 1 - k }, ex: { dy: 0, rot: 0, sq: 1 }, op: [0.28, 0.16, 0.08][k], ghost: true });
-      });
-    }
+    entries.push({ c, m, ex, slotNow, dim: m.dim + dimLosers });
   }
 
-  // shadows (non-ghost only, drawn before the ball/cups)
+  // shadows (drawn before the ball/cups)
   for (const en of entries) {
-    if (en.ghost) continue;
     const lift = Math.max(0, -(en.m.y + en.ex.dy));
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - lift / 1400);
@@ -353,8 +382,10 @@ function draw(T) {
     ctx.restore();
   }
 
-  // ball (the cat), visible under its cup during Show, and after Reveal
-  let ballShow = false, ballX = slotX(w.ballCup), ballY = 0, ballSc = 1;
+  // ball (the cat), visible under its cup during Show, and after Reveal --
+  // stays fully visible (no shrink-to-zero outro) by request: the cat's
+  // face should stay on screen, not disappear right after it's revealed.
+  let ballShow = false, ballX = slotX(w.ballCup), ballY = 0;
   const bt = T - S - 0.42;
   if (bt >= 0 && T < S + 2.15) {
     ballShow = true;
@@ -362,8 +393,7 @@ function draw(T) {
     else if (bt < 0.7) { const u = (bt - 0.36) / 0.34; ballY = -4 * 110 * u * (1 - u); }
     else if (bt < 0.9) { const u = (bt - 0.7) / 0.2; ballY = -4 * 36 * u * (1 - u); }
   }
-  if (T >= O) { ballShow = true; ballX = slotX(w.win); ballSc = 1 - fall((T - O) / 0.4); }
-  else if (T >= R + 0.3) { ballShow = true; ballX = slotX(w.win); }
+  if (T >= R + 0.3) { ballShow = true; ballX = slotX(w.win); }
   const glowPulse = T >= R + 0.45 ? 0.6 + 0.4 * Math.sin((T - R) * 9) : 0.3;
 
   if (ballShow && catImg) {
@@ -377,7 +407,6 @@ function draw(T) {
     ctx.beginPath(); ctx.arc(bx, by, w.ballD / 2, 0, 6.283); ctx.clip();
     ctx.translate(bx, by);
     ctx.rotate((Math.sin(T * 6) * 8 * Math.PI) / 180);
-    ctx.scale(ballSc, ballSc);
     // contain-fit (not cover/crop) -- the whole meme (the cat face AND the
     // pointing finger) has to read, not just whatever a tight center-crop
     // happens to keep. A touch over pure "contain" (1.08x) so the themed
@@ -553,10 +582,13 @@ function loadCat() {
 function parseQueryDefaults() {
   return {
     seed: (parseInt(QS.get('seed') || '1', 10) >>> 0) || 1,
-    cups: parseInt(QS.get('cups') || '5', 10),
-    difficulty: (QS.get('difficulty') || 'easy').toLowerCase(),
     round: parseInt(QS.get('round') || '1', 10),
     theme: (QS.get('theme') || 'candy').toLowerCase(),
+    // explicit overrides only -- absent means "derive from the round preset"
+    // (see ROUND_PRESETS / reset()). The dashboard's render-this-seed path
+    // always sends these explicitly, reproducing exactly what was previewed.
+    cupsOverride: QS.has('cups') ? parseInt(QS.get('cups'), 10) : undefined,
+    difficultyOverride: QS.has('difficulty') ? QS.get('difficulty').toLowerCase() : undefined,
   };
 }
 
@@ -579,24 +611,24 @@ if (RENDER) {
   (async () => {
     try { if (document.fonts) { document.fonts.load('900 48px "Chakra Petch"'); await document.fonts.ready; } } catch (e) {}
     await loadCat();
-    reset(d.seed, d.cups, d.difficulty, d.round, d.theme);
+    reset(d.seed, d.round, d.theme, d.cupsOverride, d.difficultyOverride);
     FTB.meta = { fps: FPS, totalFrames: Math.round(TOTAL * FPS), seed: W_.seed, width: W, height: H };
   })();
 } else {
   /* ── preview studio API (window.FTB.*) ── */
-  let raf = 0, acc = 0, prevWallT = 0, speed = 1, autoReplay = false, soundOn = false;
+  let raf = 0, acc = 0, prevWallT = 0, speed = 1, soundOn = false;
   const randSeed = () => ((Math.random() * 0x7fffffff) >>> 0) || 1;
 
   const boot = async () => {
     const d = parseQueryDefaults();
     await loadCat();
-    reset(d.seed, d.cups, d.difficulty, d.round, d.theme);
+    reset(d.seed, d.round, d.theme, d.cupsOverride, d.difficultyOverride);
     frame = 0; prevT = -1;
     resize();
   };
 
-  const restart = (seed, cups, difficulty, round, theme) => {
-    reset(seed, cups, difficulty, round, theme);
+  const restart = (seed, round, theme) => {
+    reset(seed, round, theme);
     frame = 0; prevT = -1; acc = 0; prevWallT = 0;
   };
 
@@ -607,22 +639,26 @@ if (RENDER) {
     prevWallT = now;
     let guard = 0;
     while (acc >= DT && guard++ < 800) { stepOnce(() => {}); acc -= DT; }
-    if (frame / FPS >= TOTAL + 1.2 && autoReplay) restart(randSeed(), W_.cups, W_.diffKey, W_.round, W_.themeKey);
+    // Always keep playing -- a single round ending on an intentionally empty
+    // "outro" stage would otherwise just sit there forever (looked like a
+    // broken/frozen preview). Loops straight into the next round, escalating
+    // difficulty (round wraps 1->5->1), a fresh shuffle each time -- the
+    // preview is always "playing something", same as classic's own.
+    if (frame / FPS >= TOTAL + 0.3) {
+      restart(randSeed(), (W_.round % 5) + 1, W_.themeKey);
+    }
   }
 
   // every method below is a no-op (or a safe placeholder) until boot() resolves
   // (loading the cat image is async) -- the dashboard's own readiness poll
   // treats `FTB.replay` existing as "ready" and calls getSeed()/readout()
   // right away, so none of these can assume W_ is already built.
-  FTB.replay = (seed) => W_ && restart(seed === undefined || seed === null || seed === '' ? randSeed() : (Number(seed) >>> 0) || 1, W_.cups, W_.diffKey, W_.round, W_.themeKey);
-  FTB.again = () => W_ && restart(W_.seed, W_.cups, W_.diffKey, W_.round, W_.themeKey);
-  FTB.setCups = (n) => W_ && restart(randSeed(), n, W_.diffKey, W_.round, W_.themeKey);
-  FTB.setDifficulty = (d) => W_ && restart(randSeed(), W_.cups, d, W_.round, W_.themeKey);
-  FTB.setRound = (r) => W_ && restart(W_.seed, W_.cups, W_.diffKey, r, W_.themeKey);
-  FTB.setTheme = (t) => W_ && restart(W_.seed, W_.cups, W_.diffKey, W_.round, t);
+  FTB.replay = (seed) => W_ && restart(seed === undefined || seed === null || seed === '' ? randSeed() : (Number(seed) >>> 0) || 1, W_.round, W_.themeKey);
+  FTB.again = () => W_ && restart(W_.seed, W_.round, W_.themeKey);
+  FTB.setRound = (r) => W_ && restart(randSeed(), r, W_.themeKey);
+  FTB.setTheme = (t) => W_ && restart(W_.seed, W_.round, t);
   FTB.setSpeed = (s) => { speed = [0.5, 1, 2, 4].includes(+s) ? +s : 1; };
   FTB.setSound = (on) => { soundOn = !!on; };
-  FTB.setAutoReplay = (on) => { autoReplay = !!on; };
   FTB.getSeed = () => (W_ ? W_.seed : 0);
   FTB.getMode = () => (W_ ? W_.diffKey : 'easy');
   FTB.readout = () => {

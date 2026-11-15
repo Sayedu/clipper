@@ -95,7 +95,7 @@ const settingsSchema = z
     followBallMode: z.enum(['sprint', 'classic', 'insane', 'random']),
     followBallSeed: z.number().int().positive().optional(),
     followBallVariant: z.enum(['classic', 'findthecat']),
-    findTheCatCups: z.number().int().min(3).max(5),
+    findTheCatCups: z.number().int().min(3).max(6),
     findTheCatDifficulty: z.enum(['easy', 'medium', 'hard']),
     findTheCatRound: z.number().int().min(1).max(5),
     findTheCatTheme: z.enum(['candy', 'neon', 'sunset']),
@@ -312,7 +312,7 @@ export function buildRouter(): Router {
     const body = z
       .object({
         seed: z.number().int().positive(),
-        cups: z.number().int().min(3).max(5).default(5),
+        cups: z.number().int().min(3).max(6).default(5),
         difficulty: z.enum(['easy', 'medium', 'hard']).default('easy'),
         round: z.number().int().min(1).max(5).default(1),
         theme: z.enum(['candy', 'neon', 'sunset']).default('candy'),

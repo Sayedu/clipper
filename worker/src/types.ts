@@ -308,7 +308,8 @@ export interface Settings {
   /** 'classic' (the multi-round cup-shuffle game above) or 'findthecat' (the
    *  cat-face-ball alt-variant, worker/src/pipeline/steps/findthecat.ts). */
   followBallVariant: FollowBallVariant;
-  /** Find The Cat's cup count (3-5). */
+  /** Find The Cat's cup count (3-6, derived from round via ROUND_PRESETS
+   *  unless explicitly overridden). */
   findTheCatCups: number;
   /** Find The Cat's difficulty — picks the swap count (13/19/27). */
   findTheCatDifficulty: FindTheCatDifficulty;
