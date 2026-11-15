@@ -28,4 +28,4 @@ export function baseName(r: FindTheCatRenderResult): string;
 export function buildPostKit(r: FindTheCatRenderResult): PostKit;
 export function postKitText(kit: PostKit, r: FindTheCatRenderResult, files?: Record<string, string | null | undefined>): string;
 export function coverTimeSec(r: FindTheCatRenderResult): number;
-export function writeCover(o: { ffmpeg: string; video: string; atSec: number; out: string; hook: string; sub: string }): Promise<string>;
+export function writeCover(o: { ffmpeg: string; video: string; atSec: number; out: string; hook: string; sub: string; top?: number }): Promise<string>;

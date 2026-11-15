@@ -289,7 +289,7 @@ async function finishPost(
     draft: DraftText;
     /** Write cover.0.png (a gameplay frame with this hook text burned in)
      *  + postkit.0.txt next to the video. Set for the games that get posted. */
-    kit?: { hook: string; sub: string; coverAtSec: number };
+    kit?: { hook: string; sub: string; coverAtSec: number; coverTop?: number };
   },
 ): Promise<RunOutcome> {
   if (opts.kit) {
@@ -302,7 +302,7 @@ async function finishPost(
         'PINNED COMMENT', d.pinnedComment ?? '', '', 'RENDER', opts.reason, '',
       ].join('\n'));
       // before the end card is appended, so the cover is always real gameplay
-      await writeCover({ ffmpeg: FFMPEG, video: render.videoPath, atSec: opts.kit.coverAtSec, out: ctx.file('cover.0.png'), hook: opts.kit.hook, sub: opts.kit.sub });
+      await writeCover({ ffmpeg: FFMPEG, video: render.videoPath, atSec: opts.kit.coverAtSec, out: ctx.file('cover.0.png'), hook: opts.kit.hook, sub: opts.kit.sub, top: opts.kit.coverTop });
     } catch (err) {
       ctx.log('render', `post kit skipped: ${(err as Error).message}`);
     }
@@ -558,7 +558,7 @@ async function runFollowBallPost(ctx: StepContext, jobId: string): Promise<RunOu
   return finishPost(ctx, jobId, render, {
     hookTitle: `answers ${game.answers.join('-')}`,
     reason: `${game.modeName} · ${game.rounds} rounds · answers ${game.answers.join(' ')} · seed ${game.seed}`,
-    kit: { hook: 'FOLLOW THE BALL', sub: `${game.rounds} ROUNDS · CAN YOU KEEP UP?`, coverAtSec: Math.max(1, render.durationSec - 2.8) },
+    kit: { hook: 'FOLLOW THE BALL', sub: `${game.rounds} ROUNDS · CAN YOU KEEP UP?`, coverAtSec: Math.max(1, render.durationSec - 2.8), coverTop: 0.19 },
     draft,
   });
 }
