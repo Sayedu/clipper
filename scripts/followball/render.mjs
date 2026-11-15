@@ -37,6 +37,8 @@ function numArg(name, def, int) {
 
 const opts = {
   seed: numArg('seed', Math.floor(Math.random() * 1e9), true) >>> 0,
+  // --nohook: hide the fixed round 1 title; the post packaging adds its own hook
+  nohook: arg('nohook', false) !== false,
   // SPRINT (default) is the ~17 s short format. classic / insane run 5 rounds.
   // Never random unless `--mode random` is passed explicitly.
   mode: String(arg('mode', 'sprint')),
@@ -101,7 +103,8 @@ const renderOne = async (seed, mode) => {
   const url = `http://127.0.0.1:${port}/render/followball/index.html`
     + `?render=1&seed=${seed}&mode=${encodeURIComponent(mode)}`
     + (opts.sec ? `&sec=${opts.sec}` : '')
-    + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`;
+    + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`
+    + (opts.nohook ? '&nohook=1' : '');
   log(`\n━━ FOLLOW THE BALL · seed ${seed} · mode ${mode}${opts.sec ? ` · cap ${opts.sec}s` : ''} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the game');
   await page.goto(url, { waitUntil: 'load' });
@@ -144,6 +147,7 @@ const renderOne = async (seed, mode) => {
   result.frameWidth = Math.round(opts.w * opts.ss);
   result.frameHeight = Math.round(opts.h * opts.ss);
   result.ss = opts.ss;
+  if (opts.nohook) result.nohook = true;
 
   await writeFile(opts.outJson, JSON.stringify(result, null, 2));
   await writeFile(

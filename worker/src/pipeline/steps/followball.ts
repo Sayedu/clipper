@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { paths } from '../../paths.ts';
 import { log } from '../../lib/log.ts';
@@ -71,6 +71,7 @@ export async function runFollowBall(ctx: StepContext): Promise<{ render: RenderR
       '--fps', String(fps),
       '--out-frames', framesDir,
       '--out', resultPath,
+      ...(ctx.settings.packaged ? ['--nohook'] : []),
     ],
     {
       signal: ctx.signal,
@@ -90,6 +91,9 @@ export async function runFollowBall(ctx: StepContext): Promise<{ render: RenderR
     },
   );
 
+  // the sim's event log, kept next to the result json for the post packaging
+  // (it used to be deleted with the frames)
+  if (existsSync(resolve(framesDir, 'events.json'))) copyFileSync(resolve(framesDir, 'events.json'), ctx.file('followball_events.json'));
   if (!existsSync(resultPath)) throw new Error('follow the ball produced no result');
   const game = JSON.parse(readFileSync(resultPath, 'utf8')) as FollowBallResult;
   ctx.log('render', `${game.modeName}: ${game.rounds} rounds · answers ${game.answers.join(' ')} (seed ${game.seed})`);

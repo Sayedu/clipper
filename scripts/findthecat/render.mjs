@@ -70,6 +70,8 @@ const opts = {
   theme: THEMES.has(strArg('theme', 'random').toLowerCase()) ? strArg('theme', 'random').toLowerCase() : 'random',
   hook: strArg('hook', ''),
   hookSec: Math.max(1, Math.min(3, numArg('hook-sec', 2))),
+  // --nohook: hide the fixed round 1 title; the post packaging adds its own hook
+  nohook: arg('nohook', false) !== false,
   label: strArg('label', ''),
   twists: strArg('twists', '1') !== '0',
   variety: arg('variety', false) !== false || batch > 0,
@@ -129,6 +131,7 @@ const renderOne = async (seed) => {
   if (opts.hook) q.set('hook', opts.hook);
   if (opts.label) q.set('label', opts.label);
   if (opts.safezone) q.set('safezone', '1');
+  if (opts.nohook) q.set('nohook', '1');
   const url = `http://127.0.0.1:${port}/render/findthecat/index.html?${q}`;
   log(`\n━━ FIND THE CAT · seed ${seed} · ${opts.rounds} round(s) (${lengthModeFor(opts.rounds)}) · theme ${opts.theme} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the game');
@@ -182,6 +185,7 @@ const renderOne = async (seed) => {
     frame1Hook, signature: loadPlan().signature(loadPlan().buildPlan(seed, planOpts())),
     renderedAt: new Date().toISOString(), commit: await gitCommit(),
   });
+  if (opts.nohook) result.nohook = true;
   // the Creator Rewards guarantee: a long render can never come out at 60s or less
   if (result.lengthMode === 'long' && result.durationSec <= 60) {
     throw new Error(`long render came out at ${result.durationSec}s — must be over 60s`);

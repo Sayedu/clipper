@@ -4,6 +4,8 @@
  * each one before starting the next, rather than rendering all 5 first and
  * posting at the end. For each game, in order:
  *
+ *   0. picks the order so today's first post is never the same format as
+ *      the last one posted (read from post-log/daily.json)
  *   1. renders it. Three of the five (colorwar/followball/eyetest) go
  *      through the SAME dashboard pipeline (runPipeline) so their caption/
  *      hashtags/render settings never drift out of sync with the app.
@@ -11,6 +13,11 @@
  *      engine (a separate project living at colorwars/, not the JS game
  *      renderer), invoked via its own CLI (mine -> render --best ->
  *      commit) — see renderColorwarsEvent() below for why and how.
+ *   1b. packages it (scripts/packaging): a fresh opening hook, background,
+ *      border, zoom and sound bed, plus a caption, hashtags, cover and pinned
+ *      comment written from what actually happened in that video and
+ *      checked against the last 10 posts. The kit is logged to
+ *      post-log/daily.json, which the workflow commits back.
  *   2. commits its mp4 into a small PUBLIC hand-off repo and serves it via
  *      GitHub Pages (Buffer needs a public, direct, no-auth video URL with a
  *      real video/* content-type — see developers.buffer.com/guides/
@@ -43,11 +50,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createJob, getJob } from '../../worker/src/db.ts';
-import { runPipeline } from '../../worker/src/pipeline/run.ts';
 import type { Broadcaster } from '../../worker/src/pipeline/context.ts';
-import { jobCandidateFile } from '../../worker/src/library.ts';
-import { DEFAULT_SETTINGS, type Settings } from '../../worker/src/types.ts';
+import { packageVideo } from '../packaging/package.mjs';
+import { CI_LOG, lastPostedFormat, markPosted, readLog } from '../packaging/postlog.mjs';
+import { COLORWARS_EVENT, ROTATION, commitColorwarsEpisode, isRotation, renderColorwarsEvent, renderJsGame, type Rotation } from './rotation.ts';
 
 const pexec = promisify(execFile);
 
@@ -86,44 +92,6 @@ const BUFFER_CHANNEL_ID = need('BUFFER_CHANNEL_ID');
 const OUTPUT_REPO = need('OUTPUT_REPO'); // e.g. "Sayedu/clipper-output"
 const OUTPUT_REPO_TOKEN = need('OUTPUT_REPO_TOKEN'); // a PAT with repo scope on THAT repo
 
-// the daily rotation — add to this list to add another game later.
-// lasernationsDuel was removed and replaced with ringofdoom by request.
-// disasterdrop was tried here too, then reverted: it's an already-built,
-// never-posted colorwars event, not an actually new simulation. hotpotato
-// is a real new one -- 16 balls bouncing in a static bowl, one holds a
-// "bomb" that passes hands on contact, a shrinking per-round timer
-// eliminates whoever's holding it when it hits zero.
-const ROTATION = ['colorwar', 'ringofdoom', 'hotpotato', 'followball', 'eyetest'] as const;
-type Rotation = (typeof ROTATION)[number];
-type ColorwarsKind = Extract<Rotation, 'ringofdoom' | 'hotpotato'>;
-
-// ringofdoom doesn't go through the JS pipeline/Settings at all (see
-// renderColorwarsEvent), so this only ever needs to handle the rest.
-function settingsFor(kind: Exclude<Rotation, ColorwarsKind>): Settings {
-  const base: Settings = { ...DEFAULT_SETTINGS, clipsPerRun: 1 };
-  if (kind === 'colorwar') {
-    // 'random' picks one of the four ~41-44s wild-duel boards (never SPRINT's
-    // short cold-open) — see render/colorwar/game.js's pickMode(). Shape is a
-    // cosmetic design tweak, randomized here too so the same board layout
-    // doesn't look identical to a prior day's render. Flip-sound stays
-    // pinned to 'bubble' — the user's chosen sound, not randomized.
-    return {
-      ...base,
-      contentType: 'colorwar',
-      colorWarMode: 'random',
-      colorWarShape: randomInt(0, 2) === 0 ? 'circle' : 'square',
-      colorWarFlipSound: 'bubble',
-    };
-  }
-  if (kind === 'followball') return { ...base, contentType: 'followball', followBallMode: 'random' };
-  // eyetest
-  return { ...base, contentType: 'eyetest', eyeTestBallsPerRound: [5, 6, 8], eyeTestShuffleSec: 6 };
-}
-
-function isRotation(v: string): v is Rotation {
-  return (ROTATION as readonly string[]).includes(v);
-}
-
 function shuffled<T>(arr: readonly T[]): T[] {
   const out = [...arr];
   for (let i = out.length - 1; i > 0; i--) {
@@ -135,99 +103,63 @@ function shuffled<T>(arr: readonly T[]): T[] {
 
 interface RenderedPost {
   kind: Rotation;
+  /** The job / episode folder the post packaging reads. */
+  sourceDir: string;
   videoPath: string;
-  text: string;
+  /** The render's own caption, used only if packaging fails. */
+  fallbackText: string;
   /** Run only after a successful Buffer post. Ring of Doom uses this to
    *  commit the episode to league/season.json — see renderRingOfDoom(). */
   onPosted?: () => Promise<void>;
 }
 
-function renderOne(kind: Rotation): Promise<RenderedPost> {
-  if (kind === 'ringofdoom') return renderColorwarsEvent('ring_of_doom', 'ringofdoom');
-  if (kind === 'hotpotato') return renderColorwarsEvent('hot_potato', 'hotpotato');
-
+async function renderOne(kind: Rotation): Promise<RenderedPost> {
+  if (kind === 'ringofdoom' || kind === 'hotpotato') {
+    const eventId = COLORWARS_EVENT[kind];
+    console.log(`\n=== rendering ${kind} (mining seeds for a great one) ===`);
+    const meta = await renderColorwarsEvent(eventId);
+    console.log(`[${kind}] seed ${meta.seed} — winner ${meta.winner}, MVP ${meta.mvp}, ${meta.duration_sec.toFixed(1)}s (episode ${meta.episode_id})`);
+    return {
+      kind,
+      sourceDir: meta.out_dir,
+      videoPath: join(meta.out_dir, 'final.mp4'),
+      fallbackText: (await readFile(join(meta.out_dir, 'caption.txt'), 'utf-8')).trim(),
+      // Commit AFTER a successful Buffer post, not before or unconditionally —
+      // a render that never actually goes out (e.g. the Buffer step below
+      // fails) shouldn't advance the season. Matches the engine's own "never
+      // commit automatically" rule (see colorwars/CLAUDE.md): this IS the
+      // human-equivalent approval step, the same way posting is for the other
+      // games, which have no review step either.
+      onPosted: async () => {
+        await commitColorwarsEpisode(eventId, meta.episode_id);
+        console.log(`[${kind}] committed ${meta.episode_id} to league/season.json`);
+      },
+    };
+  }
   console.log(`\n=== rendering ${kind} ===`);
-  const job = createJob({ settings: settingsFor(kind) });
-  return runPipeline({ jobId: job.id, signal: new AbortController().signal, broadcast: logProgress }).then(() => {
-    const finished = getJob(job.id);
-    if (!finished || finished.status !== 'awaiting_review' || !finished.draftText) {
-      throw new Error(`render did not finish cleanly — status: ${finished?.status}, error: ${finished?.errorMessage ?? 'none'}`);
-    }
-    const videoPath = jobCandidateFile(job.id, 0, 'video');
-    const { caption, hashtags = [] } = finished.draftText;
-    // TikTok allows at most 5 hashtags — the source caption templates already stay
-    // under that, but this is the actual enforcement point before anything posts.
-    const tags = hashtags.slice(0, 5);
-    console.log(`rendered ${videoPath}`);
-    console.log(`caption: ${caption}`);
-    console.log(`hashtags: ${tags.join(', ')}`);
-    return { kind, videoPath, text: [caption, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n') };
-  });
+  const r = await renderJsGame(kind, logProgress);
+  // TikTok allows at most 5 hashtags
+  const tags = r.hashtags.slice(0, 5);
+  return { kind, sourceDir: r.jobDir, videoPath: r.videoPath, fallbackText: [r.caption, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n') };
 }
 
-const COLORWARS_DIR = join(process.cwd(), 'colorwars');
-const COLORWARS_PYTHON = join(COLORWARS_DIR, '.venv', 'bin', 'python');
-// "post with find a great seed" — the same mining-for-drama mechanism the
-// Studio page's "Find a great seed" button runs, just headless/CLI here.
-// 300 runs matches the done-when bar the engine's other events were judged
-// against (Phase 4's decisions log) and takes well under a minute (pure
-// physics, no browser/render involved) — generous without eating much of
-// the job's time budget.
-const COLORWARS_MINE_RUNS = 300;
-
-interface ColorwarsRenderMeta {
-  out_dir: string;
-  episode_id: string;
-  seed: number;
-  winner: string;
-  mvp: string;
-  duration_sec: number;
-}
-
-/** ring_of_doom and hot_potato both live in colorwars/ — a separate
- *  Python engine (pymunk + skia, its own render/audio/league pipeline),
- *  not the JS game renderer the other 3 rotation games use. Mirrors the
- *  Studio page's own flow (mine for a great seed -> render the top one)
- *  via the CLI instead of HTTP, since there's no running studio_api
- *  server in this job. Takes eventId as a parameter (not hardcoded) so
- *  both events -- and any future colorwars event -- share this one
- *  function instead of duplicating it. */
-async function renderColorwarsEvent(eventId: string, kind: ColorwarsKind): Promise<RenderedPost> {
-  console.log(`\n=== rendering ${kind} (mining ${COLORWARS_MINE_RUNS} seeds for a great one) ===`);
-  const mined = await pexec(COLORWARS_PYTHON, [
-    '-m', 'colorwars', 'mine', '--event', eventId, '--runs', String(COLORWARS_MINE_RUNS), '--top', '5',
-  ], { cwd: COLORWARS_DIR });
-  console.log(mined.stdout.trim());
-
-  const rendered = await pexec(COLORWARS_PYTHON, [
-    '-m', 'colorwars', 'render', '--event', eventId, '--best', '--json',
-  ], { cwd: COLORWARS_DIR });
-  const lastLine = rendered.stdout.trim().split('\n').at(-1);
-  if (!lastLine) throw new Error('colorwars render --json produced no output');
-  const meta = JSON.parse(lastLine) as ColorwarsRenderMeta;
-  console.log(
-    `[${kind}] seed ${meta.seed} — winner ${meta.winner}, MVP ${meta.mvp}, ` +
-    `${meta.duration_sec.toFixed(1)}s (episode ${meta.episode_id})`,
-  );
-
-  const videoPath = join(meta.out_dir, 'final.mp4');
-  const caption = (await readFile(join(meta.out_dir, 'caption.txt'), 'utf-8')).trim();
-
-  return {
-    kind,
-    videoPath,
-    text: caption,
-    // Commit AFTER a successful Buffer post, not before or unconditionally —
-    // a render that never actually goes out (e.g. the Buffer step below
-    // fails) shouldn't advance the season. Matches the engine's own "never
-    // commit automatically" rule (see colorwars/CLAUDE.md): this IS the
-    // human-equivalent approval step, the same way posting is for the other
-    // games, which have no review step either.
-    onPosted: async () => {
-      await pexec(COLORWARS_PYTHON, ['-m', 'colorwars', 'commit', meta.episode_id, '--event', eventId], { cwd: COLORWARS_DIR });
-      console.log(`[${kind}] committed ${meta.episode_id} to league/season.json`);
-    },
-  };
+/** Post packaging (scripts/packaging): a fresh hook, background, border,
+ *  zoom, sound bed, caption, hashtags, cover and pinned comment, checked
+ *  against the last 10 posts. Falls back to the plain render rather than
+ *  losing the day's post if packaging itself breaks. */
+async function packageOne(r: RenderedPost): Promise<{ videoPath: string; text: string; kitId: string | null }> {
+  try {
+    const kit = await packageVideo(r.sourceDir, { writeLog: CI_LOG, preset: 'veryfast' });
+    const text = (await readFile(join(kit.kitDir, 'caption.txt'), 'utf-8')).trim();
+    console.log(`[${r.kind}] packaged: ${kit.hook.lines.join(' ')} · ${kit.look.bg}/${kit.look.border} · sound ${kit.sound.track}`);
+    console.log(`[${r.kind}] caption: ${kit.caption.replace(/\n/g, ' / ')}`);
+    console.log(`[${r.kind}] hashtags: ${kit.hashtags.join(', ')}`);
+    console.log(`[${r.kind}] PIN THIS COMMENT: ${kit.pinned}`);
+    return { videoPath: join(kit.kitDir, 'video.mp4'), text, kitId: kit.id };
+  } catch (err) {
+    console.error(`[${r.kind}] post packaging failed, posting the plain render instead: ${(err as Error).message}`);
+    return { videoPath: r.videoPath, text: r.fallbackText, kitId: null };
+  }
 }
 
 async function main() {
@@ -240,25 +172,31 @@ async function main() {
     order = [forced];
   } else {
     order = shuffled(ROTATION);
+    // never the same format twice in a row: today's first post can't be the
+    // format yesterday's run posted last (the post log is committed back)
+    const last = lastPostedFormat(readLog([CI_LOG]).filter((e) => e.posted));
+    if (order.length > 1 && order[0] === last) [order[0], order[1]] = [order[1]!, order[0]!];
   }
   console.log(`today's order: ${order.join(', ')}`);
 
   const outputRepo = await OutputRepo.open();
   try {
-    // render → push → post, ONE game at a time — not render-all-then-post-all.
-    // A game failing at any step doesn't stop the rest, and whatever's
-    // already posted by the time a later game fails (or the run times out)
-    // is safely queued on Buffer already, not stuck waiting on a final batch
-    // step that never runs.
+    // render → package → push → post, ONE game at a time — not
+    // render-all-then-post-all. A game failing at any step doesn't stop the
+    // rest, and whatever's already posted by the time a later game fails (or
+    // the run times out) is safely queued on Buffer already, not stuck
+    // waiting on a final batch step that never runs.
     let posted = 0, rendered = 0;
     for (const kind of order) {
       try {
         const r = await renderOne(kind);
         rendered++;
-        const videoUrl = await outputRepo.publish(r.kind, r.videoPath);
+        const p = await packageOne(r);
+        const videoUrl = await outputRepo.publish(r.kind, p.videoPath);
         console.log(`[${kind}] video public at: ${videoUrl}`);
-        const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: r.text, videoUrl });
+        const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: p.text, videoUrl });
         console.log(`[${kind}] queued on Buffer — post id ${postId}`);
+        if (p.kitId) markPosted(p.kitId, { bufferPostId: postId }, CI_LOG);
         posted++;
         // Runs after the post already succeeded, so a failure here (e.g.
         // Ring of Doom's commit step) must NOT land in the catch below —

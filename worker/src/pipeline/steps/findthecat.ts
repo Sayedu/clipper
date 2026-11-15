@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { paths } from '../../paths.ts';
 import { log } from '../../lib/log.ts';
@@ -83,6 +83,7 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
       '--fps', '60',
       '--out-frames', framesDir,
       '--out', resultPath,
+      ...(ctx.settings.packaged ? ['--nohook'] : []),
     ],
     {
       signal: ctx.signal,
@@ -102,6 +103,9 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
     },
   );
 
+  // the sim's event log, kept next to the result json for the post packaging
+  // (it used to be deleted with the frames)
+  if (existsSync(resolve(framesDir, 'events.json'))) copyFileSync(resolve(framesDir, 'events.json'), ctx.file('findthecat_events.json'));
   if (!existsSync(resultPath)) throw new Error('find the cat produced no result');
   const game = JSON.parse(readFileSync(resultPath, 'utf8')) as FindTheCatResult;
   ctx.log('render', `${game.roundCount} round(s) · answers ${game.answers.join(' ')} (seed ${game.seed})`);

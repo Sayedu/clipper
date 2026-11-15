@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { paths } from '../../paths.ts';
 import { log } from '../../lib/log.ts';
@@ -84,6 +84,7 @@ export async function runEyeTest(ctx: StepContext): Promise<{ render: RenderResu
       '--fps', String(fps),
       '--out-frames', framesDir,
       '--out', resultPath,
+      ...(ctx.settings.packaged ? ['--nohook'] : []),
     ],
     {
       signal: ctx.signal,
@@ -103,6 +104,9 @@ export async function runEyeTest(ctx: StepContext): Promise<{ render: RenderResu
     },
   );
 
+  // the sim's event log, kept next to the result json for the post packaging
+  // (it used to be deleted with the frames)
+  if (existsSync(resolve(framesDir, 'events.json'))) copyFileSync(resolve(framesDir, 'events.json'), ctx.file('eyetest_events.json'));
   if (!existsSync(resultPath)) throw new Error('eye test produced no result');
   const game = JSON.parse(readFileSync(resultPath, 'utf8')) as EyeTestResult;
   ctx.log('render', `${game.rounds} round(s) (${game.ballsPerRound.join(',')} balls) · answers ${game.answers.join(' ')} (seed ${game.seed})`);

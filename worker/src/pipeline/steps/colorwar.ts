@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { paths } from '../../paths.ts';
 import { log } from '../../lib/log.ts';
@@ -98,6 +98,7 @@ export async function runColorWar(ctx: StepContext): Promise<{ render: RenderRes
       '--fps', String(fps),
       '--out-frames', framesDir,
       '--out', resultPath,
+      ...(ctx.settings.packaged ? ['--nohook'] : []),
       ...seasonArgs,
     ],
     {
@@ -118,6 +119,9 @@ export async function runColorWar(ctx: StepContext): Promise<{ render: RenderRes
     },
   );
 
+  // the sim's event log, kept next to the result json for the post packaging
+  // (it used to be deleted with the frames)
+  if (existsSync(resolve(framesDir, 'events.json'))) copyFileSync(resolve(framesDir, 'events.json'), ctx.file('colorwar_events.json'));
   if (!existsSync(resultPath)) throw new Error('color war produced no result');
   const race = JSON.parse(readFileSync(resultPath, 'utf8')) as ColorWarResult;
   ctx.log('render', `${race.modeName}: ${race.colors.join(' vs ')} → ${race.winner} wins at ${race.winAtSec}s (seed ${race.seed})`);

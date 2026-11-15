@@ -21,6 +21,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const QS = new URLSearchParams(location.search);
+const NOHOOK = QS.get('nohook') === '1';   // display only — see the big label below
 const RENDER = QS.get('render') === '1';
 const SEED = (parseInt(QS.get('seed') || '1', 10) >>> 0) || 1;
 const FPS = Math.max(20, Math.min(60, parseInt(QS.get('fps') || '60', 10)));
@@ -600,7 +601,9 @@ function hud(force) {
   }
 
   // SPEC §7: every phase sets a big label (never null) — shuffle is the longest phase
-  const big = w.phase === 'show' ? 'WATCH THE BALL'
+  // ?nohook=1 (display only): skip round 1's opening title — the post
+  // packaging overlays its own hook there
+  const big = w.phase === 'show' ? (NOHOOK && w.ri === 0 ? null : 'WATCH THE BALL')
     : w.phase === 'shuffle' ? 'KEEP TRACKING'
     : w.phase === 'ask' ? 'WHICH CUP?'
     : w.phase === 'answer' ? 'CUP #' + (w.cups.find((c) => c.id === w.ball).slot + 1)

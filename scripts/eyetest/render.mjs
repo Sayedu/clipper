@@ -56,6 +56,8 @@ function normalizeShuffle(raw) {
 
 const opts = {
   seed: numArg('seed', Math.floor(Math.random() * 1e9), true) >>> 0,
+  // --nohook: hide the fixed round 1 title; the post packaging adds its own hook
+  nohook: arg('nohook', false) !== false,
   balls: normalizeBalls(arg('balls', '8,8,8')),
   shuffle: normalizeShuffle(arg('shuffle', 6)),
   // safety frame-cap override (seconds). Absent -> the game estimates it
@@ -116,7 +118,8 @@ const renderOne = async (seed, balls, shuffleSec) => {
   const url = `http://127.0.0.1:${port}/render/eyetest/index.html`
     + `?render=1&seed=${seed}&balls=${encodeURIComponent(balls)}&shuffle=${shuffleSec}`
     + (opts.sec ? `&sec=${opts.sec}` : '')
-    + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`;
+    + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`
+    + (opts.nohook ? '&nohook=1' : '');
   log(`\n━━ EYE TEST · seed ${seed} · balls ${balls} · shuffle ${shuffleSec}s${opts.sec ? ` · cap ${opts.sec}s` : ''} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the game');
   await page.goto(url, { waitUntil: 'load' });
@@ -157,6 +160,7 @@ const renderOne = async (seed, balls, shuffleSec) => {
   result.frameWidth = Math.round(opts.w * opts.ss);
   result.frameHeight = Math.round(opts.h * opts.ss);
   result.ss = opts.ss;
+  if (opts.nohook) result.nohook = true;
 
   await writeFile(opts.outJson, JSON.stringify(result, null, 2));
   await writeFile(

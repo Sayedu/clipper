@@ -52,6 +52,9 @@ const OPTS = {
   hookSec: clampNum(QS.get('hooksec'), 1, 3, 2),
   label: cleanText(QS.get('label'), 40),
   twists: QS.get('twists') !== '0',
+  // display only: the post packaging puts its own opening hook on top, so it
+  // can ask the game to skip the built-in round 1 title
+  nohook: QS.get('nohook') === '1',
 };
 if (QS.get('safezone') === '1') document.documentElement.classList.add('safezone');
 if (QS.get('frame') === '1') document.documentElement.classList.add('frame');
@@ -527,7 +530,7 @@ function titlesFor(w) {
       ? { at: I - 0.12, text: 'FINAL ROUND', sub: w.cups + ' CUPS · LAST CHANCE' }
       : { at: I - 0.12, text: 'ROUND ' + (w.index + 1), sub: w.cups + ' CUPS · ' + w.diff.name };
   return [
-    first,
+    ...(OPTS.nohook && w.index === 0 ? [] : [first]),
     { at: w.index === 0 ? Math.max(S + 0.1, OPTS.hookSec) : S + 0.1, text: 'EYES ON THE CAT', sub: "DON'T BLINK" },
     { at: Sh, text: 'KEEP TRACKING', sub: 'STAY LOCKED IN' },
     { at: Sh + (G - Sh) * 0.58, text: 'FASTER!!', sub: w.twist === 'colorshift' ? 'THE CUPS CHANGED COLOR' : 'NO WAY YOU GOT THIS', hot: true },

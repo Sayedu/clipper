@@ -148,6 +148,20 @@ decisions log.
 
 ## Decisions log
 
+### Post packaging export (2026-11-15)
+
+- **`run_render()` now also writes `events.json`** next to `meta.json`:
+  every SimEvent except collisions, each stamped with `video_t` (when it
+  shows up in the FINAL video, looked up through `frame_sim_time`, first
+  pass only so instant replays don't double count) and, for ball events,
+  the ball's name and team. Pure export after the sim and render have run
+  -- nothing reads it back into the engine. The repo-level post packaging
+  (`scripts/packaging/`) uses it to write captions about real moments
+  ("first ball out at 4 seconds") without re-running anything. Verified
+  with `scripts/packaging/simprint_colorwars.py`: Ring of Doom and Hot
+  Potato SimRecords (every step, event, placement) are byte-identical
+  before and after this change.
+
 ### Website Studio
 
 - **The first version of this page was one page too many: a 6-tab Setup/

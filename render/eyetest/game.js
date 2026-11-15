@@ -34,6 +34,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const QS = new URLSearchParams(location.search);
+const NOHOOK = QS.get('nohook') === '1';   // display only — see the big label below
 const RENDER = QS.get('render') === '1';
 const SEED = (parseInt(QS.get('seed') || '1', 10) >>> 0) || 1;
 const FPS = Math.max(20, Math.min(60, parseInt(QS.get('fps') || '60', 10)));
@@ -543,7 +544,9 @@ function hud(force) {
     pill.style.display = 'none';
   }
 
-  const big = w.phase === 'lockin' || w.phase === 'flash' ? 'DYNAMIC VISION TEST: FOCUS ON THE GOLD BALL'
+  // ?nohook=1 (display only): skip round 1's opening title — the post
+  // packaging overlays its own hook there
+  const big = w.phase === 'lockin' || w.phase === 'flash' ? (NOHOOK && w.round === 1 ? null : 'DYNAMIC VISION TEST: FOCUS ON THE GOLD BALL')
     : w.phase === 'shuffle' ? "DON'T BLINK! TRACK THE TARGET"
     : w.phase === 'freeze' ? 'WHICH NUMBER IS THE TARGET? LOCK IN YOUR GUESS IN THE COMMENTS'
     : w.phase === 'reveal' ? 'THE TARGET WAS BALL #' + w.answer

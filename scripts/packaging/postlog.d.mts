@@ -1,0 +1,11 @@
+import type { KitEntry } from './package.mjs';
+export const REPO: string;
+export const CI_LOG: string;
+export const LOCAL_LOG: string;
+export function writeLogPath(): string;
+export function readLog(paths?: string[] | null): KitEntry[];
+export function appendEntry(entry: KitEntry, path?: string): void;
+export function markPosted(id: string, info?: Record<string, unknown>, path?: string): boolean;
+export function recent(entries: KitEntry[], n: number, format?: string | null): KitEntry[];
+export function lastPostedFormat(entries: KitEntry[]): string | null;
+export function buildQueue<T extends { format: string }>(items: T[], lastFormat?: string | null): Array<T & { backToBack: boolean }>;

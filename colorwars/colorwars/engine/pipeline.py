@@ -192,6 +192,7 @@ def run_render(
         "drama": drama,
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    _write_events(out_dir, record, timeline)
 
     _write_caption(out_dir, event.id, episode, record, meta)
     _write_pinned_comment(out_dir, teams)
@@ -204,6 +205,37 @@ def run_render(
             print(f"post kit skipped: {exc}", file=sys.stderr)
 
     return meta
+
+
+def _write_events(out_dir: Path, record: SimRecord, timeline: Timeline) -> None:
+    """Read-only export for the post packaging: every sim event, stamped with
+    the moment it shows up in the FINAL video (slow motion stretches sim time,
+    so video time is looked up through the edit's frame_sim_time map)."""
+    import bisect
+
+    fst = timeline.frame_sim_time
+    # frame_sim_time can step backwards (instant replays); index the first pass only
+    mono, best = [], -1.0
+    for i, t in enumerate(fst):
+        if t > best:
+            mono.append((t, i))
+            best = t
+    keys = [t for t, _ in mono]
+
+    def video_t(sim_t: float):
+        k = bisect.bisect_left(keys, sim_t)
+        return round(mono[k][1] / timeline.fps, 3) if k < len(mono) else None
+
+    balls = {b.id: b for b in record.balls}
+
+    def named(data: dict) -> dict:
+        b = balls.get(data.get("ball_id"))
+        return {**data, "name": b.name, "team_name": b.team_name} if b else data
+
+    events = [{"kind": e.kind, "t": round(e.t, 4), "video_t": video_t(e.t), "data": named(e.data)} for e in record.events
+              if e.kind != "collision"]
+    payload = {"content_duration_sec": timeline.duration_sec(), "fps": timeline.fps, "events": events}
+    (out_dir / "events.json").write_text(json.dumps(payload, default=str), encoding="utf-8")
 
 
 SIMPLE_CAPTION_EVENTS = {"ring_of_doom", "hot_potato"}

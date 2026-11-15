@@ -107,7 +107,7 @@ jobs:
           # overrides it to the apt-installed one already on PATH here.
           COLORWARS_FFMPEG_PATH: ffmpeg
 
-      - name: Persist the colorwars season state (if it posted today)
+      - name: Persist the colorwars season state and the post log
         # `colorwars commit` (run by daily.ts's ringofdoom/hotpotato step,
         # after a successful Buffer post) only updates these files on THIS
         # runner's local checkout -- nothing pushes that back to the repo on
@@ -122,10 +122,14 @@ jobs:
         # the pool file's own consumption never made it back to the repo.
         if: always()
         run: |
-          git add colorwars/league/season.json colorwars/league/names_used.txt colorwars/config/names.txt
+          # post-log/daily.json is the post packaging's memory: every kit's
+          # caption, hashtags, hook, cover hash, sound and look. Tomorrow's
+          # run reads it so nothing repeats the last 10 posts and the first
+          # post isn't the same game as today's last one.
+          git add colorwars/league/season.json colorwars/league/names_used.txt colorwars/config/names.txt post-log/daily.json
           if git diff --cached --quiet; then
-            echo "no season state changes to persist"
+            echo "no season state or post log changes to persist"
           else
-            git -c user.email=bot@clipper.local -c user.name=clipper-bot commit -m "post: advance Color Wars League season"
+            git -c user.email=bot@clipper.local -c user.name=clipper-bot commit -m "post: advance Color Wars League season, update post log"
             git push
           fi

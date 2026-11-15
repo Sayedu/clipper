@@ -120,6 +120,41 @@ export const api = {
 export type FindTheCatOptions = { rounds: number; theme: string; hook: string; hookSec: number; label: string; twists: boolean };
 /** extra per-render files (Find The Cat: sfx.0.mp4, cover.0.png, postkit.0.txt) */
 export const jobExtraUrl = (jobId: string, name: string) => `${BASE}/jobs/${jobId}/extra/${name}`;
+export const postKitFileUrl = (kitId: string, name: string, download = false) =>
+  `${BASE}/postkits/${encodeURIComponent(kitId)}/${name}${download ? '?download=1' : ''}`;
+
+export interface PostKitSource { id: string; format: string; renderedAt: string; kitId: string | null }
+export interface PostKit {
+  id: string;
+  createdAt: string;
+  format: string;
+  seed: number;
+  caption: string;
+  captionStyle: string;
+  hashtags: string[];
+  pinned: string;
+  hook: { lines: string[]; style: { font: string; palette: string; anim: string } };
+  cover: { lines: string[]; atSec: number };
+  sound: { track: string; bpm?: number };
+  look: { bg: string; border: string; zoom: string };
+  video: { width: number; height: number; durationSec: number };
+  posted: boolean;
+  exists: boolean;
+}
+export interface PostKitTask {
+  running: boolean;
+  startedAt: string;
+  finishedAt?: string;
+  total: number;
+  current: string | null;
+  done: Array<{ source: string; kitId: string }>;
+  failed: Array<{ source: string; error: string }>;
+}
+export const postKitsApi = {
+  list: () => req<{ sources: PostKitSource[]; kits: PostKit[]; task: PostKitTask | null; queue: Array<{ id: string; format: string; caption: string; backToBack: boolean }> }>('/postkits'),
+  make: (sources: string[]) => req<{ task: PostKitTask }>('/postkits', { method: 'POST', body: JSON.stringify({ sources }) }),
+  markPosted: (kitId: string) => req<{ ok: boolean }>(`/postkits/${encodeURIComponent(kitId)}/posted`, { method: 'POST', body: JSON.stringify({ posted: true }) }),
+};
 export const candidatePreviewUrl = (jobId: string, index: number) => `${BASE}/jobs/${jobId}/preview/${index}`;
 export const candidateThumbUrl = (jobId: string, index: number) => `${BASE}/jobs/${jobId}/thumb/${index}`;
 export const jobDownloadUrl = (jobId: string, index = 0) => `${BASE}/jobs/${jobId}/download/${index}`;

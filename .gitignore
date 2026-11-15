@@ -65,3 +65,6 @@ render/findthecat/render-log.jsonl
 
 # Claude Code's own local session state — not project source
 .claude/
+
+# post packaging: kits (videos) stay local; post-log/daily.json is tracked (CI writes it)
+post-kits/

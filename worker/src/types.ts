@@ -327,6 +327,9 @@ export interface Settings {
   /** Pin the sim to an exact seed (the preview studio's "render this seed").
    *  0 / undefined = a fresh random seed each render. */
   findTheCatSeed?: number;
+  /** Render for post packaging: the posted games skip their fixed opening
+   *  title (display only) because scripts/packaging overlays a fresh hook. */
+  packaged?: boolean;
 
   // --- Eye Test ("Ghost Object Tracker" visual focus test) ---
   // Fully user-authored, no preset modes: each round runs the same 3s

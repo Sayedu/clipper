@@ -76,6 +76,8 @@ const opts = {
   // render/colorwar/game.js's SEASON_MODE block. Purely visual passthrough;
   // absent unless the worker is rendering a season episode.
   season: numArg('season', 0, true),
+  // --nohook: hide the fixed opening line; the post packaging adds its own hook
+  nohook: arg('nohook', false) !== false,
   episode: numArg('episode', 1, true),
   totalEpisodes: numArg('totalEpisodes', 1, true),
   scoresBefore: String(arg('scoresBefore', '0,0,0,0')),
@@ -121,6 +123,7 @@ const renderOne = async (seed, mode) => {
     + `&shape=${opts.shape}&flipsound=${opts.flipsound}&r=${opts.r}`
     + (opts.sec ? `&sec=${opts.sec}` : '')
     + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`
+    + (opts.nohook ? '&nohook=1' : '')
     + (opts.season ? `&season=${opts.season}&episode=${opts.episode}&totalEpisodes=${opts.totalEpisodes}&scoresBefore=${encodeURIComponent(opts.scoresBefore)}` : '');
   log(`\n━━ COLOR WAR · seed ${seed} · mode ${mode}${opts.sec ? ` · cap ${opts.sec}s` : ''} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the board');
@@ -135,6 +138,7 @@ const renderOne = async (seed, mode) => {
 
   const cdp = await page.context().newCDPSession(page);
   const allEvents = [];
+  const timeline = [];
   const writes = [];
   let frame = 0;
   const cap = meta.totalFrames;
@@ -153,6 +157,16 @@ const renderOne = async (seed, mode) => {
     writes.push(writeFile(join(opts.outFrames, `f_${idx}.png`), Buffer.from(shot.data, 'base64')));
     if (writes.length >= 16) await Promise.all(writes.splice(0));
     for (const ev of r.events) allEvents.push(ev);
+    // read-only event log for the post packaging: every 0.1s, read each
+    // colour's share (or OUT) and the banner text straight off the score
+    // chips the game already draws. Nothing is written into the page.
+    if (!opts.season && (frame % Math.max(1, Math.round(opts.fps / 10)) === 0 || r.done)) {
+      const s = await page.evaluate(() => ({
+        shares: [...document.querySelectorAll('#chips .cv')].map((e) => (e.textContent === 'OUT' ? null : parseFloat(e.textContent))),
+        flash: document.getElementById('flash')?.style.display === 'block' ? document.getElementById('flash').textContent : '',
+      }));
+      timeline.push({ t: +(frame / opts.fps).toFixed(2), ...s });
+    }
 
     if (frame % 15 === 0 || r.done) progress(0.05 + 0.9 * (frame / cap), `frame ${frame}/${cap}`);
     if (r.done || frame >= cap) break;
@@ -165,6 +179,8 @@ const renderOne = async (seed, mode) => {
   result.frameWidth = Math.round(opts.w * opts.ss);
   result.frameHeight = Math.round(opts.h * opts.ss);
   result.ss = opts.ss;
+  if (timeline.length) result.timeline = timeline;
+  if (opts.nohook) result.nohook = true;
 
   await writeFile(opts.outJson, JSON.stringify(result, null, 2));
   await writeFile(

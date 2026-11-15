@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -31,6 +31,8 @@ import {
   MIN_SEASON_EPISODES,
 } from './colorwarSeason.ts';
 import { searchSeasonSeeds } from '../../scripts/colorwar/search.mjs';
+import { KITS_DIR, findRenders, packageVideo, writeQueue } from '../../scripts/packaging/package.mjs';
+import { markPosted, readLog as readPostLog } from '../../scripts/packaging/postlog.mjs';
 import { Router, readJson, sendJson, serveFile, type Ctx } from './http.ts';
 import { DEFAULT_SETTINGS, type Settings } from './types.ts';
 
@@ -124,6 +126,17 @@ function listSfxPacks(): string[] {
     }
   });
 }
+
+interface PostKitTask {
+  running: boolean;
+  startedAt: string;
+  finishedAt?: string;
+  total: number;
+  current: string | null;
+  done: Array<{ source: string; kitId: string }>;
+  failed: Array<{ source: string; error: string }>;
+}
+let postKitTask: PostKitTask | null = null;
 
 export function buildRouter(): Router {
   const r = new Router();
@@ -589,6 +602,76 @@ export function buildRouter(): Router {
   r.get('/jobs/:id/screen/:name', (ctx) =>
     serveFile(ctx, resolve(jobWorkDir(ctx.params.id!), 'flagged-frames', ctx.params.name!.replace(/[^\w.-]/g, ''))),
   );
+
+  // --- post kits (scripts/packaging) --------------------------------
+  // A post kit = the render repackaged so it looks different from recent
+  // posts (hook, background, border, zoom, sound bed, caption, hashtags,
+  // cover, pinned comment), checked against the last 10 kits. One packaging
+  // task at a time, each video in turn, in this process.
+  r.get('/postkits', ({ res }) => {
+    const kits = readPostLog().slice().reverse();
+    const packaged = new Map(kits.map((k) => [k.source?.input, k.id]));
+    const sources = findRenders().slice(0, 60).map((s) => ({
+      id: s.dir.slice(paths.repoRoot.length + 1),
+      format: s.format,
+      renderedAt: new Date(s.mtime).toISOString(),
+      kitId: packaged.get(s.dir) ?? null,
+    }));
+    const queueFile = resolve(KITS_DIR, 'queue.json');
+    let order: unknown[] = [];
+    try { order = existsSync(queueFile) ? (JSON.parse(readFileSync(queueFile, 'utf8')).order ?? []) : []; } catch { /* rewritten next run */ }
+    sendJson(res, 200, {
+      sources,
+      kits: kits.slice(0, 60).map((k) => ({ ...k, exists: existsSync(resolve(k.kitDir, 'video.mp4')) })),
+      task: postKitTask,
+      queue: order,
+    });
+  });
+
+  r.post('/postkits', async ({ req, res }) => {
+    const body = z.object({ sources: z.array(z.string()).min(1).max(30) }).parse(await readJson(req));
+    if (postKitTask?.running) return sendJson(res, 409, { error: 'a post kit run is already going' });
+    const known = new Set(findRenders().map((s) => s.dir.slice(paths.repoRoot.length + 1)));
+    const bad = body.sources.filter((s) => !known.has(s));
+    if (bad.length) return sendJson(res, 400, { error: `unknown render(s): ${bad.join(', ')}` });
+    postKitTask = { running: true, startedAt: new Date().toISOString(), total: body.sources.length, current: null, done: [], failed: [] };
+    const task = postKitTask;
+    void (async () => {
+      for (const src of body.sources) {
+        task.current = src;
+        try {
+          const kit = await packageVideo(resolve(paths.repoRoot, src), { verbose: false });
+          task.done.push({ source: src, kitId: kit.id });
+        } catch (err) {
+          task.failed.push({ source: src, error: (err as Error).message });
+        }
+      }
+      try { writeQueue(); } catch { /* the queue is a convenience */ }
+      task.current = null;
+      task.running = false;
+      task.finishedAt = new Date().toISOString();
+    })();
+    sendJson(res, 202, { task });
+  });
+
+  r.post('/postkits/:kit/posted', async ({ req, res, params }) => {
+    const body = z.object({ posted: z.boolean() }).parse(await readJson(req));
+    const ok = body.posted ? markPosted(params.kit!) : false;
+    if (body.posted && !ok) return sendJson(res, 404, { error: 'no such kit in the local post log' });
+    try { writeQueue(); } catch { /* best effort */ }
+    sendJson(res, 200, { ok: true });
+  });
+
+  r.get('/postkits/:kit/:name', (ctx) => {
+    const kitId = ctx.params.kit!, name = ctx.params.name!;
+    if (!/^[\w.-]+$/.test(kitId) || !/^(video\.mp4|video_sfx_only\.mp4|cover\.png|caption\.txt|pinned_comment\.txt|kit\.json)$/.test(name)) {
+      return sendJson(ctx.res, 404, { error: 'not found' });
+    }
+    const kit = readPostLog().find((k) => k.id === kitId);
+    if (!kit) return sendJson(ctx.res, 404, { error: 'not found' });
+    const download = ctx.url.searchParams.get('download') ? `${kitId}_${name}` : undefined;
+    serveFile(ctx, resolve(kit.kitDir, name), { download });
+  });
 
   // --- library ----------------------------------------------------
   r.get('/library', ({ res }) => sendJson(res, 200, { clips: listClips() }));

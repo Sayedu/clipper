@@ -30,6 +30,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const QS = new URLSearchParams(location.search);
+// display only: hides the fixed "Watch till the end" line when the post
+// packaging is going to overlay its own opening hook
+if (QS.get('nohook') === '1') document.documentElement.classList.add('nohook');
 const RENDER = QS.get('render') === '1';
 const SEED = (parseInt(QS.get('seed') || '1', 10) >>> 0) || 1;
 const FPS = Math.max(20, Math.min(60, parseInt(QS.get('fps') || '60', 10)));
