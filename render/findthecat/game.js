@@ -147,7 +147,10 @@ function reset(seed, cups, difficulty, round, theme) {
 
   const spacing = cupSpacing(n);
   const slotX = slotXFor(n);
-  const cupW = spacing * 0.9, cupH = cupW * 1.3, ballD = cupW * 0.84;
+  // bigger than the handoff's own 0.84 -- the ball carries a specific meme
+  // image (the cat face + the pointing finger), not a flat color, so it
+  // needs to read clearly at a glance, not just as "a circle under a cup".
+  const cupW = spacing * 0.9, cupH = cupW * 1.3, ballD = cupW * 1.05;
   const ballCup = Math.floor(n / 2);
   const sched = buildSchedule(n, diff.swaps, s, Sh + 0.25, G - 0.3);
   const win = sched.finalSlots.indexOf(ballCup);
@@ -375,8 +378,14 @@ function draw(T) {
     ctx.translate(bx, by);
     ctx.rotate((Math.sin(T * 6) * 8 * Math.PI) / 180);
     ctx.scale(ballSc, ballSc);
-    const iw = w.ballD * 1.2, ih = w.ballD * 1.2;
-    ctx.drawImage(catImg, -iw / 2, -ih / 2 - w.ballD * 0.03, iw, ih);
+    // contain-fit (not cover/crop) -- the whole meme (the cat face AND the
+    // pointing finger) has to read, not just whatever a tight center-crop
+    // happens to keep. A touch over pure "contain" (1.08x) so the themed
+    // circle behind it doesn't show as a big empty ring.
+    const natW = catImg.naturalWidth || 480, natH = catImg.naturalHeight || 448;
+    const fit = Math.min(w.ballD / natW, w.ballD / natH) * 1.08;
+    const iw = natW * fit, ih = natH * fit;
+    ctx.drawImage(catImg, -iw / 2, -ih / 2, iw, ih);
     ctx.restore();
     ctx.restore();
   }

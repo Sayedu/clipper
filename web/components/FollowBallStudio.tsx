@@ -111,14 +111,21 @@ export function FollowBallStudio() {
     ftcRef.current = null;
     const poll = () => {
       if (stop) return;
-      const w = iframeRef.current?.contentWindow as (Window & { FTB?: ClassicApi | FtcApi }) | undefined;
-      if (w?.FTB?.replay) {
+      const w = iframeRef.current?.contentWindow as (Window & { FTB?: Partial<ClassicApi & FtcApi> }) | undefined;
+      const ftb = w?.FTB;
+      // Switching variants swaps the iframe's src, but contentWindow briefly
+      // still points at the OLD document until it finishes navigating -- its
+      // FTB also has `.replay`, so without this shape check we can grab the
+      // wrong game's API mid-switch (readout() shapes differ: classic has no
+      // `.t`, findthecat has no `.mode`) and crash on the first poll tick.
+      const isFindTheCat = typeof ftb?.setCups === 'function';
+      if (ftb?.replay && isFindTheCat === (variant === 'findthecat')) {
         if (variant === 'findthecat') {
-          const api2 = w.FTB as FtcApi;
+          const api2 = ftb as FtcApi;
           ftcRef.current = api2;
           api2.setSound(false);
         } else {
-          const api1 = w.FTB as ClassicApi;
+          const api1 = ftb as ClassicApi;
           fbRef.current = api1;
           api1.setSound(false);
         }
