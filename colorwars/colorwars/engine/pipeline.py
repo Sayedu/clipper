@@ -7,6 +7,7 @@ episode construction, and find_seed(). Rendering never writes season.json
 from __future__ import annotations
 
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -195,7 +196,12 @@ def run_render(
     _write_caption(out_dir, event.id, episode, record, meta)
     _write_pinned_comment(out_dir, teams)
     if event.id in POST_KIT and not preview:
-        _write_post_kit(out_dir, event.id, episode, meta, settings.ffmpeg_path, cover_path)
+        # an extra next to the video -- never worth failing the render over
+        # (e.g. an ffmpeg build without drawtext on the CI runner)
+        try:
+            _write_post_kit(out_dir, event.id, episode, meta, settings.ffmpeg_path, cover_path)
+        except Exception as exc:  # noqa: BLE001
+            print(f"post kit skipped: {exc}", file=sys.stderr)
 
     return meta
 

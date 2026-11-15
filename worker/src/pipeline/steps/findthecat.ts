@@ -166,9 +166,13 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
   // ---- post kit: cover (final reveal + hook text) and the caption txt
   ctx.progress('render', 0.96, 'writing the post kit');
   const kit = buildPostKit(game);
-  const coverPath = ctx.file('cover.0.png');
-  await writeCover({ ffmpeg: FFMPEG, video: outPath, atSec: coverTimeSec(game), out: coverPath, hook: kit.hook, sub: kit.coverSub });
   writeFileSync(ctx.file('postkit.0.txt'), postKitText(kit, game));
+  try {
+    await writeCover({ ffmpeg: FFMPEG, video: outPath, atSec: coverTimeSec(game), out: ctx.file('cover.0.png'), hook: kit.hook, sub: kit.coverSub });
+  } catch (err) {
+    // an extra — never worth failing the render over
+    ctx.log('render', `cover skipped: ${(err as Error).message}`);
+  }
 
   // thumbnail mid-shuffle (not the reveal) — the dashboard's own preview tile
   const thumbPath = ctx.file('thumb.0.jpg');

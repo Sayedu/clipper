@@ -258,7 +258,12 @@ const mux = async (result) => {
   }
 
   const kit = buildPostKit(result);
-  await writeCover({ ffmpeg: FFMPEG, video: files.video, atSec: coverTimeSec(result), out: files.cover, hook: kit.hook, sub: kit.coverSub });
+  try {
+    await writeCover({ ffmpeg: FFMPEG, video: files.video, atSec: coverTimeSec(result), out: files.cover, hook: kit.hook, sub: kit.coverSub });
+  } catch (e) {
+    log(`   cover skipped: ${e.message}`);   // an extra — never worth failing the render over
+    files.cover = null;
+  }
   await writeFile(files.postKit, postKitText(kit, result, files));
   await writeFile(files.config, JSON.stringify({ ...result, postKit: kit, files }, null, 2));
 

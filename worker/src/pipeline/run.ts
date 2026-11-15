@@ -293,13 +293,19 @@ async function finishPost(
   },
 ): Promise<RunOutcome> {
   if (opts.kit) {
-    // before the end card is appended, so the cover is always real gameplay
-    await writeCover({ ffmpeg: FFMPEG, video: render.videoPath, atSec: opts.kit.coverAtSec, out: ctx.file('cover.0.png'), hook: opts.kit.hook, sub: opts.kit.sub });
-    const d = opts.draft;
-    writeFileSync(ctx.file('postkit.0.txt'), [
-      'CAPTION', d.caption ?? '', '', (d.hashtags ?? []).map((t) => `#${t}`).join(' '), '',
-      'PINNED COMMENT', d.pinnedComment ?? '', '', 'RENDER', opts.reason, '',
-    ].join('\n'));
+    // the post kit is an extra — it must never cost the video itself (e.g.
+    // an ffmpeg build without drawtext on CI), so failures only get logged
+    try {
+      const d = opts.draft;
+      writeFileSync(ctx.file('postkit.0.txt'), [
+        'CAPTION', d.caption ?? '', '', (d.hashtags ?? []).map((t) => `#${t}`).join(' '), '',
+        'PINNED COMMENT', d.pinnedComment ?? '', '', 'RENDER', opts.reason, '',
+      ].join('\n'));
+      // before the end card is appended, so the cover is always real gameplay
+      await writeCover({ ffmpeg: FFMPEG, video: render.videoPath, atSec: opts.kit.coverAtSec, out: ctx.file('cover.0.png'), hook: opts.kit.hook, sub: opts.kit.sub });
+    } catch (err) {
+      ctx.log('render', `post kit skipped: ${(err as Error).message}`);
+    }
   }
   // the branded follow/CTA card, held for its own full length at the end
   // of every finished video -- by request. finishPost is the one place
