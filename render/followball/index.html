@@ -8,6 +8,7 @@
 <script>
   var _q = new URLSearchParams(location.search);
   if (_q.get('render') === '1') document.documentElement.classList.add('rmode');
+  if (_q.get('safezone') === '1') document.documentElement.classList.add('safezone');
   // embed mode (web-app studio iframe): the React page provides the controls,
   // so hide the built-in #studio panel and let the stage fill the frame.
   if (_q.get('embed') === '1') document.documentElement.classList.add('embed');
@@ -166,6 +167,16 @@
     font-family:ui-monospace,Menlo,monospace; min-height:0; }
   #studio .hint{ font-size:10.5px; color:rgba(255,255,255,.35); letter-spacing:.03em; }
   #studio kbd{ background:#141422; border:1px solid #2a2a3e; border-radius:4px; padding:0 4px; font-family:inherit; color:#00e7ff; }
+
+  /* debug (?safezone=1): TikTok's UI zones over the 1080x1920 frame — top
+     10% (tabs/search), bottom 20% (caption/sound), right 15% (button rail).
+     Everything important should stay out of the shaded areas. */
+  #safezone{display:none;position:fixed;inset:0;pointer-events:none;z-index:60}
+  html.safezone #safezone{display:block}
+  #safezone i{position:absolute;background:rgba(255,30,80,.32);border:2px dashed #ff2d55}
+  #safezone .sz-top{left:0;right:0;top:0;height:10%}
+  #safezone .sz-bottom{left:0;right:0;bottom:0;height:20%}
+  #safezone .sz-right{right:0;top:10%;bottom:20%;width:15%}
 </style>
 </head>
 <body>
@@ -221,6 +232,7 @@
   <div class="hint">press <kbd>S</kbd> anytime to star the current seed → <code>render-queue.txt</code></div>
 </div>
 
+<div id="safezone"><i class="sz-top"></i><i class="sz-right"></i><i class="sz-bottom"></i></div>
 <pre id="err"></pre>
 
 <script>
