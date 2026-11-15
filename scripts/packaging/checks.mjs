@@ -84,7 +84,7 @@ export function repeatProblems(kit, recent) {
     }
   }
   for (const e of recent.slice(-LIMITS.soundWindow)) {
-    if (kit.sound?.track && kit.sound.track === e.sound?.track) out.push({ part: 'sound', why: `sound track "${kit.sound.track}" used by post ${e.id}` });
+    if (kit.sound?.track && kit.sound.track !== 'none' && kit.sound.track === e.sound?.track) out.push({ part: 'sound', why: `sound track "${kit.sound.track}" used by post ${e.id}` });
   }
   for (const e of recent.slice(-LIMITS.hashtagWindow)) {
     if (e.hashtags && sameSet(kit.hashtags, e.hashtags)) out.push({ part: 'hashtags', why: `same hashtag set as post ${e.id}` });

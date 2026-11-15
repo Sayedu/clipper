@@ -28,6 +28,8 @@ export interface PackageOptions {
   salt?: string;
   verbose?: boolean;
   keepWork?: boolean;
+  /** false = no generated sound bed, game audio only (also PACKAGING_BED=off) */
+  bed?: boolean;
 }
 export const KITS_DIR: string;
 export const TRACKS: string[];

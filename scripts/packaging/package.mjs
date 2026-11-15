@@ -14,7 +14,7 @@
 //   pinned_comment.txt
 //   kit.json              every pick, the facts it came from, the checks it passed
 // and is appended to the post log the repeat checker reads.
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { analyzeVideo, bandDetail, boxMotion, writeMaskPgm } from './analyze.mjs';
 import { LIMITS, repeatProblems, revealProblems } from './checks.mjs';
@@ -140,7 +140,9 @@ export async function packageVideo(input, opts = {}) {
   const look = pickLook(history, src.format, r);
   const lastTracks = ids(history.slice(-LIMITS.soundWindow), (e) => e.sound?.track);
   const usedAt = (t) => history.map((e) => e.sound?.track).lastIndexOf(t);
-  const track = r.shuffle(TRACKS.filter((t) => !lastTracks.includes(t))).sort((a, b) => usedAt(a) - usedAt(b))[0];
+  // PACKAGING_BED=off (or opts.bed === false): keep only the game's own sound
+  const bedOn = opts.bed !== false && process.env.PACKAGING_BED !== 'off';
+  const track = bedOn ? r.shuffle(TRACKS.filter((t) => !lastTracks.includes(t))).sort((a, b) => usedAt(a) - usedAt(b))[0] : 'none';
 
   const pr = await probe(src.video);
   const contentEnd = Math.min(pr.duration, facts.contentSec || pr.duration);
@@ -169,7 +171,9 @@ export async function packageVideo(input, opts = {}) {
     await extractAudio(src.video, join(work, 'game.wav'));
     const sfxWav = join(work, 'sfx.wav');
     await extractAudio(src.sfxVideo ?? src.video, sfxWav);
-    const bed = await mixBed({ track, seed: facts.seed, orig: join(work, 'game.wav'), contentEnd, out: join(work, 'mix.wav') });
+    const bed = bedOn
+      ? await mixBed({ track, seed: facts.seed, orig: join(work, 'game.wav'), contentEnd, out: join(work, 'mix.wav') })
+      : (copyFileSync(join(work, 'game.wav'), join(work, 'mix.wav')), { track: 'none' });
 
     // ---- the video
     log(verbose, '   encoding');

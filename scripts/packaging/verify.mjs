@@ -167,7 +167,9 @@ async function tenKits() {
 async function revealAndFiles(kits, label) {
   const reveal = [], cover = [], files = [];
   for (const k of kits) {
-    const facts = buildFacts(loadSource(k.source.input), {});
+    // the facts the kit was built from (kit.json) win over a fresh read of
+    // the render folder: a replayed event log only exists in the kit
+    const facts = { ...buildFacts(loadSource(k.source.input), {}), ...(k.facts?.tense ? { tense: k.facts.tense } : {}) };
     const kit = { caption: k.caption, hashtags: k.hashtags, pinned: k.pinned, hook: k.hook, cover: k.cover };
     for (const p of revealProblems(kit, { ...facts, keyword: facts.keyword })) reveal.push(`${k.id}: ${p}`);
     // nothing on the kit may contain the winner's name with an outcome word,
