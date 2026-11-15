@@ -92,8 +92,8 @@ export async function writeCover({ ffmpeg, video, atSec, out, hook, sub }) {
     await writeFile(subFile, sub);
     const vf = [
       'scale=1080:1920:flags=lanczos',
-      `drawtext=fontfile=${COVER_FONT}:textfile=${hookFile}:fontsize=112:fontcolor=white:borderw=6:bordercolor=black@0.9:box=1:boxcolor=black@0.88:boxborderw=28:x=(w-text_w)/2:y=h*0.215`,
-      `drawtext=fontfile=${COVER_FONT}:textfile=${subFile}:fontsize=46:fontcolor=0xFFD23F:box=1:boxcolor=black@0.88:boxborderw=16:x=(w-text_w)/2:y=h*0.215+172`,
+      `drawtext=fontfile=${COVER_FONT}:textfile=${hookFile}:fontsize=112:fontcolor=white:borderw=6:bordercolor=black@0.9:box=1:boxcolor=black@1:boxborderw=28:x=(w-text_w)/2:y=h*0.215`,
+      `drawtext=fontfile=${COVER_FONT}:textfile=${subFile}:fontsize=46:fontcolor=0xFFD23F:box=1:boxcolor=black@1:boxborderw=16:x=(w-text_w)/2:y=h*0.215+172`,
     ].join(',');
     await pexec(ffmpeg, ['-y', '-v', 'error', '-ss', String(atSec), '-i', video, '-frames:v', '1', '-vf', vf, out], { maxBuffer: 1 << 24 });
   } finally {

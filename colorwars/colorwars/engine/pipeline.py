@@ -268,9 +268,9 @@ def _write_post_kit(out_dir: Path, event_id: str, episode: dict, meta: dict, ffm
         vf = ",".join([
             "scale=1080:1920:flags=lanczos",
             f"drawtext=fontfile={COVER_FONT}:textfile={hook_file}:fontsize=128:fontcolor=white:borderw=6:"
-            "bordercolor=black@0.9:box=1:boxcolor=black@0.85:boxborderw=26:x=(w-text_w)/2:y=h*0.2",
+            "bordercolor=black@0.9:box=1:boxcolor=black@1:boxborderw=26:x=(w-text_w)/2:y=h*0.2",
             f"drawtext=fontfile={COVER_FONT}:textfile={sub_file}:fontsize=54:fontcolor=0xFFD23F:box=1:"
-            "boxcolor=black@0.85:boxborderw=16:x=(w-text_w)/2:y=h*0.2+190",
+            "boxcolor=black@1:boxborderw=16:x=(w-text_w)/2:y=h*0.2+190",
         ])
         subprocess.run([ffmpeg_path, "-y", "-v", "error", "-i", str(cover_path), "-vf", vf, str(out_dir / "cover_hook.png")],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
