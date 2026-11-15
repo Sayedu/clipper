@@ -335,6 +335,13 @@ def _draw_overlay(canvas, overlay, heavy_big, heavy_mid, heavy_small, settings: 
         max_w = settings.safe_x_max - settings.safe_x_min - 40
         _draw_wrapped_centered(canvas, text, heavy_big, white, center_x, 260, max_w, 70)
 
+    elif overlay.kind == "series":
+        # below the roster, above TikTok's caption area (bottom 20%)
+        text = overlay.data["text"]
+        tw = heavy_small.measureText(text)
+        dim = skia.Paint(AntiAlias=True, Color=skia.Color(255, 255, 255, 190))
+        canvas.drawString(text, center_x - tw / 2, 1500, heavy_small, dim)
+
     elif overlay.kind == "toast":
         text = overlay.data["text"]
         tw = heavy_mid.measureText(text)

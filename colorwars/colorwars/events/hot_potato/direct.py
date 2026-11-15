@@ -94,6 +94,9 @@ def direct(record: SimRecord, settings: Settings, cfg: dict, episode: dict, fps:
 
     overlays: list[OverlayCue] = [
         OverlayCue(0, freeze_frame_index, "hook", {"text": "COMMENT WHICH COLOR WINS"}),
+        # the topic keyword on screen from frame 1 (TikTok reads on-screen
+        # text) + a series label, for the whole video, low in the safe zone
+        OverlayCue(0, total_frames, "series", {"text": f"HOT POTATO · EPISODE {episode.get('number', 1)}"}),
     ]
     for e in record.events:
         if e.kind != "elimination":
