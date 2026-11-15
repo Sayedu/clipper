@@ -23,21 +23,22 @@ type ClassicApi = {
   };
 };
 
-// Find The Cat is a single fixed-length shuffle round, not a multi-round
-// game -- its FTB readout shape is correspondingly simpler. Round (1-5)
-// drives difficulty itself now (more cups, harder swap count as it climbs,
-// see ROUND_PRESETS in game.js) rather than cups/difficulty being picked
-// independently, so there's no setCups/setDifficulty here.
+// Find The Cat is a real multi-round game like classic -- the user picks
+// how many rounds (always starting at round 1), and difficulty escalates
+// by round index inside game.js itself (easy, medium, hard, hard, ...), so
+// there's no separate cups/difficulty setting, only `setRounds` (the total
+// count). readout() reports both the total (`roundCount`) and which round
+// is currently playing (`round`), plus that round's own cups/difficulty.
 type FtcApi = {
   replay: (seed?: number | string) => void;
   again: () => void;
-  setRound: (r: number) => void;
+  setRounds: (n: number) => void;
   setTheme: (t: string) => void;
   setSpeed: (s: number) => void;
   setSound: (on: boolean) => void;
   getSeed: () => number;
   readout: () => {
-    seed: number; cups: number; difficulty: string; round: number; theme: string;
+    seed: number; roundCount: number; round: number; cups: number; difficulty: string; theme: string;
     phase: string; t: number; totalSec: number; win: number; done: boolean;
   };
 };
@@ -77,7 +78,7 @@ export function FollowBallStudio() {
 
   const [seed, setSeed] = useState(0);
   const [mode, setMode] = useState('sprint');
-  const [round, setRoundState] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [rounds, setRoundsState] = useState<1 | 2 | 3 | 4 | 5 | 6>(3);
   const [theme, setThemeState] = useState<'candy' | 'neon' | 'sunset'>('candy');
   const [speed, setSpeed] = useState<'0.5' | '1' | '2' | '4'>('1');
   const [sound, setSound] = useState(false);
@@ -170,9 +171,9 @@ export function FollowBallStudio() {
     setThemeState(v);
     ftcRef.current?.setTheme(v);
   };
-  const onRound = (v: '1' | '2' | '3' | '4' | '5') => {
-    setRoundState(Number(v) as 1 | 2 | 3 | 4 | 5);
-    ftcRef.current?.setRound(Number(v));
+  const onRounds = (v: '1' | '2' | '3' | '4' | '5' | '6') => {
+    setRoundsState(Number(v) as 1 | 2 | 3 | 4 | 5 | 6);
+    ftcRef.current?.setRounds(Number(v));
   };
   const onSpeed = (s: '0.5' | '1' | '2' | '4') => {
     setSpeed(s);
@@ -198,7 +199,7 @@ export function FollowBallStudio() {
           setRendering(false);
           return;
         }
-        const { jobId: id } = await api.findTheCatRender(r.seed, r.cups, r.difficulty, r.round, r.theme);
+        const { jobId: id } = await api.findTheCatRender(r.seed, r.roundCount, r.theme);
         setJobId(id);
       } else {
         const r = fbRef.current?.readout();
@@ -268,7 +269,7 @@ export function FollowBallStudio() {
                 </span>
               ) : ftcReadout ? (
                 <span>
-                  {ftcReadout.phase} · {ftcReadout.t.toFixed(1)}s / {ftcReadout.totalSec.toFixed(1)}s
+                  Round <b>{ftcReadout.round}/{ftcReadout.roundCount}</b> · {ftcReadout.phase} · {ftcReadout.t.toFixed(1)}s / {ftcReadout.totalSec.toFixed(1)}s
                 </span>
               ) : (
                 '…'
@@ -289,7 +290,7 @@ export function FollowBallStudio() {
             )}
             <div className="mt-0.5 text-[11px] text-[color:var(--color-faint)]">
               {variant === 'findthecat'
-                ? `Round ${ftcReadout?.round ?? round} · ${ftcReadout?.difficulty ?? ''} · ${ftcReadout?.cups ?? ''} cups · seed ${ftcReadout?.seed ?? seed}`
+                ? `${ftcReadout?.roundCount ?? rounds} round(s) · ${ftcReadout?.difficulty ?? ''} · ${ftcReadout?.cups ?? ''} cups · seed ${ftcReadout?.seed ?? seed}`
                 : `${classicReadout?.modeName ?? mode} · seed ${classicReadout?.seed ?? seed}`}
             </div>
           </div>
@@ -356,17 +357,18 @@ export function FollowBallStudio() {
           {variant === 'findthecat' && (
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[color:var(--color-muted)]">
-                Round — more cups &amp; harder as it climbs
+                Rounds — easy, then medium, then hard
               </span>
-              <SegmentedControl<'1' | '2' | '3' | '4' | '5'>
-                value={String(round) as '1' | '2' | '3' | '4' | '5'}
-                onChange={onRound}
+              <SegmentedControl<'1' | '2' | '3' | '4' | '5' | '6'>
+                value={String(rounds) as '1' | '2' | '3' | '4' | '5' | '6'}
+                onChange={onRounds}
                 options={[
                   { value: '1', label: '1' },
                   { value: '2', label: '2' },
                   { value: '3', label: '3' },
                   { value: '4', label: '4' },
                   { value: '5', label: '5' },
+                  { value: '6', label: '6' },
                 ]}
               />
             </label>
@@ -416,7 +418,7 @@ export function FollowBallStudio() {
                 <div className="mb-2 flex items-center justify-between text-[13px]">
                   <span>
                     Rendering seed <b className="tabular-nums">{variant === 'findthecat' ? ftcReadout?.seed : classicReadout?.seed}</b>
-                    {variant === 'classic' ? ` (${mode})` : ` (round ${ftcReadout?.round}, ${ftcReadout?.difficulty})`}…
+                    {variant === 'classic' ? ` (${mode})` : ` (${ftcReadout?.roundCount} rounds)`}…
                   </span>
                   <span className="tabular-nums text-[color:var(--color-muted)]">
                     {Math.round(renderPct * 100)}%

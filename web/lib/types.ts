@@ -61,7 +61,6 @@ export type ColorRaceMap = 'random' | 'zigzag' | 'pegstorm' | 'spinner' | 'fork'
 export type ColorWarMode = 'sprint' | 'random' | 'classic' | 'bigtiles' | 'finegrain' | 'stripes';
 export type FollowBallMode = 'sprint' | 'classic' | 'insane' | 'random';
 export type FollowBallVariant = 'classic' | 'findthecat';
-export type FindTheCatDifficulty = 'easy' | 'medium' | 'hard';
 export type FindTheCatTheme = 'candy' | 'neon' | 'sunset';
 
 export const COLOR_RACE_MAPS: Array<{ id: ColorRaceMap; name: string; tag: string }> = [
@@ -149,9 +148,7 @@ export interface Settings {
   followBallMode: FollowBallMode;
   followBallSeed?: number;
   followBallVariant: FollowBallVariant;
-  findTheCatCups: number;
-  findTheCatDifficulty: FindTheCatDifficulty;
-  findTheCatRound: number;
+  findTheCatRounds: number;
   findTheCatTheme: FindTheCatTheme;
   findTheCatSeed?: number;
   eyeTestBallsPerRound: number[];

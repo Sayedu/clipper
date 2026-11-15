@@ -5,19 +5,24 @@
 
    Based on the "Find The Cat" design handoff (design_handoff_find_the_cat/
    README.md + shell-game.jsx) — the SAME shell-game mechanic as Follow The
-   Ball, but the ball is a cat-face "ball", and each render is a single
-   fixed-length shuffle round rather than a multi-round, adaptive-length
-   game. buildSchedule (the accelerating weighted swap timing + biased-pair
+   Ball, but the ball is a cat-face "ball". Unlike the handoff's own single
+   fixed-length loop, this is now a REAL multi-round game like classic
+   Follow The Ball: the user picks how many rounds (1-6) the whole video
+   contains, every render always starts at round 1 and plays exactly that
+   many rounds back to back, and difficulty escalates by round INDEX --
+   round 1 easy, round 2 medium, round 3 onward hard (see
+   presetForRoundIndex) -- not a user-picked "which round" starting point.
+   buildSchedule (the accelerating weighted swap timing + biased-pair
    selection) is ported verbatim from the handoff's shell-game.jsx, since
    it's a pure function of (cups, swap count, seed) -- every visual
    quantity is computed fresh from elapsed time T each frame, not a
-   frame-stepped state machine. ROUND (1-5) now actually drives difficulty
-   via ROUND_PRESETS (more cups + a harder swap count as it climbs) instead
-   of being a cosmetic label; the live preview loops continuously through
-   rounds 1->5->1 with a fresh shuffle each time rather than freezing on
-   the empty outro stage. The single-swap VISUAL style (cupMotion) was
-   simplified away from the handoff's own scale/rotate/dim/ghost-trail
-   version to classic Follow The Ball's cleaner flat-arc smoothstep motion.
+   frame-stepped state machine; each round just gets its own time slice
+   (ROUND_TOTAL seconds) stacked back to back along one global timeline.
+   The live preview loops the whole multi-round video with a fresh seed
+   once it finishes, rather than freezing on the last round's empty outro
+   stage. The single-swap VISUAL style (cupMotion) was simplified away from
+   the handoff's own scale/rotate/dim/ghost-trail version to classic Follow
+   The Ball's cleaner flat-arc smoothstep motion.
 
    Render plumbing (invisible, same contract as render/followball/game.js):
    FTB.step/meta/result frame API; swap/tick/reveal become an event log
@@ -51,7 +56,10 @@ const Sh = S + SCENE_DUR.show;
 const G = Sh + SCENE_DUR.shuffle;
 const R = G + SCENE_DUR.guess;
 const O = R + SCENE_DUR.reveal;
-const TOTAL = O + SCENE_DUR.outro;   // 20.9s
+const ROUND_TOTAL = O + SCENE_DUR.outro;   // ~19.2s -- one round's own fixed length
+// the whole video's length -- however many rounds were asked for, stacked
+// back to back. Only valid after reset() has built W_.rounds.
+function totalDuration() { return (W_ ? W_.roundCount : 1) * ROUND_TOTAL; }
 
 const THEMES = {
   candy:  { bg: '#1A0838', ray: '#2A0F5A', floor: '#33107A', cup: '#FF3B5C', light: '#FF9AAB', dark: '#A80F35', rim: '#FFE3E9', ball: '#D4FF3A', glow: 'rgba(212,255,58,.75)', accent: '#FFD23F' },
@@ -60,21 +68,16 @@ const THEMES = {
 };
 const DIFF = { easy: { swaps: 13, name: 'EASY', color: '#3DFF8B' }, medium: { swaps: 19, name: 'MEDIUM', color: '#FFD23F' }, hard: { swaps: 27, name: 'HARD', color: '#FF4D6D' } };
 
-/* ── "ROUND r/5" now actually drives difficulty (more cups, harder swap
-   count) instead of being a cosmetic label only the creator sets -- matches
-   how classic Follow The Ball's own MODES.rounds escalate. cups goes up to
-   6 (same ceiling classic's own INSANE mode already uses, not a new
-   untested extreme for this layout math). An explicit ?cups=/?difficulty=
-   query param still overrides a round's preset (the dashboard's "render
-   this seed" reproduces exactly what was just previewed by passing the
-   live readout's values straight through). ── */
-const ROUND_PRESETS = [
-  { cups: 3, difficulty: 'easy' },
-  { cups: 4, difficulty: 'easy' },
-  { cups: 4, difficulty: 'medium' },
-  { cups: 5, difficulty: 'medium' },
-  { cups: 6, difficulty: 'hard' },
-];
+/* ── difficulty escalates by ROUND INDEX within the video, by request:
+   round 1 easy, round 2 medium, round 3 onward hard (every later round
+   repeats the hard preset, not a new tier each time). cups goes up to 6
+   for the hard tier (same ceiling classic's own INSANE mode already uses,
+   not a new untested extreme for this layout math). ── */
+function presetForRoundIndex(i) {   // i is 0-indexed
+  if (i === 0) return { cups: 3, difficulty: 'easy' };
+  if (i === 1) return { cups: 4, difficulty: 'medium' };
+  return { cups: 6, difficulty: 'hard' };
+}
 
 /* ── easing (hand-rolled, ported from the handoff's animations-v3.jsx) ── */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -168,15 +171,11 @@ let catImg = null, fontsReady = false;
 function cupSpacing(n) { return Math.min(340, 1050 / n); }
 function slotXFor(n) { const spacing = cupSpacing(n); return (i) => 540 + (i - (n - 1) / 2) * spacing; }
 
-function reset(seed, round, theme, cupsOverride, difficultyOverride) {
-  const roundN = clamp(Math.round(round ?? (W_ ? W_.round : 1)), 1, 5);
-  const preset = ROUND_PRESETS[roundN - 1];
-  const n = clamp(Math.round(cupsOverride ?? preset.cups), 3, 6);
-  const diffKey = difficultyOverride ?? preset.difficulty;
-  const diff = DIFF[diffKey] || DIFF.easy;
-  const themeKey = theme ?? (W_ ? W_.themeKey : 'candy');
-  const s = (seed >>> 0) || 1;
-
+function buildRound(seed, i) {
+  const preset = presetForRoundIndex(i);
+  const n = preset.cups;
+  const diffKey = preset.difficulty;
+  const diff = DIFF[diffKey];
   const spacing = cupSpacing(n);
   const slotX = slotXFor(n);
   // bigger than the handoff's own 0.84 -- the ball carries a specific meme
@@ -184,22 +183,29 @@ function reset(seed, round, theme, cupsOverride, difficultyOverride) {
   // needs to read clearly at a glance, not just as "a circle under a cup".
   const cupW = spacing * 0.9, cupH = cupW * 1.3, ballD = cupW * 1.05;
   const ballCup = Math.floor(n / 2);
-  const sched = buildSchedule(n, diff.swaps, s, Sh + 0.25, G - 0.3);
+  // buildSchedule already mixes n/count into its own RNG seed, but several
+  // rounds share the SAME (n, count) once difficulty plateaus at "hard" --
+  // without this offset every hard round would be the identical shuffle.
+  const roundSeed = (seed + i * 104729) >>> 0;
+  const sched = buildSchedule(n, diff.swaps, roundSeed, Sh + 0.25, G - 0.3);
   const win = sched.finalSlots.indexOf(ballCup);
-
-  // sound-event crossing detector state — see emitEvents()
-  const tickTimes = [0, 1, 2].map((i) => G + 0.35 + i * 0.95);
-
-  W_ = {
-    seed: s, cups: n, diffKey, diff, round: roundN, themeKey, theme: THEMES[themeKey] || THEMES.candy,
-    spacing, slotX, cupW, cupH, ballD, ballCup, swaps: sched.swaps, finalSlots: sched.finalSlots, win,
-    tickTimes, revealAt: R + 0.3,
-    prevT: -1, bigKey: '', bigAt: 0, cdKey: -1,
+  const tickTimes = [0, 1, 2].map((k) => G + 0.35 + k * 0.95);
+  return {
+    cups: n, diffKey, diff, spacing, slotX, cupW, cupH, ballD, ballCup,
+    swaps: sched.swaps, finalSlots: sched.finalSlots, win, tickTimes, revealAt: R + 0.3,
   };
 }
 
-function extra(c, slot, T) {
-  const w = W_;
+function reset(seed, roundCount, theme) {
+  const rc = clamp(Math.round(roundCount ?? (W_ ? W_.roundCount : 3)), 1, 6);
+  const themeKey = theme ?? (W_ ? W_.themeKey : 'candy');
+  const s = (seed >>> 0) || 1;
+  const rounds = [];
+  for (let i = 0; i < rc; i++) rounds.push(buildRound(s, i));
+  W_ = { seed: s, roundCount: rc, themeKey, theme: THEMES[themeKey] || THEMES.candy, rounds };
+}
+
+function extra(c, slot, T, w) {
   let dy = 0, rot = 0, sq = 1;
   const st = I + 0.3 + c * 0.13, land = st + 0.45;
   dy += -1500 * (1 - fall((T - st) / 0.45));
@@ -225,18 +231,27 @@ const SWAP_BASE = 233;
 let swapNote = 0;
 
 function emitEvents(prevT, T, frame, push) {
-  const w = W_;
-  for (const sw of w.swaps) {
-    if (prevT < sw.start && T >= sw.start) {
-      swapNote = (swapNote + 1) % SWAP_SCALE.length;
-      const dur = Math.max(0.001, sw.end - sw.start);
-      push({ type: 'swap', t: +T.toFixed(4), f: frame, hz: SWAP_BASE * Math.pow(2, SWAP_SCALE[swapNote] / 12), speed: Math.min(1, 0.5 / dur) });
+  // checks EVERY round's own events against their GLOBAL (round-offset)
+  // time -- cheap (a handful of rounds x a handful of events), and correct
+  // regardless of frame-rate hiccups, unlike comparing round-LOCAL times
+  // across the reset-to-zero boundary between rounds.
+  W_.rounds.forEach((w, i) => {
+    const base = i * ROUND_TOTAL;
+    for (const sw of w.swaps) {
+      const at = base + sw.start;
+      if (prevT < at && T >= at) {
+        swapNote = (swapNote + 1) % SWAP_SCALE.length;
+        const dur = Math.max(0.001, sw.end - sw.start);
+        push({ type: 'swap', t: +T.toFixed(4), f: frame, hz: SWAP_BASE * Math.pow(2, SWAP_SCALE[swapNote] / 12), speed: Math.min(1, 0.5 / dur) });
+      }
     }
-  }
-  w.tickTimes.forEach((tt, i) => {
-    if (prevT < tt && T >= tt) push({ type: 'tick', t: +T.toFixed(4), f: frame, hot: i === 2 });
+    w.tickTimes.forEach((tt, k) => {
+      const at = base + tt;
+      if (prevT < at && T >= at) push({ type: 'tick', t: +T.toFixed(4), f: frame, hot: k === 2 });
+    });
+    const revealAbs = base + w.revealAt;
+    if (prevT < revealAbs && T >= revealAbs) push({ type: 'reveal', t: +T.toFixed(4), f: frame });
   });
-  if (prevT < w.revealAt && T >= w.revealAt) push({ type: 'reveal', t: +T.toFixed(4), f: frame });
 }
 
 /* ═══════════════ draw — SPEC-equivalent, 1:1 with the design's Piece() ═══════════════ */
@@ -294,8 +309,14 @@ function paintCup(entry, th, cupW, cupH) {
   ctx.restore();
 }
 
-function draw(T) {
-  const w = W_, th = w.theme, n = w.cups, spacing = w.spacing, slotX = w.slotX;
+function draw(globalT) {
+  // slice the global timeline into (which round, how far into it) -- the
+  // rest of this function is unchanged from the single-round version: it
+  // already only ever reads `T` (now this round's own local time) and `w`
+  // (now this round's own precomputed state) and `th` (the shared theme).
+  const roundIdx = Math.min(W_.roundCount - 1, Math.floor(globalT / ROUND_TOTAL));
+  const T = globalT - roundIdx * ROUND_TOTAL;
+  const w = W_.rounds[roundIdx], th = W_.theme, n = w.cups, spacing = w.spacing, slotX = w.slotX;
   const S_ = cv.width / W;
   ctx.setTransform(S_, 0, 0, S_, 0, 0);
   ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, H);
@@ -363,7 +384,7 @@ function draw(T) {
   for (let c = 0; c < n; c++) {
     const m = cupMotion(c, T, w.swaps, slotX);
     const slotNow = m.moving ? -1 : (T >= G ? w.finalSlots.indexOf(c) : m.slot);
-    const ex = extra(c, slotNow, T);
+    const ex = extra(c, slotNow, T, w);
     const dimLosers = T > R + 0.5 && T < O && slotNow !== w.win ? 0.35 * cl((T - R - 0.5) / 0.3) : 0;
     entries.push({ c, m, ex, slotNow, dim: m.dim + dimLosers });
   }
@@ -486,19 +507,29 @@ const TITLES = [
   { at: G, text: "WHERE'S THE CAT?", sub: 'COMMENT YOUR ANSWER' },
 ];
 
-function hud(T) {
-  const w = W_;
-  el('roundLabel').textContent = 'ROUND ' + w.round + '/5';
+let pipsRoundCount = -1;
+
+function hud(globalT) {
+  const roundIdx = Math.min(W_.roundCount - 1, Math.floor(globalT / ROUND_TOTAL));
+  const T = globalT - roundIdx * ROUND_TOTAL;
+  const w = W_.rounds[roundIdx], th = W_.theme;
+
+  el('roundLabel').textContent = 'ROUND ' + (roundIdx + 1) + '/' + W_.roundCount;
   const chip = el('diffChip');
   chip.textContent = w.diff.name + ' · ' + w.cups + ' CUPS';
   chip.style.borderColor = w.diff.color;
 
+  // the pip row has exactly as many bars as there are rounds -- rebuilt only
+  // when the round count actually changes (not every frame).
+  if (pipsRoundCount !== W_.roundCount) {
+    pipsRoundCount = W_.roundCount;
+    el('pips').innerHTML = Array.from({ length: W_.roundCount }, () => '<i><b></b></i>').join('');
+  }
   const prog = cl(T / O);
-  [...el('pips').children].forEach((pip, r0) => {
-    const r = r0 + 1;
+  [...el('pips').children].forEach((pip, i) => {
     const b = pip.firstElementChild;
-    b.style.width = (r < w.round ? 100 : r === w.round ? prog * 100 : 0) + '%';
-    b.style.background = r === w.round ? w.theme.accent : '#fff';
+    b.style.width = (i < roundIdx ? 100 : i === roundIdx ? prog * 100 : 0) + '%';
+    b.style.background = i === roundIdx ? th.accent : '#fff';
   });
 
   const titleList = T > R + 0.4 ? TITLES.concat([{ at: R + 0.4, text: 'CUP ' + (w.win + 1) + '!', sub: 'DID YOU GET IT?', hot: true }]) : TITLES;
@@ -515,7 +546,7 @@ function hud(T) {
     titleWrap.style.transform = `scale(${sc}) rotate(${rot}deg)`;
     titleText.textContent = cur.text;
     titleText.style.fontSize = cur.text.length > 13 ? '7.4cqw' : '9.4cqw';
-    titleText.style.color = cur.hot ? w.theme.accent : '#fff';
+    titleText.style.color = cur.hot ? th.accent : '#fff';
     titleSub.textContent = cur.sub;
   }
 
@@ -529,7 +560,7 @@ function hud(T) {
     const circ = 2 * Math.PI * 84;
     ring.setAttribute('stroke-dasharray', String(circ));
     ring.setAttribute('stroke-dashoffset', String(circ * cl(cdK / 0.95)));
-    ring.setAttribute('stroke', w.theme.accent);
+    ring.setAttribute('stroke', th.accent);
     const numEl = el('cdNum');
     numEl.textContent = String(3 - cdI);
     numEl.style.transform = `scale(${0.4 + 0.6 * MOTION.pop(cl(cdK / 0.6))})`;
@@ -551,7 +582,7 @@ const DT = 1 / FPS;
 let frame = 0, prevT = -1;
 
 function stepOnce(push) {
-  const T = Math.min(TOTAL, frame / FPS);
+  const T = Math.min(totalDuration(), frame / FPS);
   emitEvents(prevT, T, frame, push);
   paint(T);
   prevT = T;
@@ -582,13 +613,10 @@ function loadCat() {
 function parseQueryDefaults() {
   return {
     seed: (parseInt(QS.get('seed') || '1', 10) >>> 0) || 1,
-    round: parseInt(QS.get('round') || '1', 10),
+    // how many rounds the WHOLE video contains -- every render always
+    // starts at round 1 and plays exactly this many, back to back.
+    rounds: parseInt(QS.get('rounds') || '3', 10),
     theme: (QS.get('theme') || 'candy').toLowerCase(),
-    // explicit overrides only -- absent means "derive from the round preset"
-    // (see ROUND_PRESETS / reset()). The dashboard's render-this-seed path
-    // always sends these explicitly, reproducing exactly what was previewed.
-    cupsOverride: QS.has('cups') ? parseInt(QS.get('cups'), 10) : undefined,
-    difficultyOverride: QS.has('difficulty') ? QS.get('difficulty').toLowerCase() : undefined,
   };
 }
 
@@ -600,19 +628,21 @@ if (RENDER) {
     const events = [];
     const T = stepOnce((ev) => events.push(ev));
     FTB.frame = frame;
-    const done = T >= TOTAL;
+    const done = T >= totalDuration();
     FTB.done = done;
     return { frame, events, done };
   };
   FTB.result = () => ({
-    seed: W_.seed, cups: W_.cups, difficulty: W_.diffKey, round: W_.round, theme: W_.themeKey,
-    win: W_.win + 1, durationSec: +(frame / FPS).toFixed(2), frames: frame, fps: FPS,
+    seed: W_.seed, roundCount: W_.roundCount, theme: W_.themeKey,
+    cups: W_.rounds.map((r) => r.cups), difficulty: W_.rounds.map((r) => r.diffKey),
+    answers: W_.rounds.map((r) => r.win + 1),
+    durationSec: +(frame / FPS).toFixed(2), frames: frame, fps: FPS,
   });
   (async () => {
     try { if (document.fonts) { document.fonts.load('900 48px "Chakra Petch"'); await document.fonts.ready; } } catch (e) {}
     await loadCat();
-    reset(d.seed, d.round, d.theme, d.cupsOverride, d.difficultyOverride);
-    FTB.meta = { fps: FPS, totalFrames: Math.round(TOTAL * FPS), seed: W_.seed, width: W, height: H };
+    reset(d.seed, d.rounds, d.theme);
+    FTB.meta = { fps: FPS, totalFrames: Math.round(totalDuration() * FPS), seed: W_.seed, width: W, height: H };
   })();
 } else {
   /* ── preview studio API (window.FTB.*) ── */
@@ -622,13 +652,13 @@ if (RENDER) {
   const boot = async () => {
     const d = parseQueryDefaults();
     await loadCat();
-    reset(d.seed, d.round, d.theme, d.cupsOverride, d.difficultyOverride);
+    reset(d.seed, d.rounds, d.theme);
     frame = 0; prevT = -1;
     resize();
   };
 
-  const restart = (seed, round, theme) => {
-    reset(seed, round, theme);
+  const restart = (seed, roundCount, theme) => {
+    reset(seed, roundCount, theme);
     frame = 0; prevT = -1; acc = 0; prevWallT = 0;
   };
 
@@ -639,13 +669,13 @@ if (RENDER) {
     prevWallT = now;
     let guard = 0;
     while (acc >= DT && guard++ < 800) { stepOnce(() => {}); acc -= DT; }
-    // Always keep playing -- a single round ending on an intentionally empty
-    // "outro" stage would otherwise just sit there forever (looked like a
-    // broken/frozen preview). Loops straight into the next round, escalating
-    // difficulty (round wraps 1->5->1), a fresh shuffle each time -- the
-    // preview is always "playing something", same as classic's own.
-    if (frame / FPS >= TOTAL + 0.3) {
-      restart(randSeed(), (W_.round % 5) + 1, W_.themeKey);
+    // Always keep playing -- the video ending on the last round's
+    // intentionally empty "outro" stage would otherwise just sit there
+    // forever (looked like a broken/frozen preview). Loops the whole
+    // multi-round video with a fresh seed, same round count -- the preview
+    // is always "playing something", same as classic's own.
+    if (frame / FPS >= totalDuration() + 0.3) {
+      restart(randSeed(), W_.roundCount, W_.themeKey);
     }
   }
 
@@ -653,21 +683,23 @@ if (RENDER) {
   // (loading the cat image is async) -- the dashboard's own readiness poll
   // treats `FTB.replay` existing as "ready" and calls getSeed()/readout()
   // right away, so none of these can assume W_ is already built.
-  FTB.replay = (seed) => W_ && restart(seed === undefined || seed === null || seed === '' ? randSeed() : (Number(seed) >>> 0) || 1, W_.round, W_.themeKey);
-  FTB.again = () => W_ && restart(W_.seed, W_.round, W_.themeKey);
-  FTB.setRound = (r) => W_ && restart(randSeed(), r, W_.themeKey);
-  FTB.setTheme = (t) => W_ && restart(W_.seed, W_.round, t);
+  FTB.replay = (seed) => W_ && restart(seed === undefined || seed === null || seed === '' ? randSeed() : (Number(seed) >>> 0) || 1, W_.roundCount, W_.themeKey);
+  FTB.again = () => W_ && restart(W_.seed, W_.roundCount, W_.themeKey);
+  FTB.setRounds = (n) => W_ && restart(randSeed(), n, W_.themeKey);
+  FTB.setTheme = (t) => W_ && restart(W_.seed, W_.roundCount, t);
   FTB.setSpeed = (s) => { speed = [0.5, 1, 2, 4].includes(+s) ? +s : 1; };
   FTB.setSound = (on) => { soundOn = !!on; };
   FTB.getSeed = () => (W_ ? W_.seed : 0);
-  FTB.getMode = () => (W_ ? W_.diffKey : 'easy');
   FTB.readout = () => {
-    if (!W_) return { seed: 0, cups: 5, difficulty: 'easy', round: 1, theme: 'candy', phase: 'Loading', t: 0, totalSec: TOTAL, win: 0, done: false };
-    const T = Math.min(TOTAL, frame / FPS);
-    const phase = T < S ? 'Intro' : T < Sh ? 'Show' : T < G ? 'Shuffle' : T < R ? 'Guess' : T < O ? 'Reveal' : 'Outro';
+    if (!W_) return { seed: 0, roundCount: 3, round: 1, cups: 3, difficulty: 'easy', theme: 'candy', phase: 'Loading', t: 0, totalSec: ROUND_TOTAL * 3, win: 0, done: false };
+    const T = Math.min(totalDuration(), frame / FPS);
+    const roundIdx = Math.min(W_.roundCount - 1, Math.floor(T / ROUND_TOTAL));
+    const localT = T - roundIdx * ROUND_TOTAL;
+    const rw = W_.rounds[roundIdx];
+    const phase = localT < S ? 'Intro' : localT < Sh ? 'Show' : localT < G ? 'Shuffle' : localT < R ? 'Guess' : localT < O ? 'Reveal' : 'Outro';
     return {
-      seed: W_.seed, cups: W_.cups, difficulty: W_.diffKey, round: W_.round, theme: W_.themeKey,
-      phase, t: T, totalSec: TOTAL, win: W_.win + 1, done: T >= TOTAL,
+      seed: W_.seed, roundCount: W_.roundCount, round: roundIdx + 1, cups: rw.cups, difficulty: rw.diffKey,
+      theme: W_.themeKey, phase, t: T, totalSec: totalDuration(), win: rw.win + 1, done: T >= totalDuration(),
     };
   };
   FTB._tick = tick;

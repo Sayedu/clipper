@@ -11,12 +11,14 @@ import type { RenderResult } from './render.ts';
 
 export interface FindTheCatResult {
   seed: number;
-  cups: number;
-  difficulty: string;
-  round: number;
+  roundCount: number;
+  /** Each round's cup count, in order (easy/medium/hard escalation). */
+  cups: number[];
+  /** Each round's difficulty, in order. */
+  difficulty: string[];
   theme: string;
-  /** The winning cup, 1-indexed — the answer key. */
-  win: number;
+  /** The winning cup per round, 1-indexed — the answer key. */
+  answers: number[];
   durationSec: number;
   frames: number;
   fps: number;
@@ -30,12 +32,13 @@ export interface FindTheCatResult {
 /**
  * 'Find The Cat' — the "Follow The Ball" alt-variant: the same shell-game
  * mechanic, ported from the design_handoff_find_the_cat handoff, but the
- * ball is a cat-face "ball", the whole clip is a single fixed-length
- * (~20.9s) shuffle round (not a multi-round, adaptive-length game), and
- * difficulty picks a swap COUNT (13/19/27 — easy/medium/hard) instead of a
- * round plan. Driven headlessly frame-by-frame in Chrome, same as Follow
- * The Ball classic. Soundtrack is a swoosh per swap, a tick per countdown
- * beat, and a pop + the real cat-laugh-meme-1.wav clip on the reveal.
+ * ball is a cat-face "ball". A real multi-round game like classic Follow
+ * The Ball: the user picks how many rounds (always starting at round 1),
+ * and difficulty escalates by round index inside game.js itself (easy,
+ * medium, hard, hard, ...). Driven headlessly frame-by-frame in Chrome,
+ * same as Follow The Ball classic. Soundtrack is a swoosh per swap, a tick
+ * per countdown beat, and a pop + the real cat-laugh-meme-1.wav clip on
+ * each round's reveal.
  */
 export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderResult; game: FindTheCatResult }> {
   const framesDir = ctx.file('ftcframes');
@@ -46,12 +49,10 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
   const pinned = ctx.settings.findTheCatSeed;
   const seed = pinned && pinned > 0 ? Math.floor(pinned) : randomInt(1, 2_000_000_000);
   const fps = 60;
-  const cups = ctx.settings.findTheCatCups ?? 5;
-  const difficulty = ctx.settings.findTheCatDifficulty ?? 'easy';
-  const round = ctx.settings.findTheCatRound ?? 1;
+  const rounds = ctx.settings.findTheCatRounds ?? 3;
   const theme = ctx.settings.findTheCatTheme ?? 'candy';
 
-  ctx.setStep('render', 'running', { detail: `${difficulty} · ${cups} cups · shuffling the cups` });
+  ctx.setStep('render', 'running', { detail: `${rounds} round(s) · shuffling the cups` });
   const renderScript = resolve(paths.repoRoot, 'scripts', 'findthecat', 'render.mjs');
   if (!existsSync(renderScript)) throw new Error(`find-the-cat renderer missing: ${renderScript}`);
 
@@ -60,9 +61,7 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
     [
       renderScript,
       '--seed', String(seed),
-      '--cups', String(cups),
-      '--difficulty', difficulty,
-      '--round', String(round),
+      '--rounds', String(rounds),
       '--theme', theme,
       '--fps', String(fps),
       '--out-frames', framesDir,
@@ -88,7 +87,7 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
 
   if (!existsSync(resultPath)) throw new Error('find the cat produced no result');
   const game = JSON.parse(readFileSync(resultPath, 'utf8')) as FindTheCatResult;
-  ctx.log('render', `${game.difficulty}: ${game.cups} cups · cup ${game.win} (seed ${game.seed})`);
+  ctx.log('render', `${game.roundCount} round(s) · answers ${game.answers.join(' ')} (seed ${game.seed})`);
 
   // ---- audio: a swoosh per swap, a tick per countdown beat, a pop + the real
   //      cat-laugh-meme-1.wav clip on reveal (see findthecat_audio.py)
@@ -167,7 +166,7 @@ export async function runFindTheCat(ctx: StepContext): Promise<{ render: RenderR
     ctx.signal,
   );
   const probe = await ffprobe(outPath);
-  log.ok(`find the cat — ${game.difficulty} — ${game.cups} cups — cup ${game.win} (${probe.durationSec.toFixed(1)}s, seed ${game.seed})`);
+  log.ok(`find the cat — ${game.roundCount} round(s) — answers ${game.answers.join(' ')} (${probe.durationSec.toFixed(1)}s, seed ${game.seed})`);
 
   try {
     rmSync(framesDir, { recursive: true, force: true });

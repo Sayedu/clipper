@@ -176,10 +176,10 @@
     </div>
   </div>
   <div class="row">
-    <span class="lbl">Round</span>
-    <div class="seg" id="roundSeg">
-      <button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button>
-      <button data-v="4">4</button><button data-v="5">5</button>
+    <span class="lbl">Rounds</span>
+    <div class="seg" id="roundsSeg">
+      <button data-v="1">1</button><button data-v="2">2</button><button data-v="3" class="on">3</button>
+      <button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button>
     </div>
   </div>
   <div class="row">
@@ -234,7 +234,7 @@ if (!document.documentElement.classList.contains('rmode')
   $('btnSeed').onclick = () => { const v = seedIn.value.trim(); if (v) FTB.replay(v); };
   seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnSeed').click(); });
   wireSeg('themeSeg', (v) => FTB.setTheme(v));
-  wireSeg('roundSeg', (v) => FTB.setRound(+v));
+  wireSeg('roundsSeg', (v) => FTB.setRounds(+v));
   wireSeg('speedSeg', (v) => FTB.setSpeed(+v));
   $('chkSound').onchange = (e) => FTB.setSound(e.target.checked);
 
@@ -245,7 +245,7 @@ if (!document.documentElement.classList.contains('rmode')
     const r = FTB.readout();
     clearInterval(pollT);
     try {
-      const resp = await post('/render', { seed: r.seed, cups: r.cups, difficulty: r.difficulty, round: r.round, theme: r.theme });
+      const resp = await post('/render', { seed: r.seed, rounds: r.roundCount, theme: r.theme });
       if (!resp.ok) throw new Error(await resp.text());
       const j = await resp.json();
       say(`rendering ${j.file}…`, 60000);
@@ -266,15 +266,13 @@ if (!document.documentElement.classList.contains('rmode')
   setInterval(() => {
     const r = FTB.readout();
     if (document.activeElement !== seedIn) seedIn.value = r.seed;
-    // the preview auto-loops through rounds (escalating difficulty) on its
-    // own -- keep the Round segmented control's highlight following along.
-    [...$('roundSeg').children].forEach((b) => b.classList.toggle('on', +b.dataset.v === r.round));
+    [...$('roundsSeg').children].forEach((b) => b.classList.toggle('on', +b.dataset.v === r.roundCount));
     if (r.done) {
       readout.innerHTML = `<b style="color:#FFD23F">Cup ${r.win}!</b>`
-        + `<br><span class="dim">Round ${r.round} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+        + `<br><span class="dim">Round ${r.round}/${r.roundCount} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
     } else {
       readout.innerHTML = `${r.phase} · ${r.t.toFixed(1)}s / ${r.totalSec.toFixed(1)}s`
-        + `<br><span class="dim">Round ${r.round} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
+        + `<br><span class="dim">Round ${r.round}/${r.roundCount} · ${r.difficulty} · ${r.cups} cups · seed ${r.seed}</span>`;
     }
   }, 110);
 })();

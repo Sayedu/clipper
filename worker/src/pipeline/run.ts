@@ -499,18 +499,22 @@ async function runColorWarPost(ctx: StepContext, jobId: string): Promise<RunOutc
 async function runFindTheCatPost(ctx: StepContext, jobId: string): Promise<RunOutcome> {
   skipStepsExcept(ctx, ['render']);
   const { render, game } = await stage(ctx, 'render', () => runFindTheCat(ctx));
+  const roundsLine =
+    game.roundCount > 1
+      ? `${game.roundCount} rounds — it gets harder each one (more cups, faster shuffles)`
+      : `${game.cups[0]} cups shuffling`;
   const draft: DraftText = {
     hook: 'Find the cat 🐱 watch closely!',
-    overlays: [`Cup ${game.win}`],
+    overlays: [game.roundCount > 1 ? `${game.roundCount} rounds` : `Cup ${game.answers[0]}`],
     caption:
       `Find the cat 🐱 watch closely, then call the cup before it reveals.\n\n` +
-      `${game.difficulty} difficulty, ${game.cups} cups shuffling — keep your eyes locked on the right one.\n\n` +
-      `Comment your guess 👇`,
+      `${roundsLine} — keep your eyes locked on the right one.\n\n` +
+      `Comment your ${game.roundCount > 1 ? 'guesses' : 'guess'} 👇`,
     hashtags: ['findthecat', 'shellgame', 'catsoftiktok', 'watchtillend', 'fyp'],
   };
   return finishPost(ctx, jobId, render, {
-    hookTitle: `cup ${game.win}`,
-    reason: `${game.difficulty} · ${game.cups} cups · cup ${game.win} · seed ${game.seed}`,
+    hookTitle: `answers ${game.answers.join('-')}`,
+    reason: `${game.roundCount} round(s) · ${game.difficulty.join('/')} · answers ${game.answers.join(' ')} · seed ${game.seed}`,
     draft,
   });
 }

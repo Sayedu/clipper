@@ -2,9 +2,9 @@
 //
 //   node scripts/findthecat/studio.mjs
 //
-// Opens a browser to the live preview. Reroll seeds / cups / difficulty /
-// theme until you like a shuffle, then "RENDER THIS" (POST /render -> shells
-// out to render.mjs --mux). Mirrors scripts/followball/studio.mjs exactly.
+// Opens a browser to the live preview. Reroll seeds / rounds / theme until
+// you like a shuffle, then "RENDER THIS" (POST /render -> shells out to
+// render.mjs --mux). Mirrors scripts/followball/studio.mjs exactly.
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -12,10 +12,9 @@ import { startServer } from '../followball/serve.mjs';
 
 const REPO = resolve(new URL('../..', import.meta.url).pathname);
 const RENDER = join(REPO, 'scripts/findthecat/render.mjs');
-const DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
 const THEMES = new Set(['candy', 'neon', 'sunset']);
 
-const jobs = new Map();   // id -> { seed, cups, difficulty, round, theme, state, file }
+const jobs = new Map();   // id -> { seed, rounds, theme, state, file }
 let nextId = 1;
 
 const readJson = (req) => new Promise((res) => {
@@ -23,9 +22,7 @@ const readJson = (req) => new Promise((res) => {
 });
 const sendJson = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const parseSeed = (v) => (parseInt(String(v ?? '').match(/\d+/)?.[0] ?? '', 10) >>> 0) || 0;
-const parseCups = (v) => Math.max(3, Math.min(6, parseInt(v, 10) || 5));
-const parseDifficulty = (v) => (DIFFICULTIES.has(String(v).toLowerCase()) ? String(v).toLowerCase() : 'easy');
-const parseRound = (v) => Math.max(1, Math.min(5, parseInt(v, 10) || 1));
+const parseRounds = (v) => Math.max(1, Math.min(6, parseInt(v, 10) || 3));
 const parseTheme = (v) => (THEMES.has(String(v).toLowerCase()) ? String(v).toLowerCase() : 'candy');
 
 async function onRequest(req, res, url) {
@@ -40,17 +37,15 @@ async function onRequest(req, res, url) {
 
   if (url.pathname === '/render') {
     const b = await readJson(req);
-    const seed = parseSeed(b.seed), cups = parseCups(b.cups), difficulty = parseDifficulty(b.difficulty);
-    const round = parseRound(b.round), theme = parseTheme(b.theme);
+    const seed = parseSeed(b.seed), rounds = parseRounds(b.rounds), theme = parseTheme(b.theme);
     if (!seed) { sendJson(res, 400, { error: 'no seed' }); return true; }
     const id = nextId++;
-    const file = `findthecat-${difficulty}-${seed}.mp4`;
-    const job = { id, seed, cups, difficulty, round, theme, state: 'running', file, log: [] };
+    const file = `findthecat-${rounds}r-${seed}.mp4`;
+    const job = { id, seed, rounds, theme, state: 'running', file, log: [] };
     jobs.set(id, job);
-    console.log(`\n▶ RENDER  ${difficulty} ${cups}cups seed${seed}  → render/findthecat/out/${file}`);
+    console.log(`\n▶ RENDER  ${rounds} round(s) seed${seed}  → render/findthecat/out/${file}`);
     const child = spawn(process.execPath, [
-      RENDER, '--seed', String(seed), '--cups', String(cups), '--difficulty', difficulty,
-      '--round', String(round), '--theme', theme, '--mux',
+      RENDER, '--seed', String(seed), '--rounds', String(rounds), '--theme', theme, '--mux',
     ], { cwd: REPO });
     const onData = (buf) => {
       for (const line of buf.toString().split('\n')) {
@@ -77,7 +72,7 @@ async function onRequest(req, res, url) {
 const { port } = await startServer(Number(process.argv[2]) || 5191, onRequest);
 await mkdir(join(REPO, 'render/findthecat/out'), { recursive: true });
 const previewUrl = `http://127.0.0.1:${port}/render/findthecat/index.html`;
-console.log(`\n  Find The Cat preview studio\n  ${previewUrl}\n  render a specific round later:  node scripts/findthecat/render.mjs --seed <n> --round <1-5> --theme <candy|neon|sunset> --mux\n`);
+console.log(`\n  Find The Cat preview studio\n  ${previewUrl}\n  render a specific combo later:  node scripts/findthecat/render.mjs --seed <n> --rounds <1-6> --theme <candy|neon|sunset> --mux\n`);
 
 const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
 spawn(opener, [previewUrl], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' }).on('error', () => {});

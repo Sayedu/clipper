@@ -1,16 +1,21 @@
 // Headless renderer for "Find The Cat" (the Follow The Ball alt-variant).
 //
+// A real multi-round game now (like classic Follow The Ball): --rounds picks
+// how many shuffle-rounds the video contains (always starting at round 1),
+// difficulty escalates by round index inside game.js itself (easy, medium,
+// hard, hard, ...) -- there's no separate cups/difficulty knob here anymore.
+//
 // Boots the static server, drives the canvas shell game in headless Chrome
 // one frame at a time (deterministic — seeded RNG), screenshots each frame,
 // and records the per-frame sound-event log the audio pass turns into a
 // soundtrack. Mirrors scripts/followball/render.mjs's shape exactly; the
 // static server is shared (it's already rooted at the repo and generic).
 //
-//   node scripts/findthecat/render.mjs --seed 7 --cups 5 --difficulty easy \
-//        --round 1 --theme candy --fps 60 --out-frames /path/frames --out /path/result.json
+//   node scripts/findthecat/render.mjs --seed 7 --rounds 3 \
+//        --theme candy --fps 60 --out-frames /path/frames --out /path/result.json
 //
 //   --mux : also synthesise audio + ffmpeg-mux a watchable
-//           findthecat-<difficulty>-<seed>.mp4 (the studio "RENDER THIS" path)
+//           findthecat-<rounds>r-<seed>.mp4 (the studio "RENDER THIS" path)
 
 import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -36,18 +41,11 @@ function numArg(name, def, int) {
   return Number.isFinite(n) ? n : def;
 }
 
-const DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
 const THEMES = new Set(['candy', 'neon', 'sunset']);
 
 const opts = {
   seed: numArg('seed', Math.floor(Math.random() * 1e9), true) >>> 0,
-  // undefined unless explicitly passed -- round alone already drives cups +
-  // difficulty via game.js's own ROUND_PRESETS; these are overrides only
-  // (e.g. to reproduce an exact dashboard-previewed combo).
-  cups: arg('cups', undefined) === undefined ? undefined : Math.max(3, Math.min(6, numArg('cups', 5, true))),
-  difficulty: arg('difficulty', undefined) === undefined ? undefined
-    : (DIFFICULTIES.has(String(arg('difficulty')).toLowerCase()) ? String(arg('difficulty')).toLowerCase() : 'easy'),
-  round: Math.max(1, Math.min(5, numArg('round', 1, true))),
+  rounds: Math.max(1, Math.min(6, numArg('rounds', 3, true))),
   theme: THEMES.has(String(arg('theme', 'candy')).toLowerCase()) ? String(arg('theme', 'candy')).toLowerCase() : 'candy',
   fps: numArg('fps', 60, true),
   w: numArg('w', 1080, true),
@@ -70,7 +68,7 @@ function progress(pct, msg) {
   process.stderr.write('@progress ' + JSON.stringify({ pct: Math.max(0, Math.min(1, pct)), msg }) + '\n');
 }
 
-const renderOne = async (seed, cups, difficulty, round, theme) => {
+const renderOne = async (seed, rounds, theme) => {
   await rm(opts.outFrames, { recursive: true, force: true });
   await mkdir(opts.outFrames, { recursive: true });
 
@@ -96,11 +94,9 @@ const renderOne = async (seed, cups, difficulty, round, theme) => {
   page.on('pageerror', (e) => log('  [pageerror] ' + e.message));
 
   const url = `http://127.0.0.1:${port}/render/findthecat/index.html`
-    + `?render=1&seed=${seed}&round=${round}&theme=${theme}`
-    + (cups !== undefined ? `&cups=${cups}` : '')
-    + (difficulty !== undefined ? `&difficulty=${difficulty}` : '')
+    + `?render=1&seed=${seed}&rounds=${rounds}&theme=${theme}`
     + `&fps=${opts.fps}&w=${opts.w}&h=${opts.h}&ss=${opts.ss}`;
-  log(`\n━━ FIND THE CAT · seed ${seed} · round ${round}${cups !== undefined ? ` · ${cups} cups` : ''}${difficulty !== undefined ? ` · ${difficulty}` : ''} · theme ${theme} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
+  log(`\n━━ FIND THE CAT · seed ${seed} · ${rounds} round(s) · theme ${theme} · @ ${opts.fps}fps · capture ${opts.w * opts.ss}×${opts.h * opts.ss} → out ${opts.w * opts.out}×${opts.h * opts.out} ━━`);
   progress(0.02, 'loading the game');
   await page.goto(url, { waitUntil: 'load' });
 
@@ -147,7 +143,7 @@ const renderOne = async (seed, cups, difficulty, round, theme) => {
     JSON.stringify({ fps: meta.fps, durationSec: result.durationSec, events: allEvents }),
   );
 
-  log(`   seed ${seed} → ${result.difficulty} · ${result.cups} cups · cup ${result.win} · ${result.frames} frames · ${allEvents.length} sound events`);
+  log(`   seed ${seed} → answers ${result.answers.join(' ')} (${result.difficulty.join('/')}) · ${result.frames} frames · ${allEvents.length} sound events`);
   progress(1, 'frames done');
 
   await browser.close();
@@ -162,9 +158,7 @@ const mux = async (result, seed) => {
   const framesDir = opts.outFrames;
   const rawWav = join(framesDir, '_audio_raw.wav');
   const finalWav = join(framesDir, '_audio_final.wav');
-  // result.difficulty, not opts.difficulty -- the latter is undefined unless
-  // explicitly overridden on the command line (see opts.cups/difficulty above)
-  const outMp4 = join(opts.muxDir, `findthecat-${result.difficulty}-${seed}.mp4`);
+  const outMp4 = join(opts.muxDir, `findthecat-${result.roundCount}r-${seed}.mp4`);
 
   progress(0.9, 'scoring the sound');
   await pexec(PY, [join(REPO, 'python/findthecat_audio.py'),
@@ -202,7 +196,7 @@ const mux = async (result, seed) => {
 };
 
 const main = async () => {
-  const result = await renderOne(opts.seed, opts.cups, opts.difficulty, opts.round, opts.theme);
+  const result = await renderOne(opts.seed, opts.rounds, opts.theme);
   const mp4 = opts.mux ? await mux(result, opts.seed) : null;
   process.stdout.write(JSON.stringify(mp4 ? { ...result, mp4 } : result));
 };

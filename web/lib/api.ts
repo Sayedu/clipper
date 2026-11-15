@@ -42,11 +42,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ seed, mode }),
     }),
-  findTheCatRender: (seed: number, cups: number, difficulty: string, round: number, theme: string) =>
-    req<{ jobId: string; seed: number; cups: number; difficulty: string; round: number; theme: string }>(
-      '/findthecat/render',
-      { method: 'POST', body: JSON.stringify({ seed, cups, difficulty, round, theme }) },
-    ),
+  findTheCatRender: (seed: number, rounds: number, theme: string) =>
+    req<{ jobId: string; seed: number; rounds: number; theme: string }>('/findthecat/render', {
+      method: 'POST',
+      body: JSON.stringify({ seed, rounds, theme }),
+    }),
   eyetestRender: (seed: number, ballsPerRound: number[], shuffleSec: number) =>
     req<{ jobId: string; seed: number; ballsPerRound: number[]; shuffleSec: number }>('/eyetest/render', {
       method: 'POST',
