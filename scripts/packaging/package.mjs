@@ -140,8 +140,9 @@ export async function packageVideo(input, opts = {}) {
   const look = pickLook(history, src.format, r);
   const lastTracks = ids(history.slice(-LIMITS.soundWindow), (e) => e.sound?.track);
   const usedAt = (t) => history.map((e) => e.sound?.track).lastIndexOf(t);
-  // PACKAGING_BED=off (or opts.bed === false): keep only the game's own sound
-  const bedOn = opts.bed !== false && process.env.PACKAGING_BED !== 'off';
+  // no music by default (by request): the video keeps only the game's own
+  // sound. PACKAGING_BED=on (or opts.bed === true) adds a generated bed.
+  const bedOn = opts.bed === true || process.env.PACKAGING_BED === 'on';
   const track = bedOn ? r.shuffle(TRACKS.filter((t) => !lastTracks.includes(t))).sort((a, b) => usedAt(a) - usedAt(b))[0] : 'none';
 
   const pr = await probe(src.video);

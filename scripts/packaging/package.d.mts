@@ -28,7 +28,7 @@ export interface PackageOptions {
   salt?: string;
   verbose?: boolean;
   keepWork?: boolean;
-  /** false = no generated sound bed, game audio only (also PACKAGING_BED=off) */
+  /** true = add a generated music bed under the game sound (also PACKAGING_BED=on); off by default */
   bed?: boolean;
 }
 export const KITS_DIR: string;

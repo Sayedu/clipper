@@ -14,7 +14,7 @@
  *      renderer), invoked via its own CLI (mine -> render --best ->
  *      commit) — see renderColorwarsEvent() below for why and how.
  *   1b. packages it (scripts/packaging): a fresh opening hook, background,
- *      border, zoom and sound bed, plus a caption, hashtags, cover and pinned
+ *      border and zoom (the game's own sound, no added music), plus a caption, hashtags, cover and pinned
  *      comment written from what actually happened in that video and
  *      checked against the last 10 posts. The kit is logged to
  *      post-log/daily.json, which the workflow commits back.
@@ -144,7 +144,8 @@ async function renderOne(kind: Rotation): Promise<RenderedPost> {
 }
 
 /** Post packaging (scripts/packaging): a fresh hook, background, border,
- *  zoom, sound bed, caption, hashtags, cover and pinned comment, checked
+ *  zoom (game sound only, no added music), caption, hashtags, cover and
+ *  pinned comment, checked
  *  against the last 10 posts. Tried twice; if it still fails the game is
  *  skipped for today rather than posted unpackaged. */
 async function packageOne(r: RenderedPost): Promise<{ videoPath: string; text: string; kitId: string }> {

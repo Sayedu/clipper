@@ -74,7 +74,7 @@ export default function PostKitsPage() {
           <h1 className="text-[28px] font-semibold tracking-tight">Post kits</h1>
           <p className="mt-1.5 text-[15px] text-[color:var(--color-muted)]">
             Repackage renders so every post looks different from the last ten: a new opening hook, background,
-            border, zoom and sound bed, plus a caption, hashtags, cover and pinned comment written from what happens
+            border and zoom, plus a caption, hashtags, cover and pinned comment written from what happens
             in that video. The game itself is never changed.
           </p>
         </header>
@@ -178,7 +178,7 @@ export default function PostKitsPage() {
                   <div className="mt-1"><Copy text={`${k.caption}\n\n${k.hashtags.map((t) => `#${t}`).join(' ')}`} label="Copy caption" /></div>
                   <p className="mt-2"><span className="text-[color:var(--color-muted)]">Pinned: </span>{k.pinned} <Copy text={k.pinned} /></p>
                   <p className="mt-2 text-[color:var(--color-muted)]">
-                    Hook “{k.hook.lines.join(' ')}” · cover “{k.cover.lines.join(' ')}” · {k.look.bg} background · {k.look.border} border · {k.sound.track} sound
+                    Hook “{k.hook.lines.join(' ')}” · cover “{k.cover.lines.join(' ')}” · {k.look.bg} background · {k.look.border} border{k.sound.track !== 'none' ? ` · ${k.sound.track} sound` : ''}
                   </p>
                   {k.exists && (
                     <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-medium">
