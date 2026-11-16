@@ -156,6 +156,182 @@
    "posted": true,
    "postedAt": "2026-11-16T06:58:26.302Z",
    "bufferPostId": "6afaa99206e1675856d1954e"
+  },
+  {
+   "id": "2026-11-16_colorwar_seed1189344857_4azsh",
+   "createdAt": "2026-11-16T07:51:48.185Z",
+   "format": "colorwar",
+   "seed": 1189344857,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/Xa8Dn-5rEIBV",
+    "video": "/home/runner/work/clipper/clipper/data/work/Xa8Dn-5rEIBV/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-16_colorwar_seed1189344857_4azsh",
+   "caption": "Color war: watch the borders move every time a ball hits enemy paint 🎨\nWhich colour did you pick?",
+   "captionFirstLine": "Color war: watch the borders move every time a ball hits enemy paint 🎨",
+   "captionStyle": "moment",
+   "captionIds": [
+    "cw.m5",
+    "cw.a3"
+   ],
+   "hashtags": [
+    "colorwar",
+    "satisfyingvideo",
+    "colorbattle"
+   ],
+   "hook": {
+    "id": "cw.h10",
+    "lines": [
+     "COLOR WAR #1",
+     "PICK YOUR SIDE"
+    ],
+    "style": {
+     "font": "marker",
+     "palette": "violet-white",
+     "plate": "split",
+     "anim": "slide-right",
+     "align": "center",
+     "size": 120,
+     "sec": 2.8,
+     "cy": 1380
+    },
+    "slotMotion": 0.27,
+    "slotDetail": 19.8,
+    "slotPeak": 6.7,
+    "backing": {
+     "w": 860,
+     "h": 204
+    },
+    "extent": {
+     "x0": 90.75,
+     "y0": 1268.140625,
+     "x1": 865.25,
+     "y1": 1491.859375
+    },
+    "firstFrame": {
+     "x0": 90.75,
+     "y0": 1268.140625,
+     "x1": 853.25,
+     "y1": 1491.859375,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "cw.v13",
+    "lines": [
+     "TILE BY",
+     "TILE"
+    ],
+    "phash": "43673c98276661c7",
+    "atSec": 13.09,
+    "nearest": {
+     "id": "2026-11-16_ringofdoom_seed177_1k4z9",
+     "d": 26
+    },
+    "style": {
+     "font": "bebas",
+     "palette": "yellow-black",
+     "plate": "tilt",
+     "align": "center",
+     "size": 146,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 13.09,
+      "score": 81.3,
+      "nearest": {
+       "id": "2026-11-16_ringofdoom_seed177_1k4z9",
+       "d": 26
+      }
+     }
+    ]
+   },
+   "pinned": "One colour got squeezed down to 7% in the final duel. Which one were you rooting for?",
+   "pinnedId": "cw.p7",
+   "sound": {
+    "track": "chip",
+    "bpm": 128,
+    "root": 60,
+    "mode": "major",
+    "seed": 1189344857,
+    "bedDbBelowGame": 12
+   },
+   "look": {
+    "bg": "grid",
+    "border": "glow",
+    "borderColour": "#FFD400",
+    "zoom": "push",
+    "stage": {
+     "x": 0.16666666666666666,
+     "y": 0.041666666666666664,
+     "w": 0.6666666666666666,
+     "h": 0.7135416666666666
+    },
+    "letterbox": 0.57
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 42.99,
+    "contentEndSec": 40.98
+   },
+   "facts": {
+    "contentSec": 40.98,
+    "board": "Classic",
+    "colours": [
+     "Blue",
+     "Red",
+     "Green",
+     "Yellow"
+    ],
+    "n": 4,
+    "closest": 1,
+    "dip": 7,
+    "tense": [
+     [
+      25.8,
+      35.47
+     ],
+     [
+      11.391,
+      25
+     ]
+    ],
+    "hidden": {
+     "winner": "Green",
+     "words": [
+      "Green"
+     ]
+    },
+    "leadChanges": 16,
+    "bombs": 29,
+    "firstOut": {
+     "colour": "Yellow",
+     "t": "20"
+    },
+    "duelT": "25",
+    "snap": {
+     "colour": "Green",
+     "pct": "44",
+     "t": "20",
+     "rank": "first"
+    },
+    "format": "colorwar",
+    "keyword": "Color war",
+    "seed": 1189344857,
+    "episode": 1
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-16T07:52:42.215Z",
+   "bufferPostId": "6afab64a60a910801c79b0ab"
   }
  ]
 }
