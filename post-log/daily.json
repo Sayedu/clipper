@@ -1,4 +1,161 @@
 {
  "version": 1,
- "entries": []
+ "entries": [
+  {
+   "id": "2026-11-16_ringofdoom_seed177_1k4z9",
+   "createdAt": "2026-11-16T06:57:48.807Z",
+   "format": "ringofdoom",
+   "seed": 177,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/colorwars/out/ep005",
+    "video": "/home/runner/work/clipper/clipper/colorwars/out/ep005/final.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-16_ringofdoom_seed177_1k4z9",
+   "caption": "Ring of Doom: 4 colours, 16 balls and a ring whose gaps keep opening 🔴🔵🟢🟡\nWhich colour is still in the ring at the end?",
+   "captionFirstLine": "Ring of Doom: 4 colours, 16 balls and a ring whose gaps keep opening 🔴🔵🟢🟡",
+   "captionStyle": "question",
+   "captionIds": [
+    "rod.q4",
+    "rod.a1"
+   ],
+   "hashtags": [
+    "ringofdoom",
+    "colorwars",
+    "satisfying",
+    "whowins",
+    "lastonestanding"
+   ],
+   "hook": {
+    "id": "rod.h3",
+    "lines": [
+     "THE RING",
+     "NEVER STOPS"
+    ],
+    "style": {
+     "font": "bangers",
+     "palette": "white-black",
+     "plate": "tilt",
+     "anim": "stagger",
+     "align": "left",
+     "size": 120,
+     "sec": 2.4,
+     "cy": 450
+    },
+    "slotMotion": 0.5,
+    "slotDetail": 25.4,
+    "slotPeak": 9.2,
+    "backing": {
+     "w": 790,
+     "h": 244
+    },
+    "extent": {
+     "x0": 210.93966674804688,
+     "y0": 288.6895751953125,
+     "x1": 769.035400390625,
+     "y1": 607.3666381835938
+    },
+    "firstFrame": {
+     "x0": 210.93966674804688,
+     "y0": 288.6895751953125,
+     "x1": 769.035400390625,
+     "y1": 607.3666381835938,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "rod.v10",
+    "lines": [
+     "STILL",
+     "SPINNING"
+    ],
+    "phash": "43c32e3c2f91393c",
+    "atSec": 10.53,
+    "nearest": null,
+    "style": {
+     "font": "montserrat",
+     "palette": "mint-night",
+     "plate": "pill",
+     "align": "left",
+     "size": 146,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 10.53,
+      "score": 37.3,
+      "nearest": null
+     }
+    ]
+   },
+   "pinned": "Drop your colour and a name to get a ball in episode 6. Which colour takes it?",
+   "pinnedId": "rod.p6",
+   "sound": {
+    "track": "pulse",
+    "bpm": 111,
+    "root": 62,
+    "mode": "minor",
+    "seed": 177,
+    "bedDbBelowGame": 12
+   },
+   "look": {
+    "bg": "forest",
+    "border": "corners",
+    "borderColour": "#00E5FF",
+    "zoom": "punch",
+    "stage": null,
+    "letterbox": 1
+   },
+   "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 60,
+    "durationSec": 31.05,
+    "contentEndSec": 29.05
+   },
+   "facts": {
+    "contentSec": 29.05,
+    "episode": 5,
+    "finale": false,
+    "teams": 4,
+    "balls": 16,
+    "leadChanges": 7,
+    "nearMisses": null,
+    "finalTwoSec": 8,
+    "collisions": 552,
+    "eliminations": 15,
+    "shout": [],
+    "hidden": {
+     "winner": "Green",
+     "words": [
+      "Green",
+      "Green 2"
+     ]
+    },
+    "tense": [
+     [
+      8.265,
+      26.35
+     ]
+    ],
+    "firstOut": {
+     "name": null,
+     "team": "Green",
+     "t": "2"
+    },
+    "halfGoneT": "8",
+    "format": "ringofdoom",
+    "keyword": "Ring of Doom",
+    "seed": 177
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-16T06:58:26.302Z",
+   "bufferPostId": "6afaa99206e1675856d1954e"
+  }
+ ]
 }
