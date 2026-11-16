@@ -87,6 +87,11 @@ function need(name: string): string {
   return v;
 }
 
+// DRY_RUN=1: render + package exactly like a real run, but publish nothing,
+// post nothing and log to a throwaway file (the kits land in post-kits/,
+// which the workflow uploads as an artifact so they can be inspected)
+const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
+const POST_LOG_PATH = DRY_RUN ? join(tmpdir(), 'dry-run-post-log.json') : CI_LOG;
 const BUFFER_API_KEY = need('BUFFER_API_KEY');
 const BUFFER_CHANNEL_ID = need('BUFFER_CHANNEL_ID');
 const OUTPUT_REPO = need('OUTPUT_REPO'); // e.g. "Sayedu/clipper-output"
@@ -106,8 +111,6 @@ interface RenderedPost {
   /** The job / episode folder the post packaging reads. */
   sourceDir: string;
   videoPath: string;
-  /** The render's own caption, used only if packaging fails. */
-  fallbackText: string;
   /** Run only after a successful Buffer post. Ring of Doom uses this to
    *  commit the episode to league/season.json — see renderRingOfDoom(). */
   onPosted?: () => Promise<void>;
@@ -123,7 +126,6 @@ async function renderOne(kind: Rotation): Promise<RenderedPost> {
       kind,
       sourceDir: meta.out_dir,
       videoPath: join(meta.out_dir, 'final.mp4'),
-      fallbackText: (await readFile(join(meta.out_dir, 'caption.txt'), 'utf-8')).trim(),
       // Commit AFTER a successful Buffer post, not before or unconditionally —
       // a render that never actually goes out (e.g. the Buffer step below
       // fails) shouldn't advance the season. Matches the engine's own "never
@@ -138,18 +140,19 @@ async function renderOne(kind: Rotation): Promise<RenderedPost> {
   }
   console.log(`\n=== rendering ${kind} ===`);
   const r = await renderJsGame(kind, logProgress);
-  // TikTok allows at most 5 hashtags
-  const tags = r.hashtags.slice(0, 5);
-  return { kind, sourceDir: r.jobDir, videoPath: r.videoPath, fallbackText: [r.caption, tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n') };
+  return { kind, sourceDir: r.jobDir, videoPath: r.videoPath };
 }
 
 /** Post packaging (scripts/packaging): a fresh hook, background, border,
  *  zoom, sound bed, caption, hashtags, cover and pinned comment, checked
- *  against the last 10 posts. Falls back to the plain render rather than
- *  losing the day's post if packaging itself breaks. */
-async function packageOne(r: RenderedPost): Promise<{ videoPath: string; text: string; kitId: string | null }> {
-  try {
-    const kit = await packageVideo(r.sourceDir, { writeLog: CI_LOG, preset: 'veryfast' });
+ *  against the last 10 posts. Tried twice; if it still fails the game is
+ *  skipped for today rather than posted unpackaged. */
+async function packageOne(r: RenderedPost): Promise<{ videoPath: string; text: string; kitId: string }> {
+  // every post goes out packaged (fresh hook, look, sound, caption) — a
+  // packaging failure skips the game rather than posting a plain repeat
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) try {
+    const kit = await packageVideo(r.sourceDir, { writeLog: POST_LOG_PATH, readLogs: [CI_LOG, POST_LOG_PATH], preset: 'veryfast', salt: attempt > 1 ? `retry${attempt}` : undefined });
     const text = (await readFile(join(kit.kitDir, 'caption.txt'), 'utf-8')).trim();
     console.log(`[${r.kind}] packaged: ${kit.hook.lines.join(' ')} · ${kit.look.bg}/${kit.look.border} · sound ${kit.sound.track}`);
     console.log(`[${r.kind}] caption: ${kit.caption.replace(/\n/g, ' / ')}`);
@@ -157,9 +160,10 @@ async function packageOne(r: RenderedPost): Promise<{ videoPath: string; text: s
     console.log(`[${r.kind}] PIN THIS COMMENT: ${kit.pinned}`);
     return { videoPath: join(kit.kitDir, 'video.mp4'), text, kitId: kit.id };
   } catch (err) {
-    console.error(`[${r.kind}] post packaging failed, posting the plain render instead: ${(err as Error).message}`);
-    return { videoPath: r.videoPath, text: r.fallbackText, kitId: null };
+    lastErr = err as Error;
+    console.error(`[${r.kind}] post packaging attempt ${attempt} failed: ${lastErr.message}`);
   }
+  throw new Error(`post packaging failed, not posting an unpackaged video: ${lastErr?.message}`);
 }
 
 async function main() {
@@ -179,7 +183,8 @@ async function main() {
   }
   console.log(`today's order: ${order.join(', ')}`);
 
-  const outputRepo = await OutputRepo.open();
+  if (DRY_RUN) console.log('DRY RUN: rendering and packaging only, nothing gets published or posted');
+  const outputRepo = DRY_RUN ? null : await OutputRepo.open();
   try {
     // render → package → push → post, ONE game at a time — not
     // render-all-then-post-all. A game failing at any step doesn't stop the
@@ -192,11 +197,17 @@ async function main() {
         const r = await renderOne(kind);
         rendered++;
         const p = await packageOne(r);
+        if (!outputRepo) {
+          console.log(`[${kind}] DRY RUN kit: ${p.videoPath}`);
+          console.log(`[${kind}] DRY RUN post text:\n${p.text}`);
+          posted++;
+          continue;
+        }
         const videoUrl = await outputRepo.publish(r.kind, p.videoPath);
         console.log(`[${kind}] video public at: ${videoUrl}`);
         const postId = await postToBuffer({ channelId: BUFFER_CHANNEL_ID, text: p.text, videoUrl });
         console.log(`[${kind}] queued on Buffer — post id ${postId}`);
-        if (p.kitId) markPosted(p.kitId, { bufferPostId: postId }, CI_LOG);
+        markPosted(p.kitId, { bufferPostId: postId }, CI_LOG);
         posted++;
         // Runs after the post already succeeded, so a failure here (e.g.
         // Ring of Doom's commit step) must NOT land in the catch below —
@@ -217,7 +228,7 @@ async function main() {
     if (posted === 0) throw new Error('every render succeeded but every publish/post failed');
     console.log(`\n${posted}/${order.length} posted today`);
   } finally {
-    await outputRepo.close();
+    await outputRepo?.close();
   }
 }
 

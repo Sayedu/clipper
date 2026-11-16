@@ -62,7 +62,9 @@ export function startServer(port = 0, onRequest = null) {
   });
 }
 
+// no top-level await: this module is also loaded from CommonJS (tsx) scripts
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { port } = await startServer(Number(process.argv[2]) || 5190);
-  console.log(`followball static server on http://127.0.0.1:${port}/`);
+  startServer(Number(process.argv[2]) || 5190).then(({ port }) => {
+    console.log(`followball static server on http://127.0.0.1:${port}/`);
+  });
 }

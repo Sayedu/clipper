@@ -18,6 +18,11 @@ on:
         description: "Force one game instead of the random pick (colorwar / ringofdoom / hotpotato / followball / eyetest) — leave blank for normal behavior"
         required: false
         type: string
+      dry_run:
+        description: "Dry run: render + package only, post nothing (the kits are uploaded as a run artifact to look at)"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: daily-post
@@ -102,10 +107,24 @@ jobs:
           OUTPUT_REPO: ${{ secrets.OUTPUT_REPO }}
           OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
           FORCE_PICK: ${{ inputs.force_pick }}
+          DRY_RUN: ${{ inputs.dry_run }}
           # colorwars/config/settings.yaml hardcodes a local macOS dev path
           # for ffmpeg (that machine's bare `ffmpeg` is broken) — this
           # overrides it to the apt-installed one already on PATH here.
           COLORWARS_FFMPEG_PATH: ffmpeg
+
+      - name: Upload the dry run's post kits
+        if: always() && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-kits
+          path: |
+            post-kits/*/video.mp4
+            post-kits/*/cover.png
+            post-kits/*/caption.txt
+            post-kits/*/pinned_comment.txt
+            post-kits/*/kit.json
+          if-no-files-found: warn
 
       - name: Persist the colorwars season state and the post log
         # `colorwars commit` (run by daily.ts's ringofdoom/hotpotato step,
@@ -120,7 +139,7 @@ jobs:
         # every run consumed the SAME front-of-queue names (the "comment
         # your name for a ball" feature never actually advanced) because
         # the pool file's own consumption never made it back to the repo.
-        if: always()
+        if: always() && !inputs.dry_run
         run: |
           # post-log/daily.json is the post packaging's memory: every kit's
           # caption, hashtags, hook, cover hash, sound and look. Tomorrow's
