@@ -332,6 +332,183 @@
    "posted": true,
    "postedAt": "2026-11-16T07:52:42.215Z",
    "bufferPostId": "6afab64a60a910801c79b0ab"
+  },
+  {
+   "id": "2026-11-16_colorwar_seed959281645_1w6fh",
+   "createdAt": "2026-11-16T21:39:28.445Z",
+   "format": "colorwar",
+   "seed": 959281645,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/zh3d6Ljk1Iaw",
+    "video": "/home/runner/work/clipper/clipper/data/work/zh3d6Ljk1Iaw/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-16_colorwar_seed959281645_1w6fh",
+   "caption": "Color war, 4 colours fighting over every single tile 🎨\nWho are you backing?",
+   "captionFirstLine": "Color war, 4 colours fighting over every single tile 🎨",
+   "captionStyle": "question",
+   "captionIds": [
+    "cw.q4",
+    "cw.a2"
+   ],
+   "hashtags": [
+    "colorwar",
+    "territorywar",
+    "oddlysatisfying",
+    "simulation"
+   ],
+   "hook": {
+    "id": "cw.h14",
+    "lines": [
+     "WATCH THE",
+     "BORDERS MOVE"
+    ],
+    "style": {
+     "font": "bungee",
+     "palette": "yellow-black",
+     "plate": "box",
+     "anim": "stamp",
+     "align": "left",
+     "size": 128,
+     "sec": 2.8,
+     "cy": 1380
+    },
+    "slotMotion": 0.24,
+    "slotDetail": 20,
+    "slotPeak": 9.3,
+    "backing": {
+     "w": 860,
+     "h": 204
+    },
+    "extent": {
+     "x0": 138.46875,
+     "y0": 1246.727783203125,
+     "x1": 835.1691741943359,
+     "y1": 1514.6893310546875
+    },
+    "firstFrame": {
+     "x0": 139.84385681152344,
+     "y0": 1246.727783203125,
+     "x1": 835.1691741943359,
+     "y1": 1514.6893310546875,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "cw.v6",
+    "lines": [
+     "FINE GRAIN",
+     "BOARD"
+    ],
+    "phash": "41263fc33e9ad838",
+    "atSec": 28.79,
+    "nearest": {
+     "id": "2026-11-16_ringofdoom_seed177_1k4z9",
+     "d": 26
+    },
+    "style": {
+     "font": "bangers",
+     "palette": "orange-night",
+     "plate": "box",
+     "align": "left",
+     "size": 132,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 28.79,
+      "score": 85.5,
+      "nearest": {
+       "id": "2026-11-16_ringofdoom_seed177_1k4z9",
+       "d": 26
+      }
+     }
+    ]
+   },
+   "pinned": "Which colour do you always end up picking?",
+   "pinnedId": "cw.p9",
+   "sound": {
+    "track": "bounce",
+    "bpm": 118,
+    "root": 64,
+    "mode": "major",
+    "seed": 959281645,
+    "bedDbBelowGame": 12
+   },
+   "look": {
+    "bg": "dots",
+    "border": "double",
+    "borderColour": "#FF2E88",
+    "zoom": "nudge",
+    "stage": {
+     "x": 0.16666666666666666,
+     "y": 0.041666666666666664,
+     "w": 0.6574074074074074,
+     "h": 0.7135416666666666
+    },
+    "letterbox": 0.57
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 42.97,
+    "contentEndSec": 40.97
+   },
+   "facts": {
+    "contentSec": 40.97,
+    "board": "Fine Grain",
+    "colours": [
+     "Blue",
+     "Red",
+     "Green",
+     "Yellow"
+    ],
+    "n": 4,
+    "closest": 2,
+    "dip": 4,
+    "tense": [
+     [
+      24.8,
+      35.45
+     ],
+     [
+      11.385,
+      24
+     ]
+    ],
+    "hidden": {
+     "winner": "Yellow",
+     "words": [
+      "Yellow"
+     ]
+    },
+    "leadChanges": 12,
+    "bombs": 22,
+    "firstOut": {
+     "colour": "Red",
+     "t": "19"
+    },
+    "duelT": "24",
+    "snap": {
+     "colour": "Yellow",
+     "pct": "34",
+     "t": "9",
+     "rank": "first"
+    },
+    "format": "colorwar",
+    "keyword": "Color war",
+    "seed": 959281645,
+    "episode": 2
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-16T21:40:24.692Z",
+   "bufferPostId": "6afb7848d20f4d2f754de8c1"
   }
  ]
 }
