@@ -509,6 +509,178 @@
    "posted": true,
    "postedAt": "2026-11-16T21:40:24.692Z",
    "bufferPostId": "6afb7848d20f4d2f754de8c1"
+  },
+  {
+   "id": "2026-11-16_colorwar_seed779328065_tdyr5",
+   "createdAt": "2026-11-16T22:16:10.558Z",
+   "format": "colorwar",
+   "seed": 779328065,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/jGKHGb46Tq-m",
+    "video": "/home/runner/work/clipper/clipper/data/work/jGKHGb46Tq-m/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-16_colorwar_seed779328065_tdyr5",
+   "caption": "Color war, pick the colour you think nobody else is picking 🟥🟦🟩🟨\nWhich colour takes the whole grid?",
+   "captionFirstLine": "Color war, pick the colour you think nobody else is picking 🟥🟦🟩🟨",
+   "captionStyle": "challenge",
+   "captionIds": [
+    "cw.c5",
+    "cw.a1"
+   ],
+   "hashtags": [
+    "colorwar",
+    "whowins",
+    "physicssimulation",
+    "physics"
+   ],
+   "hook": {
+    "id": "cw.h7",
+    "lines": [
+     "LAST COLOUR STANDING",
+     "TAKES THE GRID"
+    ],
+    "style": {
+     "font": "bebas",
+     "palette": "red-white",
+     "plate": "none",
+     "anim": "pop",
+     "align": "center",
+     "size": 112,
+     "sec": 2.8,
+     "cy": 1380
+    },
+    "slotMotion": 0.36,
+    "slotDetail": 20.6,
+    "slotPeak": 6.8,
+    "backing": {
+     "w": 860,
+     "h": 204
+    },
+    "extent": {
+     "x0": 120.671875,
+     "y0": 1283.9375,
+     "x1": 847.328125,
+     "y1": 1476.046875
+    },
+    "firstFrame": {
+     "x0": 120.671875,
+     "y0": 1283.9375,
+     "x1": 847.328125,
+     "y1": 1476.046875,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "cw.v8",
+    "lines": [
+     "TOO CLOSE",
+     "TO CALL?"
+    ],
+    "phash": "43e1341f307c0f1f",
+    "atSec": 29.61,
+    "nearest": {
+     "id": "2026-11-16_colorwar_seed1189344857_4azsh",
+     "d": 24
+    },
+    "style": {
+     "font": "luckiest",
+     "palette": "blue-white",
+     "plate": "none",
+     "align": "left",
+     "size": 132,
+     "cy": 460
+    },
+    "tried": [
+     {
+      "t": 29.61,
+      "score": 91.6,
+      "nearest": {
+       "id": "2026-11-16_colorwar_seed1189344857_4azsh",
+       "d": 24
+      }
+     }
+    ]
+   },
+   "pinned": "Green went out at 18 seconds. Which colour were you backing at that point?",
+   "pinnedId": "cw.p1",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "midnight",
+    "border": "thick",
+    "borderColour": "#8B5CF6",
+    "zoom": "push",
+    "stage": {
+     "x": 0.16666666666666666,
+     "y": 0.041666666666666664,
+     "w": 0.6666666666666666,
+     "h": 0.7135416666666666
+    },
+    "letterbox": 0.57
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 40.62,
+    "contentEndSec": 38.62
+   },
+   "facts": {
+    "contentSec": 38.62,
+    "board": "Stripes",
+    "colours": [
+     "Blue",
+     "Red",
+     "Green",
+     "Yellow"
+    ],
+    "n": 4,
+    "closest": 1,
+    "dip": 25,
+    "tense": [
+     [
+      23.8,
+      33.1
+     ],
+     [
+      10.68,
+      23
+     ]
+    ],
+    "hidden": {
+     "winner": "Red",
+     "words": [
+      "Red"
+     ]
+    },
+    "leadChanges": 15,
+    "bombs": 23,
+    "firstOut": {
+     "colour": "Green",
+     "t": "18"
+    },
+    "duelT": "23",
+    "snap": {
+     "colour": "Red",
+     "pct": "31",
+     "t": "12",
+     "rank": "first"
+    },
+    "format": "colorwar",
+    "keyword": "Color war",
+    "seed": 779328065,
+    "episode": 3
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-16T22:17:12.652Z",
+   "bufferPostId": "6afb80e8d580c79908847211"
   }
  ]
 }
