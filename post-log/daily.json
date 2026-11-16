@@ -681,6 +681,173 @@
    "posted": true,
    "postedAt": "2026-11-16T22:17:12.652Z",
    "bufferPostId": "6afb80e8d580c79908847211"
+  },
+  {
+   "id": "2026-11-16_followball_seed498476725_fq6g6",
+   "createdAt": "2026-11-16T22:30:20.786Z",
+   "format": "followball",
+   "seed": 498476725,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/IQWNQX9IZ4Jk",
+    "video": "/home/runner/work/clipper/clipper/data/work/IQWNQX9IZ4Jk/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-16_followball_seed498476725_fq6g6",
+   "caption": "Follow the ball, 21 swaps across 3 rounds 🥤\nHow many of the 3 did you get right?",
+   "captionFirstLine": "Follow the ball, 21 swaps across 3 rounds 🥤",
+   "captionStyle": "question",
+   "captionIds": [
+    "ftb.q3",
+    "ftb.a1"
+   ],
+   "hashtags": [
+    "followtheball",
+    "shellgame",
+    "visualtest",
+    "brainteaser",
+    "canyoukeepup"
+   ],
+   "hook": {
+    "id": "ftb.h13",
+    "lines": [
+     "ONE BALL.",
+     "NO MISTAKES."
+    ],
+    "style": {
+     "font": "luckiest",
+     "palette": "outline-yellow",
+     "plate": "underline",
+     "anim": "slide-left",
+     "align": "left",
+     "size": 112,
+     "sec": 2.4,
+     "cy": 1320
+    },
+    "slotMotion": 0.14,
+    "slotDetail": 3,
+    "slotPeak": 4.3,
+    "backing": null,
+    "extent": {
+     "x0": 64,
+     "y0": 1210.25,
+     "x1": 701.03125,
+     "y1": 1401.75
+    },
+    "firstFrame": {
+     "x0": 214,
+     "y0": 1210.25,
+     "x1": 701.03125,
+     "y1": 1401.75,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "ftb.v2",
+    "lines": [
+     "STILL WITH",
+     "IT?"
+    ],
+    "phash": "13d26d6d32241b3b",
+    "atSec": 3.47,
+    "nearest": {
+     "id": "2026-11-16_colorwar_seed779328065_tdyr5",
+     "d": 22
+    },
+    "style": {
+     "font": "bangers",
+     "palette": "blue-white",
+     "plate": "pill",
+     "align": "center",
+     "size": 132,
+     "cy": 1280
+    },
+    "tried": [
+     {
+      "t": 3.47,
+      "score": 44.4,
+      "nearest": {
+       "id": "2026-11-16_colorwar_seed779328065_tdyr5",
+       "d": 22
+      }
+     }
+    ]
+   },
+   "pinned": "Which swap made you lose it?",
+   "pinnedId": "ftb.p9",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "aurora",
+    "border": "thin",
+    "borderColour": "#FFFFFF",
+    "zoom": "punch",
+    "stage": {
+     "x": 0.14814814814814814,
+     "y": 0.052083333333333336,
+     "w": 0.7037037037037037,
+     "h": 0.7395833333333334
+    },
+    "letterbox": 0.54
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 22.49,
+    "contentEndSec": 20.48
+   },
+   "facts": {
+    "contentSec": 20.48,
+    "mode": "Sprint",
+    "rounds": 3,
+    "cups": [
+     3,
+     4,
+     5
+    ],
+    "maxCups": 5,
+    "swaps": [
+     5,
+     7,
+     9
+    ],
+    "totalSwaps": 21,
+    "lastSwaps": 9,
+    "hidden": {
+     "answers": [
+      2,
+      4,
+      5
+     ]
+    },
+    "tense": [
+     [
+      1.3,
+      4.5832999999999995
+     ],
+     [
+      7.2166999999999994,
+      10.7333
+     ],
+     [
+      13.333300000000001,
+      17.150000000000002
+     ]
+    ],
+    "format": "followball",
+    "keyword": "Follow the ball",
+    "seed": 498476725,
+    "episode": 1
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-16T22:31:17.152Z",
+   "bufferPostId": "6afb843585dca6b14a02d5b0"
   }
  ]
 }
