@@ -1662,6 +1662,186 @@
    "posted": true,
    "postedAt": "2026-11-17T06:06:13.210Z",
    "bufferPostId": "6afbeed5f83aaca8f3b2e338"
+  },
+  {
+   "id": "2026-11-17_followball_seed803303965_3qmud",
+   "createdAt": "2026-11-17T19:05:38.240Z",
+   "format": "followball",
+   "seed": 803303965,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/vKGn0EGUdmHX",
+    "video": "/home/runner/work/clipper/clipper/data/work/vKGn0EGUdmHX/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-17_followball_seed803303965_3qmud",
+   "caption": "Follow the ball episode 3 with 5 cups in the last round 🥤\nDid you get all 5?",
+   "captionFirstLine": "Follow the ball episode 3 with 5 cups in the last round 🥤",
+   "captionStyle": "episode",
+   "captionIds": [
+    "ftb.e2",
+    "ftb.a3"
+   ],
+   "hashtags": [
+    "followtheball",
+    "shellgame",
+    "trackingtest",
+    "puzzle"
+   ],
+   "hook": {
+    "id": "ftb.h9",
+    "lines": [
+     "NO",
+     "REWINDING"
+    ],
+    "style": {
+     "font": "bangers",
+     "palette": "red-white",
+     "plate": "none",
+     "anim": "shake",
+     "align": "left",
+     "size": 120,
+     "sec": 2.4,
+     "cy": 1320
+    },
+    "slotMotion": 0.15,
+    "slotDetail": 4.1,
+    "slotPeak": 4.3,
+    "backing": null,
+    "extent": {
+     "x0": 45.5,
+     "y0": 1203.859375,
+     "x1": 452.91666412353516,
+     "y1": 1436.125
+    },
+    "firstFrame": {
+     "x0": 64,
+     "y0": 1203.859375,
+     "x1": 439.25,
+     "y1": 1436.125,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "ftb.v5",
+    "lines": [
+     "YOU LOST IT,",
+     "RIGHT?"
+    ],
+    "phash": "0cda2f2f92748276",
+    "atSec": 35.89,
+    "nearest": {
+     "id": "2026-11-17_eyetest_seed167188933_ywxr4",
+     "d": 20
+    },
+    "style": {
+     "font": "rubikmono",
+     "palette": "cyan-night",
+     "plate": "split",
+     "align": "center",
+     "size": 146,
+     "cy": 1280
+    },
+    "tried": [
+     {
+      "t": 35.89,
+      "score": 42.4,
+      "nearest": {
+       "id": "2026-11-17_eyetest_seed167188933_ywxr4",
+       "d": 20
+      }
+     }
+    ]
+   },
+   "pinned": "Do you do better on the first watch or the second?",
+   "pinnedId": "ftb.p10",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "slate",
+    "border": "corners",
+    "borderColour": "#FF8A00",
+    "zoom": "push",
+    "stage": {
+     "x": 0.14814814814814814,
+     "y": 0.052083333333333336,
+     "w": 0.7037037037037037,
+     "h": 0.7395833333333334
+    },
+    "letterbox": 0.53
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 43.44,
+    "contentEndSec": 41.43
+   },
+   "facts": {
+    "contentSec": 41.43,
+    "mode": "Classic",
+    "rounds": 5,
+    "cups": [
+     3,
+     3,
+     4,
+     4,
+     5
+    ],
+    "maxCups": 5,
+    "swaps": [
+     3,
+     5,
+     8,
+     11,
+     12
+    ],
+    "totalSwaps": 39,
+    "lastSwaps": 12,
+    "hidden": {
+     "answers": [
+      1,
+      3,
+      2,
+      2,
+      3
+     ]
+    },
+    "tense": [
+     [
+      1.5,
+      4.6167
+     ],
+     [
+      8.05,
+      11.7167
+     ],
+     [
+      15.116700000000002,
+      19.700000000000003
+     ],
+     [
+      23.133300000000002,
+      28.150000000000002
+     ],
+     [
+      31.5833,
+      36.5
+     ]
+    ],
+    "format": "followball",
+    "keyword": "Follow the ball",
+    "seed": 803303965,
+    "episode": 3
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-17T19:06:41.877Z",
+   "bufferPostId": "6afca5c1f7b04ce25b55725e"
   }
  ]
 }
