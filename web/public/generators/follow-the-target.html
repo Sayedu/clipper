@@ -611,7 +611,7 @@ THEMES.parking = {
     g.save(); g.shadowColor = o.lines; g.shadowBlur = 16; g.strokeStyle = o.lines; g.lineWidth = 5; g.lineCap = 'round';
     for (let s = 0; s < L.n; s++) {
       const P = L.slot(s), x0 = P.x - L.cellW * 0.48, x1 = P.x + L.cellW * 0.48, y0 = P.y - L.cellH * 0.47, y1 = P.y + L.cellH * 0.47;
-      g.beginPath(); g.moveTo(x1, y0); g.lineTo(x0, y0); g.lineTo(x0, y1); g.lineTo(x1, y1); g.stroke();
+      g.beginPath(); g.moveTo(x1, y0); g.lineTo(x0, y0); g.lineTo(x0, y1); g.lineTo(x1, y1); g.closePath(); g.stroke();
     }
     g.restore();
     g.fillStyle = 'rgba(255,255,255,0.06)';
