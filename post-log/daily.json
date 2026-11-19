@@ -2672,6 +2672,834 @@
    "posted": true,
    "postedAt": "2026-11-18T06:10:49.327Z",
    "bufferPostId": "6afd416980faf674a1c52fe7"
+  },
+  {
+   "id": "2026-11-19_hotpotato_seed107_ka5ej",
+   "createdAt": "2026-11-19T05:05:23.465Z",
+   "format": "hotpotato",
+   "seed": 107,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/colorwars/out/ep010",
+    "video": "/home/runner/work/clipper/clipper/colorwars/out/ep010/final.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-19_hotpotato_seed107_ka5ej",
+   "caption": "Hot Potato episode 10, 4 colours and nowhere to hide 🔴🔵🟢🟡\nWhose ball do you think makes it?",
+   "captionFirstLine": "Hot Potato episode 10, 4 colours and nowhere to hide 🔴🔵🟢🟡",
+   "captionStyle": "episode",
+   "captionIds": [
+    "hp.e4",
+    "hp.a4"
+   ],
+   "hashtags": [
+    "hotpotato",
+    "colorwars",
+    "ballsimulation",
+    "lastonestanding",
+    "oddlysatisfying"
+   ],
+   "hook": {
+    "id": "hp.h4",
+    "lines": [
+     "15 GO BOOM",
+     "ONE SURVIVES"
+    ],
+    "style": {
+     "font": "marker",
+     "palette": "pink-white",
+     "plate": "underline",
+     "anim": "stamp",
+     "align": "center",
+     "size": 120,
+     "sec": 2.6,
+     "cy": 420
+    },
+    "slotMotion": 0.89,
+    "slotDetail": 24.4,
+    "slotPeak": 82.8,
+    "backing": {
+     "w": 810,
+     "h": 304
+    },
+    "extent": {
+     "x0": 177.81210327148438,
+     "y0": 289.78118896484375,
+     "x1": 834.703125,
+     "y1": 520.2691650390625
+    },
+    "firstFrame": {
+     "x0": 177.81210327148438,
+     "y0": 289.78118896484375,
+     "x1": 833.8233337402344,
+     "y1": 520.2691650390625,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "hp.v4",
+    "lines": [
+     "STILL",
+     "SAFE?"
+    ],
+    "phash": "53c38718b83ea19e",
+    "atSec": 13.6,
+    "nearest": {
+     "id": "2026-11-17_hotpotato_seed107_1vr33",
+     "d": 20
+    },
+    "style": {
+     "font": "montserrat",
+     "palette": "violet-white",
+     "plate": "split",
+     "align": "left",
+     "size": 132,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 13.6,
+      "score": 56.6,
+      "nearest": {
+       "id": "2026-11-17_hotpotato_seed107_1vr33",
+       "d": 20
+      }
+     }
+    ]
+   },
+   "pinned": "Drop your colour and a name to get a ball in episode 11. Which colour takes it?",
+   "pinnedId": "hp.p6",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "grape",
+    "border": "thick",
+    "borderColour": "#FFFFFF",
+    "zoom": "none",
+    "stage": null,
+    "letterbox": 1
+   },
+   "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 60,
+    "durationSec": 28.5,
+    "contentEndSec": 26.5
+   },
+   "facts": {
+    "contentSec": 26.5,
+    "episode": 10,
+    "finale": false,
+    "teams": 4,
+    "balls": 16,
+    "leadChanges": 7,
+    "nearMisses": null,
+    "finalTwoSec": 1,
+    "collisions": 1089,
+    "eliminations": 15,
+    "shout": [],
+    "hidden": {
+     "winner": "Blue",
+     "words": [
+      "Blue",
+      "Blue 1"
+     ]
+    },
+    "tense": [
+     [
+      7.4948999999999995,
+      23.783
+     ]
+    ],
+    "firstOut": {
+     "name": null,
+     "team": "Red",
+     "t": "4"
+    },
+    "halfGoneT": "15",
+    "format": "hotpotato",
+    "keyword": "Hot Potato",
+    "seed": 107
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-19T05:06:54.239Z",
+   "bufferPostId": "6afe83ee749099bdc710374c"
+  },
+  {
+   "id": "2026-11-19_ringofdoom_seed98_n7ud6",
+   "createdAt": "2026-11-19T05:10:40.423Z",
+   "format": "ringofdoom",
+   "seed": 98,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/colorwars/out/ep011",
+    "video": "/home/runner/work/clipper/clipper/colorwars/out/ep011/final.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-19_ringofdoom_seed98_n7ud6",
+   "caption": "Ring of Doom episode 11. The ring spins, the gaps open and the balls fall out one by one 🌀\nWhose ball are you rooting for?",
+   "captionFirstLine": "Ring of Doom episode 11. The ring spins, the gaps open and the balls fall out one by one 🌀",
+   "captionStyle": "episode",
+   "captionIds": [
+    "rod.e1",
+    "rod.a4"
+   ],
+   "hashtags": [
+    "ringofdoom",
+    "colorwars",
+    "lastonestanding",
+    "satisfying"
+   ],
+   "hook": {
+    "id": "rod.h2",
+    "lines": [
+     "LAST BALL INSIDE",
+     "WINS"
+    ],
+    "style": {
+     "font": "chakra",
+     "palette": "red-white",
+     "plate": "pill",
+     "anim": "slide-down",
+     "align": "center",
+     "size": 128,
+     "sec": 2.6,
+     "cy": 1405
+    },
+    "slotMotion": 0.27,
+    "slotDetail": 30.5,
+    "slotPeak": 5.6,
+    "backing": {
+     "w": 830,
+     "h": 254
+    },
+    "extent": {
+     "x0": 136.203125,
+     "y0": 1192.609375,
+     "x1": 861.78125,
+     "y1": 1491.390625
+    },
+    "firstFrame": {
+     "x0": 136.203125,
+     "y0": 1192.609375,
+     "x1": 861.78125,
+     "y1": 1381.390625,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "rod.v11",
+    "lines": [
+     "WHO'S",
+     "NEXT?"
+    ],
+    "phash": "50c92f3681b3b9cc",
+    "atSec": 19.97,
+    "nearest": {
+     "id": "2026-11-18_hotpotato_seed107_1bqxo",
+     "d": 22
+    },
+    "style": {
+     "font": "rubikmono",
+     "palette": "yellow-black",
+     "plate": "none",
+     "align": "center",
+     "size": 146,
+     "cy": 460
+    },
+    "tried": [
+     {
+      "t": 19.97,
+      "score": 41.1,
+      "nearest": {
+       "id": "2026-11-18_hotpotato_seed107_1bqxo",
+       "d": 22
+      }
+     }
+    ]
+   },
+   "pinned": "Which colour did you pick before the ring started spinning?",
+   "pinnedId": "rod.p4",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "ember",
+    "border": "double",
+    "borderColour": "#B6FF3B",
+    "zoom": "none",
+    "stage": null,
+    "letterbox": 1
+   },
+   "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 60,
+    "durationSec": 39.8,
+    "contentEndSec": 37.8
+   },
+   "facts": {
+    "contentSec": 37.8,
+    "episode": 11,
+    "finale": false,
+    "teams": 4,
+    "balls": 16,
+    "leadChanges": 7,
+    "nearMisses": null,
+    "finalTwoSec": 9,
+    "collisions": 1066,
+    "eliminations": 15,
+    "shout": [],
+    "hidden": {
+     "winner": "Green",
+     "words": [
+      "Green",
+      "Green 1"
+     ]
+    },
+    "tense": [
+     [
+      10.889999999999999,
+      35.099999999999994
+     ]
+    ],
+    "firstOut": {
+     "name": null,
+     "team": "Blue",
+     "t": "1"
+    },
+    "halfGoneT": "18",
+    "format": "ringofdoom",
+    "keyword": "Ring of Doom",
+    "seed": 98
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-19T05:11:37.845Z",
+   "bufferPostId": "6afe85093802f5b9fc6c30a0"
+  },
+  {
+   "id": "2026-11-19_followball_seed863117348_1085b",
+   "createdAt": "2026-11-19T05:29:48.151Z",
+   "format": "followball",
+   "seed": 863117348,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/upqCrG45KTN_",
+    "video": "/home/runner/work/clipper/clipper/data/work/upqCrG45KTN_/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-19_followball_seed863117348_1085b",
+   "caption": "Follow the ball shell game where the cups never slow down 👀\nDid you track it or guess?",
+   "captionFirstLine": "Follow the ball shell game where the cups never slow down 👀",
+   "captionStyle": "question",
+   "captionIds": [
+    "ftb.q4",
+    "ftb.a6"
+   ],
+   "hashtags": [
+    "followtheball",
+    "shellgame",
+    "focustest",
+    "cupgame",
+    "eyetest"
+   ],
+   "hook": {
+    "id": "ftb.h14",
+    "lines": [
+     "SHELL",
+     "GAME"
+    ],
+    "style": {
+     "font": "bebas",
+     "palette": "lime-night",
+     "plate": "box",
+     "anim": "zoom-in",
+     "align": "left",
+     "size": 120,
+     "sec": 2.6,
+     "cy": 1320
+    },
+    "slotMotion": 0.13,
+    "slotDetail": 3,
+    "slotPeak": 4,
+    "backing": null,
+    "extent": {
+     "x0": 57.837982177734375,
+     "y0": 1158.29443359375,
+     "x1": 400.5370178222656,
+     "y1": 1481.68994140625
+    },
+    "firstFrame": {
+     "x0": 100.34124755859375,
+     "y0": 1198.403564453125,
+     "x1": 358.03375244140625,
+     "y1": 1441.580810546875,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "ftb.v6",
+    "lines": [
+     "6 CUPS",
+     "1 BALL"
+    ],
+    "phash": "0dc13c1fc33eb063",
+    "atSec": 10.57,
+    "nearest": {
+     "id": "2026-11-17_followball_seed803303965_3qmud",
+     "d": 22
+    },
+    "style": {
+     "font": "montserrat",
+     "palette": "mint-night",
+     "plate": "none",
+     "align": "center",
+     "size": 132,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 10.57,
+      "score": 48.1,
+      "nearest": {
+       "id": "2026-11-17_followball_seed803303965_3qmud",
+       "d": 22
+      }
+     }
+    ]
+   },
+   "pinned": "At what point did you start guessing?",
+   "pinnedId": "ftb.p7",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "ocean",
+    "border": "dashed",
+    "borderColour": "#FF3B3B",
+    "zoom": "nudge",
+    "stage": {
+     "x": 0.14814814814814814,
+     "y": 0.052083333333333336,
+     "w": 0.7037037037037037,
+     "h": 0.7395833333333334
+    },
+    "letterbox": 0.54
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 43.41,
+    "contentEndSec": 41.4
+   },
+   "facts": {
+    "contentSec": 41.4,
+    "mode": "Insane",
+    "rounds": 5,
+    "cups": [
+     4,
+     5,
+     5,
+     6,
+     6
+    ],
+    "maxCups": 6,
+    "swaps": [
+     7,
+     9,
+     14,
+     17,
+     20
+    ],
+    "totalSwaps": 67,
+    "lastSwaps": 20,
+    "hidden": {
+     "answers": [
+      2,
+      2,
+      2,
+      2,
+      3
+     ]
+    },
+    "tense": [
+     [
+      1.5,
+      4.949999999999999
+     ],
+     [
+      8.3833,
+      11.8833
+     ],
+     [
+      15.2833,
+      19.633300000000002
+     ],
+     [
+      23.0667,
+      27.9833
+     ],
+     [
+      31.416700000000002,
+      36.4667
+     ]
+    ],
+    "format": "followball",
+    "keyword": "Follow the ball",
+    "seed": 863117348,
+    "episode": 5
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [
+     "cover text ftb.v8: cover text repeats post 2026-11-18_eyetest_seed770715476_1nfcq"
+    ],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-19T05:30:51.683Z",
+   "bufferPostId": "6afe898bf6b6aa0cd4a41ebd"
+  },
+  {
+   "id": "2026-11-19_eyetest_seed1392436844_x6t6m",
+   "createdAt": "2026-11-19T05:47:29.416Z",
+   "format": "eyetest",
+   "seed": 1392436844,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/Br7ysU-HXy7m",
+    "video": "/home/runner/work/clipper/clipper/data/work/Br7ysU-HXy7m/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-19_eyetest_seed1392436844_x6t6m",
+   "caption": "Eye test, no blinking allowed while the arena spins 🎯\nHow many of the 3 rounds did you get?",
+   "captionFirstLine": "Eye test, no blinking allowed while the arena spins 🎯",
+   "captionStyle": "challenge",
+   "captionIds": [
+    "et.c3",
+    "et.a1"
+   ],
+   "hashtags": [
+    "eyetest",
+    "attentiontest",
+    "trackingtest",
+    "focustest"
+   ],
+   "hook": {
+    "id": "et.h1",
+    "lines": [
+     "8 BALLS.",
+     "1 TARGET."
+    ],
+    "style": {
+     "font": "chakra",
+     "palette": "mint-night",
+     "plate": "none",
+     "anim": "stamp",
+     "align": "left",
+     "size": 120,
+     "sec": 2.8,
+     "cy": 420
+    },
+    "slotMotion": 0.1,
+    "slotDetail": 2.1,
+    "slotPeak": 3.7,
+    "backing": null,
+    "extent": {
+     "x0": 36.79365539550781,
+     "y0": 292.6508483886719,
+     "x1": 564.3418121337891,
+     "y1": 547.3335571289062
+    },
+    "firstFrame": {
+     "x0": 36.79365539550781,
+     "y0": 292.6508483886719,
+     "x1": 564.3418121337891,
+     "y1": 547.3335571289062,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "et.v3",
+    "lines": [
+     "LOST IT",
+     "YET?"
+    ],
+    "phash": "60e11f1ee3c37838",
+    "atSec": 31.26,
+    "nearest": {
+     "id": "2026-11-18_eyetest_seed770715476_1nfcq",
+     "d": 22
+    },
+    "style": {
+     "font": "marker",
+     "palette": "red-white",
+     "plate": "tilt",
+     "align": "center",
+     "size": 132,
+     "cy": 460
+    },
+    "tried": [
+     {
+      "t": 31.26,
+      "score": 37.6,
+      "nearest": {
+       "id": "2026-11-18_eyetest_seed770715476_1nfcq",
+       "d": 22
+      }
+     }
+    ]
+   },
+   "pinned": "Score out of 3?",
+   "pinnedId": "et.p1",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "grid",
+    "border": "thick",
+    "borderColour": "#FF2E88",
+    "zoom": "punch",
+    "stage": {
+     "x": 0.17592592592592593,
+     "y": 0.08854166666666667,
+     "w": 0.6481481481481481,
+     "h": 0.703125
+    },
+    "letterbox": 0.54
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 46.77,
+    "contentEndSec": 44.77
+   },
+   "facts": {
+    "contentSec": 44.77,
+    "rounds": 3,
+    "balls": [
+     5,
+     6,
+     8
+    ],
+    "maxBalls": 8,
+    "shuffleSec": 6,
+    "nearMisses": 65,
+    "hidden": {
+     "answers": [
+      3,
+      1,
+      2
+     ]
+    },
+    "tense": [
+     [
+      3.8167,
+      8.9833
+     ],
+     [
+      17.1833,
+      22.366699999999998
+     ],
+     [
+      30.6167,
+      35.800000000000004
+     ]
+    ],
+    "format": "eyetest",
+    "keyword": "Eye test",
+    "seed": 1392436844,
+    "episode": 3
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-19T05:48:21.147Z",
+   "bufferPostId": "6afe8da559eff0b616e35f6e"
+  },
+  {
+   "id": "2026-11-19_colorwar_seed1589899426_1jtgs",
+   "createdAt": "2026-11-19T06:07:08.153Z",
+   "format": "colorwar",
+   "seed": 1589899426,
+   "source": {
+    "input": "/home/runner/work/clipper/clipper/data/work/lvk2wOL4anMk",
+    "video": "/home/runner/work/clipper/clipper/data/work/lvk2wOL4anMk/final.0.mp4"
+   },
+   "kitDir": "/home/runner/work/clipper/clipper/post-kits/2026-11-19_colorwar_seed1589899426_1jtgs",
+   "caption": "Color war: 4 colours, the Fine Grain board and every tile up for grabs 🟥🟦🟩🟨\nBe honest, did your colour make it?",
+   "captionFirstLine": "Color war: 4 colours, the Fine Grain board and every tile up for grabs 🟥🟦🟩🟨",
+   "captionStyle": "question",
+   "captionIds": [
+    "cw.q5",
+    "cw.a5"
+   ],
+   "hashtags": [
+    "colorwar",
+    "territorywar",
+    "oddlysatisfying",
+    "physics"
+   ],
+   "hook": {
+    "id": "cw.h1",
+    "lines": [
+     "4 COLOURS.",
+     "1 SURVIVOR."
+    ],
+    "style": {
+     "font": "anton",
+     "palette": "lime-night",
+     "plate": "pill",
+     "anim": "slide-right",
+     "align": "left",
+     "size": 112,
+     "sec": 2.8,
+     "cy": 1380
+    },
+    "slotMotion": 0.33,
+    "slotDetail": 19.8,
+    "slotPeak": 8.7,
+    "backing": {
+     "w": 860,
+     "h": 204
+    },
+    "extent": {
+     "x0": 183.46875,
+     "y0": 1244.03125,
+     "x1": 772.515625,
+     "y1": 1504
+    },
+    "firstFrame": {
+     "x0": 183.46875,
+     "y0": 1244.03125,
+     "x1": 760.515625,
+     "y1": 1504,
+     "o": 1
+    }
+   },
+   "cover": {
+    "id": "cw.v14",
+    "lines": [
+     "THE BORDERS",
+     "ARE MOVING"
+    ],
+    "phash": "43233ddc38c4cc1f",
+    "atSec": 39.16,
+    "nearest": {
+     "id": "2026-11-18_hotpotato_seed107_1bqxo",
+     "d": 24
+    },
+    "style": {
+     "font": "rubikmono",
+     "palette": "cyan-night",
+     "plate": "none",
+     "align": "center",
+     "size": 146,
+     "cy": 580
+    },
+    "tried": [
+     {
+      "t": 39.16,
+      "score": 82.3,
+      "nearest": {
+       "id": "2026-11-18_hotpotato_seed107_1bqxo",
+       "d": 24
+      }
+     }
+    ]
+   },
+   "pinned": "Did anyone call the winner before the final two at 25 seconds?",
+   "pinnedId": "cw.p2",
+   "sound": {
+    "track": "none"
+   },
+   "look": {
+    "bg": "stripes",
+    "border": "double",
+    "borderColour": "#FF2E88",
+    "zoom": "punch",
+    "stage": {
+     "x": 0.16666666666666666,
+     "y": 0.041666666666666664,
+     "w": 0.6666666666666666,
+     "h": 0.7135416666666666
+    },
+    "letterbox": 0.57
+   },
+   "video": {
+    "width": 2160,
+    "height": 3840,
+    "fps": 60,
+    "durationSec": 48.59,
+    "contentEndSec": 46.58
+   },
+   "facts": {
+    "contentSec": 46.58,
+    "board": "Fine Grain",
+    "colours": [
+     "Blue",
+     "Red",
+     "Green",
+     "Yellow"
+    ],
+    "n": 4,
+    "closest": 1,
+    "dip": 8,
+    "tense": [
+     [
+      25.8,
+      41.07
+     ],
+     [
+      13.071,
+      25
+     ]
+    ],
+    "hidden": {
+     "winner": "Yellow",
+     "words": [
+      "Yellow"
+     ]
+    },
+    "leadChanges": 15,
+    "bombs": 29,
+    "firstOut": {
+     "colour": "Green",
+     "t": "20"
+    },
+    "duelT": "25",
+    "snap": {
+     "colour": "Yellow",
+     "pct": "34",
+     "t": "17",
+     "rank": "first"
+    },
+    "format": "colorwar",
+    "keyword": "Color war",
+    "seed": 1589899426,
+    "episode": 6
+   },
+   "checks": {
+    "reveal": "pass",
+    "repeat": "pass",
+    "notes": [],
+    "eventsFrom": "render"
+   },
+   "posted": true,
+   "postedAt": "2026-11-19T06:08:15.381Z",
+   "bufferPostId": "6afe924f749099bdc715124e"
   }
  ]
 }
