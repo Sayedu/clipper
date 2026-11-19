@@ -65,6 +65,9 @@ export function TopBar({ right }: { right?: React.ReactNode }) {
         <Link href="/postkits" className="hover:text-[color:var(--color-text)]">
           Post kits
         </Link>
+        <Link href="/follow-the-target" className="hover:text-[color:var(--color-text)]">
+          Shuffle
+        </Link>
         <Link href="/colorwars" className="hover:text-[color:var(--color-text)]">
           Color Wars
         </Link>
