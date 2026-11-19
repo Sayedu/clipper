@@ -20,9 +20,10 @@ button,select,input{font:inherit;color:inherit}
 .safe{position:absolute;inset:0;pointer-events:none}
 .safe[hidden]{display:none}
 .safe i{position:absolute;background:repeating-linear-gradient(135deg,rgba(255,60,60,.28) 0 8px,rgba(255,60,60,.12) 8px 16px);outline:1px dashed rgba(255,90,90,.7)}
-.safe .t{left:0;right:0;top:0;height:10%}
-.safe .b{left:0;right:0;bottom:0;height:20%}
-.safe .r{right:0;top:10%;bottom:20%;width:15%}
+.safe .t{left:0;right:0;top:0;height:12.7%}
+.safe .b{left:0;right:0;bottom:0;height:11.5%}
+.safe .r{left:83.2%;right:0;top:52%;bottom:11.5%}
+.safe .l{left:0;top:12.7%;bottom:11.5%;width:5.2%}
 .safe span{position:absolute;left:8px;top:6px;font-size:11px;letter-spacing:.08em;color:#ffb3b3}
 
 .panel{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;padding:2px 2px 2px 0}
@@ -77,7 +78,7 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
   <main class="stage">
     <div class="frame">
       <canvas id="cv" width="1080" height="1920" aria-label="Follow the Target video preview"></canvas>
-      <div class="safe" id="safe" hidden><i class="t"></i><i class="b"></i><i class="r"></i><span>TIKTOK UI ZONES</span></div>
+      <div class="safe" id="safe" hidden><i class="t"></i><i class="b"></i><i class="r"></i><i class="l"></i><span>TIKTOK UI + CROP</span></div>
     </div>
   </main>
 
@@ -154,7 +155,7 @@ const W = 1080, H = 1920, TAU = Math.PI * 2;
 const T_HIDE0 = 1.8, T_HIDE1 = 2.2;      // target highlight hides between these times
 const T_SHUF0 = 2.2, T_END = 27.2;       // shuffle window: 25 s of movement
 const T_HOLD = 2.8, T_TOTAL = T_END + T_HOLD;
-const CX = 500;                           // text / button centre: middle of TikTok's safe area (x 0 to 918, left-biased)
+const CX = 510;                           // text / button centre: middle of what TikTok shows left of its button column
 const FONT = '"Arial Black","Impact","Helvetica Neue",Arial,sans-serif';
 
 /* ════════════════════════ helpers ════════════════════════ */
@@ -196,8 +197,8 @@ function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width 
 
 /* ════════════════════════ layout ════════════════════════ */
 function makeLayout(rows) {
-  const cols = 3, gy0 = 520, gy1 = 1350, gx = 60;   // grid sits left of centre so the right-hand TikTok button strip stays clear
-  const cellW = 300, cellH = Math.min(300, (gy1 - gy0) / rows);
+  const cols = 3, gy0 = 560, gy1 = 1460, gx = 128;   // 3.5 cells wide with the swing of the arcs: stays between x 70 and 880, left of TikTok's button column
+  const cellW = 230, cellH = Math.min(300, (gy1 - gy0) / rows);
   const x0 = gx, y0 = gy0 + ((gy1 - gy0) - cellH * rows) / 2;
   return {
     rows, cols, n: rows * cols, cellW, cellH, x0, y0, bw: cellW * 0.8, bh: cellH * 0.84,
@@ -618,7 +619,7 @@ THEMES.parking = {
     vignette(g, 0.5);
   },
   item(g, v, it) {
-    const L = v.L, o = v.th.o, len = Math.min(L.bw * 1.04, L.bh * 2.1), wid = len / 2.05;
+    const L = v.L, o = v.th.o, len = Math.min(L.bw * 1.08, L.bh * 2.1), wid = len / 2.05;
     const rot = 0.34 * it.dy * it.spd;
     g.save(); g.translate(it.x, it.y);
     blob(g, 4 + it.elev * 0.3, 10 + it.elev * 0.5, len * 0.58, wid * 0.62, 0.5 - Math.min(0.2, it.elev * 0.01));
@@ -990,11 +991,11 @@ function render(g, v, t) {
   const swap = smooth(T_END, T_END + 0.22, t);
   if (swap < 1) {
     const a = 1 - swap, dy = -26 * swap;
-    drawRich(g, v.hook[0], 252, 100, v.th.hlCol, a, 1, dy); drawRich(g, v.hook[1], 364, 114, v.th.hlCol, a, 1, dy);
+    drawRich(g, v.hook[0], 332, 94, v.th.hlCol, a, 1, dy); drawRich(g, v.hook[1], 440, 108, v.th.hlCol, a, 1, dy);
   }
   if (swap > 0) {
     const k = easeOutBack(clamp((t - T_END) / 0.3)), dy = 24 * (1 - swap);
-    drawRich(g, v.fin[0], 248, 88, v.th.hlCol, swap, 0.9 + 0.1 * k, dy); drawRich(g, v.fin[1], 360, 116, v.th.hlCol, swap, 0.9 + 0.1 * k, dy);
+    drawRich(g, v.fin[0], 326, 82, v.th.hlCol, swap, 0.9 + 0.1 * k, dy); drawRich(g, v.fin[1], 436, 108, v.th.hlCol, swap, 0.9 + 0.1 * k, dy);
   }
 
   if (t >= T_END) {
@@ -1005,10 +1006,10 @@ function render(g, v, t) {
     }
     // CTA
     const pa = smooth(T_END + 0.25, T_END + 0.7, t), sa = smooth(T_END + 0.5, T_END + 0.95, t);
-    const py = 1424 + 26 * (1 - pa), pw = 760, ph = 118, pls = 1 + 0.018 * Math.sin(t * 5);
+    const py = 1540 + 26 * (1 - pa), pw = 740, ph = 112, pls = 1 + 0.018 * Math.sin(t * 5);
     if (pa > 0) {
       g.save(); g.globalAlpha = pa; g.translate(CX, py); g.scale(pls, pls);
-      glow(g, 0, 0, 520, '#ffcf3a', 0.28);
+      glow(g, 0, 0, 480, '#ffcf3a', 0.28);
       g.fillStyle = lg(g, 0, -ph / 2, 0, ph / 2, [[0, '#ffe27a'], [0.5, '#ffc928'], [1, '#e59d0a']]); rr(g, -pw / 2, -ph / 2, pw, ph, ph / 2); g.fill();
       g.lineWidth = 6; g.strokeStyle = '#7a4d00'; g.stroke();
       g.fillStyle = 'rgba(255,255,255,0.35)'; rr(g, -pw / 2 + 18, -ph / 2 + 10, pw - 36, ph * 0.28, ph * 0.14); g.fill();
@@ -1017,7 +1018,7 @@ function render(g, v, t) {
     }
     if (sa > 0) {
       g.save(); g.globalAlpha = sa; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 38px ${FONT}`; g.lineJoin = 'round';
-      g.lineWidth = 9; g.strokeStyle = '#000'; g.strokeText('ANSWER TOMORROW • FOLLOW', CX, 1503); g.fillStyle = '#fff'; g.fillText('ANSWER TOMORROW • FOLLOW', CX, 1503);
+      g.lineWidth = 9; g.strokeStyle = '#000'; g.strokeText('ANSWER TOMORROW • FOLLOW', CX, 1622); g.fillStyle = '#fff'; g.fillText('ANSWER TOMORROW • FOLLOW', CX, 1622);
       g.restore();
     }
   }
@@ -1247,7 +1248,7 @@ window.FTT = {
       if (!v.targets.every(t => v.finalSlot[t] !== t)) bad('target did not move');
       if (v.win.some(n => n < 1 || n > v.n)) bad('win out of range');
       // positions stay on screen and inside the grid zone
-      for (let t = 0; t <= T_TOTAL; t += 0.1) for (let i = 0; i < v.n; i++) { const p = itemPos(v, i, t); if (p.x < 40 || p.x > W - 40 || p.y < 380 || p.y > 1480) { bad(`item off-grid at ${t.toFixed(1)}`); t = 99; break; } }
+      for (let t = 0; t <= T_TOTAL; t += 0.1) for (let i = 0; i < v.n; i++) { const p = itemPos(v, i, t); const hw = v.L.bw * 0.5 * p.sc; if (p.x - hw < 56 || p.x + hw > 893 || p.y < 470 || p.y > 1500) { bad(`item outside the TikTok-safe area at ${t.toFixed(1)}: x ${Math.round(p.x - hw)}..${Math.round(p.x + hw)}`); t = 99; break; } }
       // pacing: first three medium, last two sharp
       const d = v.moves.map(m => m.dur); if (!(d[d.length - 1] < d[0] && d[d.length - 2] < d[1])) bad('pacing');
     }
