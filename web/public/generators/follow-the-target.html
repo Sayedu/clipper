@@ -64,6 +64,10 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
 .opts .inline .btn{height:36px;padding:0 12px;font-size:13px}
 .chk{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px;color:var(--ink)!important;cursor:pointer}
 .note{color:var(--mute);font-size:12px;margin:0}
+details summary{cursor:pointer;color:var(--mute);font-size:12.5px;padding:4px 0}
+details[open] summary{margin-bottom:8px}
+.opts.adv{margin-top:2px}
+textarea{width:100%;border-radius:8px;border:1px solid var(--line);background:#0b0d13;padding:8px 10px;resize:vertical;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 @media (max-width:900px){
   body{height:auto}
   .app{grid-template-columns:1fr;height:auto;padding:16px}
@@ -117,6 +121,36 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
       </dl>
     </section>
 
+    <section class="card opts" id="cardVoice">
+      <h2>Voiceover and end text</h2>
+      <label class="chk" for="chkVoice"><input type="checkbox" id="chkVoice"> Voiceover at the start of the video</label>
+      <label class="chk" for="chkEnd"><input type="checkbox" id="chkEnd"> Rotating text under the button at the end</label>
+      <div class="status" id="voiceStatus" role="status" aria-live="polite"></div>
+      <details id="advVoice">
+        <summary>Voice and text settings</summary>
+        <div class="opts adv">
+          <label for="selEngine">Voice engine
+            <select id="selEngine"><option value="kokoro">Offline (Kokoro, no internet)</option><option value="edge">Online (edge-tts)</option></select>
+          </label>
+          <label for="inVoice">Voice name <input type="text" id="inVoice" list="voiceList" autocomplete="off" spellcheck="false"></label>
+          <datalist id="voiceList"></datalist>
+          <label for="inRate">Speaking rate (+10% is a bit faster than normal) <input type="text" id="inRate" autocomplete="off" spellcheck="false"></label>
+          <label for="selMode">Which line to use
+            <select id="selMode"><option value="rotate">Rotate: the next line for each recording</option><option value="random">Random</option><option value="fixed">Always the same line</option></select>
+          </label>
+          <label for="inFixed" id="lblFixed">Line number to use <input type="text" id="inFixed" inputmode="numeric"></label>
+          <label for="taLines">Voice lines, one per line. {question} and {find} fill in from the theme (for example “Which police car has the sirens?” and “the police car with the sirens”).
+            <textarea id="taLines" rows="7" spellcheck="false"></textarea>
+          </label>
+          <label for="inMax">Warn me if a line is longer than (seconds) <input type="text" id="inMax" inputmode="decimal"></label>
+          <label for="inDuck">Sound effects drop to this percent while the voice plays <input type="text" id="inDuck" inputmode="numeric"></label>
+          <label for="inEnd1">End text, first <input type="text" id="inEnd1" autocomplete="off"></label>
+          <label for="inEnd2">End text, then <input type="text" id="inEnd2" autocomplete="off"></label>
+          <label for="inSwitch">Switch to the second text this many seconds into the final freeze <input type="text" id="inSwitch" inputmode="decimal"></label>
+        </div>
+      </details>
+    </section>
+
     <section class="card opts">
       <h2>Options</h2>
       <label for="selTheme">Theme
@@ -155,6 +189,30 @@ const W = 1080, H = 1920, TAU = Math.PI * 2;
 const T_HIDE0 = 1.8, T_HIDE1 = 2.2;      // target highlight hides between these times
 const T_SHUF0 = 2.2, T_END = 27.2;       // shuffle window: 25 s of movement
 const T_HOLD = 2.8, T_TOTAL = T_END + T_HOLD;
+/* ── configuration: defaults, then what the settings card saved, then window.FTT_CONFIG (used by scripts/followtarget/render.mjs) ── */
+const DEFAULT_LINES = [
+  "{question} Comment the number and I'll tell you if you're right. Then send it to a friend. Loser buys lunch.",
+  "Can you find {find}? Comment your answer and I'll reply. Bet your friend can't.",
+  "Watch closely. {question} Comment the number, then send this to a friend. If they're wrong, they owe you food.",
+  "Only a few people get this right. {question} Comment and I'll tell you.",
+];
+const DEFAULT_CFG = {
+  // voice: engine 'kokoro' = offline, 'edge' = online edge-tts. rate is edge-style ("+10%").
+  // mode: 'rotate' = the next line for each recording, 'random', or 'fixed' (line number in `fixed`).
+  voice: { enabled: true, engine: 'kokoro', name: 'am_adam', rate: '+10%', mode: 'rotate', fixed: 1, maxSec: 6, duck: 35, lines: DEFAULT_LINES },
+  endText: { enabled: true, texts: ["I'LL REPLY IF YOU'RE RIGHT", 'SEND TO A FRIEND • LOSER BUYS LUNCH'], switchAt: 1.5 },
+  ttsUrl: '/worker/tts',
+};
+function mergeCfg(base, over) {
+  const o = JSON.parse(JSON.stringify(base));
+  if (over) { for (const k of ['voice', 'endText']) if (over[k]) Object.assign(o[k], over[k]); if (over.ttsUrl) o.ttsUrl = over.ttsUrl; }
+  return o;
+}
+let CFG = DEFAULT_CFG;
+try { CFG = mergeCfg(DEFAULT_CFG, JSON.parse(localStorage.getItem('ftt.cfg.v1') || 'null')); } catch (e) { /* storage unavailable: defaults */ }
+if (window.FTT_CONFIG) CFG = mergeCfg(CFG, window.FTT_CONFIG);
+const saveCfg = () => { try { localStorage.setItem('ftt.cfg.v1', JSON.stringify(CFG)); } catch (e) { /* not saved */ } };
+
 const CX = 510;                           // text / button centre: middle of what TikTok shows left of its button column
 const FONT = '"Arial Black","Impact","Helvetica Neue",Arial,sans-serif';
 
@@ -197,7 +255,7 @@ function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width 
 
 /* ════════════════════════ layout ════════════════════════ */
 function makeLayout(rows) {
-  const cols = 3, gy0 = 560, gy1 = 1460, gx = 128;   // 3.5 cells wide with the swing of the arcs: stays between x 70 and 880, left of TikTok's button column
+  const cols = 3, gy0 = 535, gy1 = 1335, gx = 128;   // 3.5 cells wide with the swing of the arcs: stays between x 70 and 880, left of TikTok's button column
   const cellW = 230, cellH = Math.min(300, (gy1 - gy0) / rows);
   const x0 = gx, y0 = gy0 + ((gy1 - gy0) - cellH * rows) / 2;
   return {
@@ -502,7 +560,7 @@ THEMES.cups = {
     const hook = nT === 1 ? pick(r, [["DON'T LOSE", 'THE *BALL*'], ['TRACK THE', '*GLOWING BALL*'], ['EYES ON', 'THE *BALL*'], ['FOLLOW THE', '*NEON BALL*']])
                           : pick(r, [["DON'T LOSE", 'BOTH *BALLS*'], ['TRACK THE', '*TWO BALLS*']]);
     const fin = nT === 1 ? ['WHICH CUP HAS', 'THE *BALL*?'] : ['WHICH CUPS HAVE', 'THE *BALLS*?'];
-    return { nT, o: { col, felt, balls }, hook, fin, targetWord: nT === 1 ? 'ball' : 'balls', sfx: { f0: 700, f1: 1500, q: 0.9, scrape: 1500, thump: 190, clink: 0 } };
+    return { nT, o: { col, felt, balls }, hook, fin, targetWord: nT === 1 ? 'ball' : 'balls', find: nT === 1 ? 'the cup with the ball' : 'the cups with the balls', sfx: { f0: 700, f1: 1500, q: 0.9, scrape: 1500, thump: 190, clink: 0 } };
   },
   bg(g, v, r) {
     const o = v.th.o, L = v.L;
@@ -600,7 +658,7 @@ THEMES.parking = {
     const lines = pick(r, ['#ffd23a', '#38e1ff', '#ff8cf0']);
     const hook = { sedan: [['FOLLOW THE', '*HEADLIGHTS*'], ['TRACK THE', '*FLASHING CAR*']], police: [['FOLLOW THE', '*POLICE CAR*'], ['WATCH THE', '*POLICE CAR*']], ambulance: [['FOLLOW THE', '*AMBULANCE*'], ['TRACK THE', '*AMBULANCE*']], fire: [['FOLLOW THE', '*FIRE TRUCK*'], ['TRACK THE', '*FIRE TRUCK*']] }[kind];
     const fin = { sedan: ['WHICH CAR HAS', 'THE *HEADLIGHTS*?'], police: ['WHICH POLICE CAR', 'HAS THE *SIRENS*?'], ambulance: ['WHICH AMBULANCE', 'HAS THE *SIRENS*?'], fire: ['WHICH FIRE TRUCK', 'HAS THE *SIRENS*?'] }[kind];
-    return { nT: 1, o: { kind, col, lines }, hook: pick(r, hook), fin, targetWord: kind === 'sedan' ? 'flashing car' : kind, sfx: { f0: 260, f1: 900, q: 0.7, scrape: 600, thump: 120, clink: 0, squeal: 1700 } };
+    return { nT: 1, o: { kind, col, lines }, hook: pick(r, hook), fin, targetWord: kind === 'sedan' ? 'flashing car' : kind, find: { sedan: 'the car with the headlights', police: 'the police car with the sirens', ambulance: 'the ambulance with the sirens', fire: 'the fire truck with the sirens' }[kind], sfx: { f0: 260, f1: 900, q: 0.7, scrape: 600, thump: 120, clink: 0, squeal: 1700 } };
   },
   bg(g, v, r) {
     const o = v.th.o, L = v.L;
@@ -671,7 +729,7 @@ THEMES.sky = {
     const noun = model === 'fighter' ? 'JET' : 'PLANE', word = glowCol === 'gold' ? 'GOLD' : 'RED';
     return { nT: 1, o: { model, glowCol: glowCol === 'gold' ? '#ffcf3a' : '#ff3d3d', pal, tint },
       hook: pick(r, [['FOLLOW THE', `*${word} ${noun}*`], ['TRACK THE', `*GLOWING ${noun}*`]]), fin: [`WHICH ${noun} HAS`, `THE *${word}* GLOW?`],
-      targetWord: `${word.toLowerCase()} ${noun.toLowerCase()}`, sfx: { f0: 1100, f1: 3000, q: 0.6, scrape: 2500, thump: 0, clink: 0, rumble: 260 } };
+      targetWord: `${word.toLowerCase()} ${noun.toLowerCase()}`, find: `the ${word.toLowerCase()} ${noun.toLowerCase()}`, sfx: { f0: 1100, f1: 3000, q: 0.6, scrape: 2500, thump: 0, clink: 0, rumble: 260 } };
   },
   bg(g, v, r) {
     const L = v.L;
@@ -788,11 +846,11 @@ THEMES.carton = {
     const kind = pick(r, ['egg', 'box']);
     if (kind === 'egg') {
       return { nT: 1, o: { kind, shell: pick(r, ['#f1e6d3', '#c99a6b', '#e9d9bf', '#f6f1e8']), tray: pick(r, ['#b9b3a3', '#a99f8c', '#c4bba6']) },
-        hook: pick(r, [['TRACK THE', '*GOLDEN EGG*'], ['FOLLOW THE', '*GOLDEN EGG*'], ['WATCH THE', '*GOLDEN EGG*']]), fin: ['WHICH EGG IS', 'THE *GOLDEN* ONE?'], targetWord: 'golden egg',
+        hook: pick(r, [['TRACK THE', '*GOLDEN EGG*'], ['FOLLOW THE', '*GOLDEN EGG*'], ['WATCH THE', '*GOLDEN EGG*']]), fin: ['WHICH EGG IS', 'THE *GOLDEN* ONE?'], targetWord: 'golden egg', find: 'the golden egg',
         sfx: { f0: 520, f1: 1000, q: 0.8, scrape: 900, thump: 230, clink: 0 } };
     }
     return { nT: 1, o: { kind, board: pick(r, ['#b98c58', '#c19a63', '#a87d4c']), fur: pick(r, ['#f0a23c', '#8d97a5', '#d8d2c6', '#3a3a42']) },
-      hook: pick(r, [['TRACK THE', '*HIDDEN CAT*'], ['FOLLOW THE', '*CAT*'], ['WATCH THE', '*CAT*']]), fin: ['WHICH BOX HAS', 'THE *CAT*?'], targetWord: 'cat',
+      hook: pick(r, [['TRACK THE', '*HIDDEN CAT*'], ['FOLLOW THE', '*CAT*'], ['WATCH THE', '*CAT*']]), fin: ['WHICH BOX HAS', 'THE *CAT*?'], targetWord: 'cat', find: 'the cat in the box',
       sfx: { f0: 400, f1: 900, q: 0.7, scrape: 700, thump: 120, clink: 0 } };
   },
   bg(g, v, r) {
@@ -891,7 +949,7 @@ THEMES.coins = {
   setup(r) {
     const metal = pick(r, ['gold', 'silver']), mark = pick(r, ['btc', 'diamond']);
     const nm = mark === 'btc' ? 'BITCOIN' : 'DIAMOND';
-    return { nT: 1, o: { metal, mark }, hook: pick(r, [['FOLLOW THE', `*${nm}*`], ['TRACK THE', `*${nm}*`], ['WATCH THE', `*${nm}* COIN`]]), fin: ['WHICH COIN IS', `THE *${nm}*?`], targetWord: nm.toLowerCase(),
+    return { nT: 1, o: { metal, mark }, hook: pick(r, [['FOLLOW THE', `*${nm}*`], ['TRACK THE', `*${nm}*`], ['WATCH THE', `*${nm}* COIN`]]), fin: ['WHICH COIN IS', `THE *${nm}*?`], targetWord: nm.toLowerCase(), find: `the ${nm.toLowerCase()} coin`,
       sfx: { f0: 1900, f1: 4400, q: 1.2, scrape: 3000, thump: 0, clink: 1 } };
   },
   bg(g, v, r) {
@@ -991,11 +1049,11 @@ function render(g, v, t) {
   const swap = smooth(T_END, T_END + 0.22, t);
   if (swap < 1) {
     const a = 1 - swap, dy = -26 * swap;
-    drawRich(g, v.hook[0], 332, 94, v.th.hlCol, a, 1, dy); drawRich(g, v.hook[1], 440, 108, v.th.hlCol, a, 1, dy);
+    drawRich(g, v.hook[0], 316, 90, v.th.hlCol, a, 1, dy); drawRich(g, v.hook[1], 418, 104, v.th.hlCol, a, 1, dy);
   }
   if (swap > 0) {
     const k = easeOutBack(clamp((t - T_END) / 0.3)), dy = 24 * (1 - swap);
-    drawRich(g, v.fin[0], 326, 82, v.th.hlCol, swap, 0.9 + 0.1 * k, dy); drawRich(g, v.fin[1], 436, 108, v.th.hlCol, swap, 0.9 + 0.1 * k, dy);
+    drawRich(g, v.fin[0], 310, 78, v.th.hlCol, swap, 0.9 + 0.1 * k, dy); drawRich(g, v.fin[1], 414, 104, v.th.hlCol, swap, 0.9 + 0.1 * k, dy);
   }
 
   if (t >= T_END) {
@@ -1004,9 +1062,8 @@ function render(g, v, t) {
       const s = v.finalSlot[i], P = L.slot(s);
       drawNumber(g, s + 1, P.x, P.y + L.bh * T.numDy, ns, easeOutBack(clamp((t - T_END - 0.008 * s) / 0.28)));
     }
-    // CTA
-    const pa = smooth(T_END + 0.25, T_END + 0.7, t), sa = smooth(T_END + 0.5, T_END + 0.95, t);
-    const py = 1540 + 26 * (1 - pa), pw = 740, ph = 112, pls = 1 + 0.018 * Math.sin(t * 5);
+    // CTA: the pill, then (optionally) a line under it that changes once
+    const pa = smooth(T_END + 0.25, T_END + 0.7, t), py = 1410 + 26 * (1 - pa), pw = 740, ph = 112, pls = 1 + 0.018 * Math.sin(t * 5);
     if (pa > 0) {
       g.save(); g.globalAlpha = pa; g.translate(CX, py); g.scale(pls, pls);
       glow(g, 0, 0, 480, '#ffcf3a', 0.28);
@@ -1016,12 +1073,25 @@ function render(g, v, t) {
       g.font = `900 50px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#2b1b00'; g.fillText('COMMENT THE NUMBER ↓', 0, 5);
       g.restore();
     }
-    if (sa > 0) {
-      g.save(); g.globalAlpha = sa; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 38px ${FONT}`; g.lineJoin = 'round';
-      g.lineWidth = 9; g.strokeStyle = '#000'; g.strokeText('ANSWER TOMORROW • FOLLOW', CX, 1622); g.fillStyle = '#fff'; g.fillText('ANSWER TOMORROW • FOLLOW', CX, 1622);
-      g.restore();
+    const E = CFG.endText, texts = (E.texts || []).map(x => String(x).trim().toUpperCase()).filter(Boolean).slice(0, 2);
+    if (E.enabled && texts.length) {
+      const rel = t - T_END, sw = clamp(+E.switchAt || 1.5, 0.7, T_HOLD - 0.4), y = 1498;
+      if (texts.length === 1 || rel < sw) endLine(g, texts[0], y, smooth(0.5, 0.85, rel) * (texts.length === 2 ? 1 - smooth(sw - 0.02, sw + 0.14, rel) : 1), 1 + 0.07 * (1 - clamp((rel - 0.5) / 0.3)));
+      else {
+        endLine(g, texts[0], y, 1 - smooth(sw, sw + 0.14, rel), 1);
+        endLine(g, texts[1], y, smooth(sw + 0.04, sw + 0.2, rel), 0.6 + 0.4 * easeOutBack(clamp((rel - sw - 0.04) / 0.3)));
+      }
     }
   }
+}
+function endLine(g, text, y, alpha, scale) {
+  if (alpha <= 0.01) return;
+  g.save(); g.globalAlpha = clamp(alpha); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  let fs = 38; g.font = `900 ${fs}px ${FONT}`;
+  const w = g.measureText(text).width, maxW = 720; if (w > maxW) { fs = Math.floor(fs * maxW / w); g.font = `900 ${fs}px ${FONT}`; }
+  g.translate(CX, y); g.scale(scale, scale);
+  g.lineWidth = 9; g.strokeStyle = '#000'; g.strokeText(text, 0, 0); g.fillStyle = '#fff'; g.fillText(text, 0, 0);
+  g.restore();
 }
 
 /* ════════════════════════ audio (100% Web Audio, no instruments) ════════════════════════ */
@@ -1047,8 +1117,8 @@ const sfx = {
     return this.ctx;
   },
   /** Schedule the whole soundtrack for variation v starting at ctx time `at`. Returns a handle with stop(). */
-  schedule(v, at) {
-    const c = this.ctx, bus = c.createGain(); bus.gain.value = 1; bus.connect(this.master);
+  schedule(v, at, voice = null) {
+    const c = this.ctx, duck = c.createGain(), bus = c.createGain(); duck.gain.value = 1; bus.gain.value = 1; duck.connect(this.master); bus.connect(duck);
     const rnd = mulberry32((v.seed ^ 0xA53C9E) >>> 0), S = v.th.sfx, white = this.white, pink = this.pink, nodes = [];
     const bq = (type, f, q) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
     const ns = (buf, when, dur, node) => { const s = c.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(node); s.start(when, rnd() * (buf.duration - 0.2)); s.stop(when + dur + 0.05); nodes.push(s); return s; };
@@ -1098,7 +1168,22 @@ const sfx = {
     // lock-in: numbers pop in
     chime(at + T_END, 0.4); pop(at + T_END + 0.02, 900, 0.3); whoosh(at + T_END + 0.27, 0.35, 1500, 3200, 0.8, 0.12);
 
-    return { stop() { const n = c.currentTime; bus.gain.cancelScheduledValues(n); bus.gain.setValueAtTime(bus.gain.value, n); bus.gain.linearRampToValueAtTime(0, n + 0.04); setTimeout(() => { for (const s of nodes) { try { s.stop(); } catch (e) { } } try { bus.disconnect(); } catch (e) { } }, 90); } };
+    // voiceover: starts with the video (0.02 s in); the sound effects and room tone drop to the
+    // configured level while it plays and come back afterwards
+    let vg = null;
+    if (voice) {
+      const vs = c.createBufferSource(); vg = c.createGain(); vg.gain.value = 1.0; vs.buffer = voice.buf; vs.connect(vg).connect(this.master);
+      const st = at + 0.02, en = st + voice.dur, lvl = clamp(CFG.voice.duck / 100, 0.1, 1);
+      vs.start(st, voice.trim); nodes.push(vs);
+      duck.gain.setValueAtTime(1, Math.max(c.currentTime, st - 0.05)); duck.gain.linearRampToValueAtTime(lvl, st + 0.08);
+      duck.gain.setValueAtTime(lvl, en); duck.gain.linearRampToValueAtTime(1, en + 0.45);
+    }
+
+    return { stop() {
+      const n = c.currentTime;
+      for (const gn of [bus, vg]) if (gn) { gn.gain.cancelScheduledValues(n); gn.gain.setValueAtTime(gn.gain.value, n); gn.gain.linearRampToValueAtTime(0, n + 0.04); }
+      setTimeout(() => { for (const s of nodes) { try { s.stop(); } catch (e) { } } for (const gn of [bus, duck, vg]) { try { gn && gn.disconnect(); } catch (e) { } } }, 90);
+    } };
   },
 };
 
@@ -1106,11 +1191,66 @@ const sfx = {
 const cv = document.getElementById('cv'), g = cv.getContext('2d', { alpha: false });
 const $ = id => document.getElementById(id);
 const ui = { status: $('status'), clock: $('clock'), phase: $('phase'), bar: $('barFill'), btnNew: $('btnNew'), btnPlay: $('btnPlay'), btnRec: $('btnRec') };
-let cur = null, run = null, recorder = null;
+let cur = null, run = null, recorder = null, waiting = false;
 let REC_TAIL = +(new URLSearchParams(location.search).get('tail') ?? 0.12);
 
 function say(msg, cls = '') { ui.status.textContent = msg; ui.status.className = 'status ' + cls; }
 function phaseName(t) { return t < T_HIDE1 ? 'Reveal' : t < T_END ? 'Shuffle' : 'Cliffhanger freeze'; }
+
+/* ── voiceover: choose the line, fetch + decode it (the site's /worker/tts makes and caches it) ── */
+const lineList = () => { const l = (CFG.voice.lines || []).map(x => String(x).trim()).filter(Boolean); return l.length ? l : DEFAULT_LINES; };
+const rotationNext = () => { try { return Math.max(0, parseInt(localStorage.getItem('ftt.voiceNext') || '0', 10) || 0); } catch (e) { return 0; } };
+const bumpRotation = () => { try { localStorage.setItem('ftt.voiceNext', String(rotationNext() + 1)); } catch (e) { /* not saved */ } };
+function questionOf(v) { const t = v.th.fin.join(' ').replace(/\*/g, '').toLowerCase().replace(/\bbitcoin\b/, 'Bitcoin'); return t.charAt(0).toUpperCase() + t.slice(1); }
+const findOf = v => String(v.th.find || 'the target').replace(/\bbitcoin\b/, 'Bitcoin');
+function voiceLineIndex(v) {
+  const n = lineList().length, c = CFG.voice;
+  if (c.mode === 'fixed') return clamp(Math.round(+c.fixed || 1) - 1, 0, n - 1);
+  if (c.mode === 'random') return Math.floor(mulberry32((v.seed ^ 0x51ED) >>> 0)() * n);
+  return rotationNext() % n;
+}
+const fillLine = (line, v) => line.replace(/\{question\}/g, questionOf(v)).replace(/\{find\}/g, findOf(v));
+const voiceCache = new Map();
+function loadVoice(text) {
+  const c = CFG.voice, key = [c.engine, c.name, c.rate, text].join('|');
+  if (!voiceCache.has(key)) {
+    voiceCache.set(key, (async () => {
+      const url = `${CFG.ttsUrl}?engine=${encodeURIComponent(c.engine)}&voice=${encodeURIComponent(c.name)}&rate=${encodeURIComponent(c.rate)}&text=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      if (!res.ok) { let m = ''; try { m = (await res.json()).error; } catch (e) { /* not json */ } throw new Error(m || `the voice service answered ${res.status}`); }
+      const ac = sfx.ensure(false); if (!ac) throw new Error('Web Audio is not available');
+      const buf = await ac.decodeAudioData(await res.arrayBuffer());
+      const d = buf.getChannelData(0); let i = 0; while (i < d.length && Math.abs(d[i]) < 0.015) i++;
+      const trim = Math.max(0, i / buf.sampleRate - 0.02);                 // start on the first sound, not the silence before it
+      return { buf, trim, dur: buf.duration - trim, text };
+    })().catch(e => { voiceCache.delete(key); throw e; }));
+  }
+  return voiceCache.get(key);
+}
+function prepareVoice(v) {
+  v.voice = null; v.voiceErr = null; v.voiceIdx = voiceLineIndex(v);
+  v.voiceText = CFG.voice.enabled ? fillLine(lineList()[v.voiceIdx], v) : '';
+  v.voiceP = !CFG.voice.enabled ? Promise.resolve(null)
+    : loadVoice(v.voiceText).then(x => { if (cur === v) { v.voice = x; showVoice(v); } else v.voice = x; return x; })
+        .catch(e => { v.voiceErr = e.message; if (cur === v) showVoice(v); return null; });
+  showVoice(v);
+  return v.voiceP;
+}
+function showVoice(v) {
+  const el = $('voiceStatus'), c = CFG.voice; if (!el) return;
+  const n = lineList().length;
+  let msg = '', cls = 'status';
+  if (!c.enabled) msg = 'Voiceover is off.';
+  else if (v.voiceErr) { msg = `Voice not available: ${v.voiceErr}. Recording is blocked until you fix it or switch the voiceover off.`; cls += ' err'; }
+  else if (!v.voice) msg = 'Making the voice…';
+  else {
+    msg = `Line ${v.voiceIdx + 1} of ${n}: “${v.voice.text}” · ${v.voice.dur.toFixed(1)} s`;
+    if (v.voice.dur > c.maxSec) { msg += `\nWARNING: that is ${v.voice.dur.toFixed(1)} s, over your ${c.maxSec} s limit. Shorten the line or raise the speaking rate.`; cls += ' warn'; }
+    else cls += ' ok';
+    if (c.mode === 'rotate') msg += `\nThe next recording uses line ${v.voiceIdx + 1}; the one after uses line ${(v.voiceIdx + 1) % n + 1}.`;
+  }
+  el.textContent = msg; el.className = cls; el.style.whiteSpace = 'pre-line';
+}
 
 function setVariation(v) {
   cur = v;
@@ -1126,23 +1266,30 @@ function setVariation(v) {
   $('winNum').textContent = label;
   $('winDesc').textContent = `Item${v.win.length > 1 ? 's' : ''} start in ${v.targets.map(s => '#' + (s + 1)).sort().join(' & ')} and end at ${label}.`;
   $('snip').textContent = snippet(v);
+  prepareVoice(v);
 }
 const snippet = v => `Yesterday's Answer: ${v.win.map(n => '#' + n).join(' & ')} 👀 Did you get it right?`;
 
-function generate(seed = newSeed(), sound = true) {
+/** Waits for the voice (if it is on) so it can start together with the first frame. */
+async function withVoice(v, then) {
+  if (CFG.voice.enabled && !v.voice && !v.voiceErr) { waiting = true; say('Making the voice…'); await v.voiceP; waiting = false; }
+  if (cur !== v) return;
+  return then();
+}
+async function generate(seed = newSeed(), sound = true) {
   stopRun();
   const rowsSel = +$('selGrid').value || 0;
   const v = makeVariation(seed, { theme: $('selTheme').value, rows: rowsSel || undefined });
   setVariation(v);
-  startRun({ sound });
-  say(sound ? 'New variation playing.' : 'Preview is playing without sound. Press Replay to hear it.');
+  if (!sound) { startRun({ sound: false }); say('Preview is playing without sound. Press Replay to hear it.'); return; }
+  await withVoice(v, () => { startRun({ sound: true }); say(v.voiceErr ? 'Playing without the voice (see the voice box).' : 'New variation playing.', v.voiceErr ? 'warn' : ''); });
 }
 
 function startRun({ sound = false, record = false } = {}) {
   stopRun(true);
   const lead = 0.1;
   run = { t0: performance.now() + lead * 1000, sound, record, ended: false, audio: null };
-  if (sound) { const c = sfx.ensure(); if (c) run.audio = sfx.schedule(cur, c.currentTime + lead); }
+  if (sound) { const c = sfx.ensure(); if (c) run.audio = sfx.schedule(cur, c.currentTime + lead, CFG.voice.enabled ? cur.voice : null); }
   ui.btnPlay.disabled = ui.btnNew.disabled = ui.btnRec.disabled = record;
 }
 function stopRun(keepRec) {
@@ -1158,7 +1305,7 @@ function frame() {
     const raw = (performance.now() - run.t0) / 1000;
     t = clamp(raw, 0, T_TOTAL);
     if (!run.ended && raw >= T_TOTAL + (run.record ? REC_TAIL : 0)) { run.ended = true; onEnd(); }
-  } else t = T_TOTAL;
+  } else t = waiting ? 0 : T_TOTAL;
   if (cur) render(g, cur, t);
   ui.clock.textContent = `${t.toFixed(1)} / ${T_TOTAL.toFixed(1)} s`;
   ui.bar.style.width = (t / T_TOTAL * 100).toFixed(1) + '%';
@@ -1176,10 +1323,14 @@ function pickMime() {
   const list = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
   return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 }
-function recordAndDownload() {
+async function recordAndDownload() {
   if (!window.MediaRecorder || !cv.captureStream) { say('This browser cannot record the canvas. Use a recent Chrome.', 'err'); return; }
   const ctx = sfx.ensure(); if (!ctx) { say('Web Audio is not available in this browser.', 'err'); return; }
-  const mime = pickMime(), v = cur;
+  const v = cur;
+  if (CFG.voice.enabled && !v.voice && !v.voiceErr) { waiting = true; say('Making the voice…'); await v.voiceP; waiting = false; }
+  if (cur !== v) return;
+  if (CFG.voice.enabled && !v.voice) { say(`Not recording: the voice failed (${v.voiceErr || 'unknown'}). Fix it or switch the voiceover off, so you don't post a video without it.`, 'err'); return; }
+  const mime = pickMime();
   const stream = new MediaStream([...cv.captureStream(60).getVideoTracks(), ...sfx.recDest.stream.getAudioTracks()]);
   const chunks = [];
   let rec;
@@ -1195,7 +1346,8 @@ function recordAndDownload() {
     recorder = null; if (run) { if (run.audio) setTimeout(() => run && run.audio && run.audio.stop(), 300); }
     run = null; ui.btnPlay.disabled = ui.btnNew.disabled = ui.btnRec.disabled = false;
     say(`Saved ${name} (${(blob.size / 1048576).toFixed(1)} MB, ${type.split(';')[0]}).`, 'ok');
-    window.__lastRecording = { name, size: blob.size, type };
+    window.__lastRecording = { name, size: blob.size, type, voice: v.voice ? { text: v.voice.text, sec: +v.voice.dur.toFixed(2) } : null };
+    if (CFG.voice.enabled && CFG.voice.mode === 'rotate') { bumpRotation(); showVoice(v); }
   };
   rec.onerror = e => say('Recording error: ' + (e.error && e.error.message || 'unknown'), 'err');
   rec.start(250);
@@ -1207,7 +1359,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 $('btnNew').addEventListener('click', () => generate());
-$('btnPlay').addEventListener('click', () => { startRun({ sound: true }); say('Replaying with sound.'); });
+$('btnPlay').addEventListener('click', () => { const v = cur; withVoice(v, () => { startRun({ sound: true }); say('Replaying with sound.'); }); });
 $('btnRec').addEventListener('click', recordAndDownload);
 $('btnSeed').addEventListener('click', () => { const s = Number($('inSeed').value.trim()); if (Number.isFinite(s) && s >= 0) generate(s >>> 0); else say('Enter a whole number for the seed.', 'err'); });
 $('inSeed').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnSeed').click(); });
@@ -1224,10 +1376,43 @@ $('btnCopy').addEventListener('click', async () => {
   }
 });
 
+/* voiceover + end text settings */
+const VOICES = {
+  kokoro: ['am_adam', 'am_michael', 'am_echo', 'am_eric', 'am_liam', 'am_puck', 'am_fenrir', 'af_heart', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky', 'af_nova', 'bm_george', 'bf_emma'],
+  edge: ['en-US-AndrewNeural', 'en-US-AvaNeural', 'en-US-GuyNeural', 'en-US-AriaNeural', 'en-US-ChristopherNeural', 'en-US-EmmaNeural', 'en-GB-RyanNeural'],
+};
+function fillSettings() {
+  const c = CFG.voice, e = CFG.endText;
+  $('chkVoice').checked = c.enabled; $('chkEnd').checked = e.enabled;
+  $('selEngine').value = c.engine; $('inVoice').value = c.name; $('inRate').value = c.rate; $('selMode').value = c.mode; $('inFixed').value = c.fixed;
+  $('taLines').value = lineList().join('\n'); $('inMax').value = c.maxSec; $('inDuck').value = c.duck;
+  $('inEnd1').value = e.texts[0] || ''; $('inEnd2').value = e.texts[1] || ''; $('inSwitch').value = e.switchAt;
+  $('voiceList').innerHTML = VOICES[c.engine].map(n => `<option value="${n}">`).join('');
+  $('lblFixed').hidden = c.mode !== 'fixed';
+}
+function onVoiceSettingChange() { saveCfg(); fillSettings(); if (cur) { prepareVoice(cur); } }
+const num = (el, d, lo, hi) => { const x = parseFloat(String(el.value).replace(',', '.')); return Number.isFinite(x) ? clamp(x, lo, hi) : d; };
+$('chkVoice').addEventListener('change', e => { CFG.voice.enabled = e.target.checked; onVoiceSettingChange(); });
+$('chkEnd').addEventListener('change', e => { CFG.endText.enabled = e.target.checked; saveCfg(); });
+$('selEngine').addEventListener('change', e => { CFG.voice.engine = e.target.value; if (!(VOICES[CFG.voice.engine].includes(CFG.voice.name))) CFG.voice.name = VOICES[CFG.voice.engine][0]; onVoiceSettingChange(); });
+$('inVoice').addEventListener('change', e => { CFG.voice.name = e.target.value.trim() || VOICES[CFG.voice.engine][0]; onVoiceSettingChange(); });
+$('inRate').addEventListener('change', e => { const r = e.target.value.trim(); CFG.voice.rate = /^[+-]\d{1,3}%$/.test(r) ? r : DEFAULT_CFG.voice.rate; onVoiceSettingChange(); });
+$('selMode').addEventListener('change', e => { CFG.voice.mode = e.target.value; onVoiceSettingChange(); });
+$('inFixed').addEventListener('change', e => { CFG.voice.fixed = Math.max(1, Math.round(num(e.target, 1, 1, 99))); onVoiceSettingChange(); });
+$('taLines').addEventListener('change', e => { CFG.voice.lines = e.target.value.split('\n').map(x => x.trim()).filter(Boolean); onVoiceSettingChange(); });
+$('inMax').addEventListener('change', e => { CFG.voice.maxSec = num(e.target, 6, 1, 30); saveCfg(); fillSettings(); if (cur) showVoice(cur); });
+$('inDuck').addEventListener('change', e => { CFG.voice.duck = Math.round(num(e.target, 35, 10, 100)); saveCfg(); fillSettings(); });
+$('inEnd1').addEventListener('change', e => { CFG.endText.texts[0] = e.target.value; saveCfg(); });
+$('inEnd2').addEventListener('change', e => { CFG.endText.texts[1] = e.target.value; saveCfg(); });
+$('inSwitch').addEventListener('change', e => { CFG.endText.switchAt = num(e.target, 1.5, 0.7, T_HOLD - 0.4); saveCfg(); fillSettings(); });
+fillSettings();
+
 /* debug / test hooks */
 window.FTT = {
   makeVariation, render: (v, t) => render(g, v, t), get cur() { return cur; }, T_TOTAL, T_END, T_SHUF0, itemPos, setVariation,
   drawAt(t) { render(g, cur, t); }, load(seed, opt) { stopRun(); const v = makeVariation(seed, opt || {}); setVariation(v); run = null; return v; },
+  get cfg() { return CFG; }, setConfig(over) { CFG = mergeCfg(CFG, over); fillSettings(); if (cur) prepareVoice(cur); },
+  async voiceInfo() { const v = cur; await v.voiceP; return { enabled: CFG.voice.enabled, line: v.voiceText, index: v.voiceIdx, lines: lineList().length, sec: v.voice ? +v.voice.dur.toFixed(2) : null, error: v.voiceErr, tooLong: !!(v.voice && v.voice.dur > CFG.voice.maxSec), maxSec: CFG.voice.maxSec, engine: CFG.voice.engine, name: CFG.voice.name, rate: CFG.voice.rate }; },
   selfTest(count = 200) {
     const out = { runs: 0, fails: [], themes: {}, rows: {}, moves: {}, types: {} };
     for (let k = 0; k < count; k++) {

@@ -31,6 +31,7 @@ import {
   MIN_SEASON_EPISODES,
 } from './colorwarSeason.ts';
 import { searchSeasonSeeds } from '../../scripts/colorwar/search.mjs';
+import { ttsLine } from '../../scripts/followtarget/tts.mjs';
 import { KITS_DIR, findRenders, packageVideo, writeQueue } from '../../scripts/packaging/package.mjs';
 import { markPosted, readLog as readPostLog } from '../../scripts/packaging/postlog.mjs';
 import { Router, readJson, sendJson, serveFile, type Ctx } from './http.ts';
@@ -142,6 +143,19 @@ export function buildRouter(): Router {
   const r = new Router();
 
   r.get('/health', ({ res }) => sendJson(res, 200, { ok: true, queue: queue.status() }));
+
+  // Voiceover line for Follow the Target (offline Kokoro by default, or edge-tts;
+  // cached on disk). Takes ?text=&engine=&voice=&rate= and answers with the audio.
+  r.get('/tts', async (ctx) => {
+    const q = ctx.url.searchParams;
+    try {
+      const out = await ttsLine({ text: q.get('text') ?? '', engine: (q.get('engine') ?? undefined) as 'kokoro' | 'edge' | undefined, voice: q.get('voice') ?? undefined, rate: q.get('rate') ?? undefined });
+      ctx.res.setHeader('X-Voice-Cached', out.cached ? '1' : '0');
+      serveFile(ctx, out.path);
+    } catch (err) {
+      sendJson(ctx.res, 502, { error: (err as Error).message });
+    }
+  });
 
   r.get('/doctor', async ({ res }) => sendJson(res, 200, await runDoctor()));
 

@@ -68,3 +68,5 @@ render/findthecat/render-log.jsonl
 
 # post packaging: kits (videos) stay local; post-log/daily.json is tracked (CI writes it)
 post-kits/
+render/followtarget/out/
+data/tts-cache/

@@ -19,6 +19,8 @@ dependencies = [
     # Storyteller mode — narration
     "kokoro-onnx>=0.4",     # Kokoro-82M TTS (Apache-2.0, CPU); bundles espeak-ng via espeakng-loader
     "soundfile>=0.12",      # write the narration WAV
+    # Follow the Target — start-of-video voiceover (Microsoft Edge online voices; needs internet)
+    "edge-tts>=7.0",
 ]
 
 # These scripts are invoked directly by the worker via the venv interpreter:
