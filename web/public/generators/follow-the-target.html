@@ -82,7 +82,7 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
   </main>
 
   <aside class="panel">
-    <div class="brand"><h1>Follow the Target</h1><small>1080 × 1920 · 60 fps · 17.8 s</small></div>
+    <div class="brand"><h1>Follow the Target</h1><small id="brandLen">1080 × 1920 · 60 fps</small></div>
 
     <section class="card btns">
       <button class="btn primary" id="btnNew">Generate New Variation</button>
@@ -92,7 +92,7 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
       </div>
       <div>
         <div class="bar"><i id="barFill"></i></div>
-        <div class="stat"><span id="phase">Preview</span><b id="clock">0.0 / 17.8 s</b></div>
+        <div class="stat"><span id="phase">Preview</span><b id="clock">0.0 s</b></div>
         <div class="status" id="status" role="status" aria-live="polite">Preview is playing without sound. Press Replay to hear it.</div>
       </div>
     </section>
@@ -152,7 +152,7 @@ dt{color:var(--mute)} dd{margin:0;text-align:right;font-variant-numeric:tabular-
 /* ════════════════════════ constants ════════════════════════ */
 const W = 1080, H = 1920, TAU = Math.PI * 2;
 const T_HIDE0 = 1.8, T_HIDE1 = 2.2;      // target highlight hides between these times
-const T_SHUF0 = 2.2, T_END = 15.0;       // shuffle window
+const T_SHUF0 = 2.2, T_END = 27.2;       // shuffle window: 25 s of movement
 const T_HOLD = 2.8, T_TOTAL = T_END + T_HOLD;
 const CX = 500;                           // text / button centre: middle of TikTok's safe area (x 0 to 918, left-biased)
 const FONT = '"Arial Black","Impact","Helvetica Neue",Arial,sans-serif';
@@ -221,7 +221,7 @@ function segPos(L, s, u) {
       return { x: lerp(A.x, B.x, e) + (s.ax === 'x' ? o : 0), y: lerp(A.y, B.y, e) + (s.ax === 'y' ? o : 0), sc: 1 - 0.12 * sn, z: -1 };
     }
     case 'ell': {
-      const phi = s.phi0 + s.dir * Math.PI / 2 * e;
+      const phi = s.phi0 + s.dir * (s.span || Math.PI / 2) * e;
       return { x: s.cx + (L.cellW / Math.SQRT2) * Math.cos(phi), y: s.cy + (L.cellH / Math.SQRT2) * Math.sin(phi), sc: 1 + 0.04 * sn, z: 0 };
     }
   }
@@ -245,7 +245,7 @@ function genShuffle(r, L, targets) {
     return true;
   };
   let best = null;
-  for (let att = 0; att < 80; att++) {
+  for (let att = 0; att < 40; att++) {
     const res = attempt();
     if (!best || res.score > best.score) best = res;
     if (res.score >= 100) break;
@@ -253,12 +253,14 @@ function genShuffle(r, L, targets) {
   return best;
 
   function attempt() {
-    const count = 14 + Math.floor(r() * 7);
+    const count = 40 + Math.floor(r() * 13);                      // 40 to 52 moves across the 25 s shuffle
     const seq = new Array(count).fill(null);
     seq[0] = seq[1] = seq[2] = 'pairs'; seq[count - 2] = 'pairs'; seq[count - 1] = 'diag';
     const mids = shuffled(r, Array.from({ length: count - 5 }, (_, i) => i + 3));
-    ['row', 'col', 'rot', 'diag', 'rot'].forEach((t, i) => { seq[mids[i]] = t; });
-    for (let i = 3; i < count - 2; i++) if (!seq[i]) { const x = r(); seq[i] = x < .46 ? 'pairs' : x < .58 ? 'row' : x < .68 ? 'col' : x < .84 ? 'rot' : 'diag'; }
+    ['row', 'col', 'rot', 'diag', 'rot180', 'tri', 'ring', 'rot', 'rot180', 'tri', 'ring'].forEach((t, i) => { seq[mids[i]] = t; });
+    const WEIGHTS = [['pairs', .28], ['row', .07], ['col', .06], ['rot', .15], ['diag', .11], ['rot180', .09], ['tri', .09], ['ring', .09], ['row2', .06]];
+    const pickType = () => { let x = r(); for (const [t, p] of WEIGHTS) { if ((x -= p) < 0) return t; } return 'pairs'; };
+    for (let i = 3; i < count - 2; i++) if (!seq[i]) seq[i] = pickType();
 
     const itemAt = Array.from({ length: n }, (_, s) => s);
     const moves = [];
@@ -266,57 +268,105 @@ function genShuffle(r, L, targets) {
     const pairSegs = list => list.flatMap(({ a, b, sg }) => [
       { item: itemAt[a], from: a, to: b, kind: 'arc', sgn: sg }, { item: itemAt[b], from: b, to: a, kind: 'arc', sgn: sg }]);
 
-    function addPairs(base, chosen, k, usedSet) {
+    function addPairs(chosen, k, usedSet) {
       for (const [a, b] of shuffled(r, adj)) {
         if (usedSet.has(a) || usedSet.has(b)) continue;
         const sg = r() < .5 ? 1 : -1, trial = { a, b, sg };
-        if (valid([...base, ...pairSegs([...chosen, trial])])) { chosen.push(trial); usedSet.add(a); usedSet.add(b); if (chosen.length >= k) break; }
+        if (valid(pairSegs([...chosen, trial]))) { chosen.push(trial); usedSet.add(a); usedSet.add(b); if (chosen.length >= k) break; }
       }
     }
+    // a 2x2 block that contains slot `must` when there is one
+    const blockFor = must => {
+      if (must < 0) return [Math.floor(r() * (R - 1)), Math.floor(r() * 2)];
+      const mr = Math.floor(must / C), mc = must % C;
+      return [pick(r, [mr - 1, mr].filter(x => x >= 0 && x <= R - 2)), pick(r, [mc - 1, mc].filter(x => x >= 0 && x <= 1))];
+    };
+    // 2x2 block turning around its centre: span PI/2 = quarter turn, PI = half turn
+    const mkEll = (r0, c0, dir, span, used) => {
+      const tl = r0 * C + c0, ring = [tl, tl + 1, tl + C + 1, tl + C];
+      if (ring.some(s => used.has(s))) return null;
+      const cx = (L.slot(tl).x + L.slot(ring[2]).x) / 2, cy = (L.slot(tl).y + L.slot(ring[2]).y) / 2, shift = span > 2 ? 2 : (dir > 0 ? 1 : 3);
+      return ring.map((s, i) => {
+        const P = L.slot(s);
+        return { item: itemAt[s], from: s, to: ring[(i + shift) % 4], kind: 'ell', dir, span, cx, cy, phi0: Math.atan2((P.y - cy) / (L.cellH / 2), (P.x - cx) / (L.cellW / 2)) };
+      });
+    };
+    const turn = (must, span) => {
+      const used = new Set(), dir = r() < .5 ? 1 : -1, [r0, c0] = blockFor(must);
+      const first = mkEll(r0, c0, dir, span, used);
+      if (!first) return null;
+      first.forEach(s => used.add(s.from));
+      let segs = first;
+      for (let g = 0; g < 2 && R >= 4 && r() < .5; g++) {   // gear blocks turning the other way
+        const second = mkEll(Math.floor(r() * (R - 1)), Math.floor(r() * 2), g % 2 === 0 ? -dir : dir, span, used);
+        if (second && valid([...segs, ...second])) { segs = [...segs, ...second]; second.forEach(s => used.add(s.from)); }
+      }
+      return segs;
+    };
+    const rowShift = (row, dir, sg) => {
+      const segs = [];
+      for (let c = 0; c < C; c++) {
+        const from = row * C + c, nc = c + dir, wrap = nc < 0 || nc >= C, to = row * C + (wrap ? (dir > 0 ? 0 : C - 1) : nc);
+        segs.push({ item: itemAt[from], from, to, kind: wrap ? 'wrap' : 'line', ax: 'y', sgn: sg });
+      }
+      return segs;
+    };
     const builders = {
-      pairs() {
+      pairs(must) {
         const k = 2 + Math.floor(r() * 3), chosen = [], used = new Set();
-        addPairs([], chosen, k, used);
+        if (must >= 0) for (const [a, b] of shuffled(r, adj)) {
+          if (a !== must && b !== must) continue;
+          const trial = { a, b, sg: r() < .5 ? 1 : -1 };
+          if (valid(pairSegs([trial]))) { chosen.push(trial); used.add(a); used.add(b); break; }
+        }
+        addPairs(chosen, k, used);
         return chosen.length >= 2 ? pairSegs(chosen) : null;
       },
-      diag() {
+      diag(must) {
         const r0 = Math.floor(r() * Math.max(1, R - 2)), r1 = Math.min(R - 1, r0 + 2 + (r() < .4 ? 1 : 0));
-        const flip = r() < .5, a = r0 * C + (flip ? 2 : 0), b = r1 * C + (flip ? 0 : 2), sg = r() < .5 ? 1 : -1;
-        const main = { a, b, sg }, base = pairSegs([main]);
-        if (!valid(base)) return null;
+        const flip = r() < .5, a = r0 * C + (flip ? 2 : 0), b = r1 * C + (flip ? 0 : 2), main = { a, b, sg: r() < .5 ? 1 : -1 };
+        if (!valid(pairSegs([main]))) return null;
         const chosen = [main], used = new Set([a, b]);
-        addPairs([], chosen, 3, used);
+        if (must >= 0 && !used.has(must)) for (const [x, y] of shuffled(r, adj)) {   // bring the target into the crossover
+          if ((x !== must && y !== must) || used.has(x) || used.has(y)) continue;
+          const trial = { a: x, b: y, sg: r() < .5 ? 1 : -1 };
+          if (valid(pairSegs([...chosen, trial]))) { chosen.push(trial); used.add(x); used.add(y); break; }
+        }
+        addPairs(chosen, 3, used);
         return pairSegs(chosen);
       },
-      rot() {
-        const blocks = [], used = new Set();
-        const mk = (r0, c0, dir) => {
-          const tl = r0 * C + c0, tr = tl + 1, br = tl + C + 1, bl = tl + C, ring = [tl, tr, br, bl];
-          if (ring.some(s => used.has(s))) return null;
-          ring.forEach(s => used.add(s));
-          const cx = (L.slot(tl).x + L.slot(br).x) / 2, cy = (L.slot(tl).y + L.slot(br).y) / 2;
-          return ring.map((s, i) => {
-            const P = L.slot(s);
-            return { item: itemAt[s], from: s, to: ring[(i + (dir > 0 ? 1 : 3)) % 4], kind: 'ell', dir, cx, cy, phi0: Math.atan2((P.y - cy) / (L.cellH / 2), (P.x - cx) / (L.cellW / 2)) };
-          });
-        };
+      rot(must) { return turn(must, Math.PI / 2); },
+      rot180(must) { return turn(must, Math.PI); },
+      tri(must) {                                              // three items of a 2x2 block chase each other round it
+        const [r0, c0] = blockFor(must), tl = r0 * C + c0, ring = [tl, tl + 1, tl + C + 1, tl + C];
+        const omit = pick(r, ring.filter(q => q !== must)), three = ring.filter(s => s !== omit), dir = r() < .5 ? 1 : 2;
+        const segs = three.map((from, i) => {
+          const to = three[(i + dir) % 3], same = Math.floor(from / C) === Math.floor(to / C) || from % C === to % C;
+          return { item: itemAt[from], from, to, kind: same ? 'line' : 'arc', sgn: r() < .5 ? 1 : -1 };
+        });
+        return valid(segs) ? segs : null;
+      },
+      ring(must) {                                             // carousel: the border of a 3-wide block slides one step round
+        const h = 3 + Math.floor(r() * (R - 2));
+        let starts = Array.from({ length: R - h + 1 }, (_, i) => i);
+        if (must >= 0) { const mr = Math.floor(must / C), mc = must % C; const ok = starts.filter(r0 => mr >= r0 && mr < r0 + h && (mr === r0 || mr === r0 + h - 1 || mc !== 1)); if (ok.length) starts = ok; }
+        const r0 = pick(r, starts), ring = [];
+        for (let c = 0; c < C; c++) ring.push(r0 * C + c);
+        for (let rw = r0 + 1; rw < r0 + h; rw++) ring.push(rw * C + 2);
+        for (let c = 1; c >= 0; c--) ring.push((r0 + h - 1) * C + c);
+        for (let rw = r0 + h - 2; rw > r0; rw--) ring.push(rw * C);
         const dir = r() < .5 ? 1 : -1;
-        const first = mk(Math.floor(r() * (R - 1)), Math.floor(r() * 2), dir);
-        if (!first) return null;
-        let segs = first;
-        if (R >= 4 && r() < .55) { const second = mk(Math.floor(r() * (R - 1)), Math.floor(r() * 2), -dir); if (second && valid([...first, ...second])) segs = [...first, ...second]; }
-        return segs;
+        return ring.map((from, j) => ({ item: itemAt[from], from, to: ring[(j + dir + ring.length) % ring.length], kind: 'line' }));
       },
-      row() {
-        const row = Math.floor(r() * R), dir = r() < .5 ? 1 : -1, sg = r() < .5 ? 1 : -1, segs = [];
-        for (let c = 0; c < C; c++) {
-          const from = row * C + c, nc = c + dir, wrap = nc < 0 || nc >= C, to = row * C + (wrap ? (dir > 0 ? 0 : C - 1) : nc);
-          segs.push({ item: itemAt[from], from, to, kind: wrap ? 'wrap' : 'line', ax: 'y', sgn: sg });
-        }
-        return segs;
+      row(must) { return rowShift(must >= 0 ? Math.floor(must / C) : Math.floor(r() * R), r() < .5 ? 1 : -1, r() < .5 ? 1 : -1); },
+      row2(must) {                                             // two rows slide opposite ways
+        const ra = must >= 0 ? Math.floor(must / C) : Math.floor(r() * R);
+        let rb = Math.floor(r() * R); if (rb === ra) rb = (ra + 1) % R;
+        const dir = r() < .5 ? 1 : -1, up = Math.min(ra, rb);
+        return [...rowShift(ra, dir, ra === up ? -1 : 1), ...rowShift(rb, -dir, rb === up ? -1 : 1)];
       },
-      col() {
-        const col = Math.floor(r() * C), dir = r() < .5 ? 1 : -1, sg = r() < .5 ? 1 : -1, segs = [];
+      col(must) {
+        const col = must >= 0 ? must % C : Math.floor(r() * C), dir = r() < .5 ? 1 : -1, sg = r() < .5 ? 1 : -1, segs = [];
         for (let rw = 0; rw < R; rw++) {
           const from = rw * C + col, nr = rw + dir, wrap = nr < 0 || nr >= R, to = (wrap ? (dir > 0 ? 0 : R - 1) : nr) * C + col;
           segs.push({ item: itemAt[from], from, to, kind: wrap ? 'wrap' : 'line', ax: 'x', sgn: sg });
@@ -326,41 +376,47 @@ function genShuffle(r, L, targets) {
     };
     let prevKey = '';
     for (let i = 0; i < count; i++) {
+      const tSlots = targets.map(t => itemAt.indexOf(t)), needT = r() < 0.94;      // the target is in almost every move
       let segs = null, type = seq[i];
-      for (let tries = 0; tries < 30 && !segs; tries++) {
-        const cand = builders[type]();
-        if (!cand) continue;
-        const key = cand.map(s => s.from + '>' + s.to).sort().join(',');
-        const undo = cand.map(s => s.to + '>' + s.from).sort().join(',');
-        if (undo === prevKey && tries < 25) continue;
-        segs = cand; prevKey = key;
-      }
-      if (!segs) { type = 'pairs'; for (let tries = 0; tries < 60 && !segs; tries++) segs = builders.pairs(); }
-      if (!segs) { const [a, b] = adj[Math.floor(r() * adj.length)]; segs = pairSegs([{ a, b, sg: 1 }]); }
+      const attemptType = (ty, tries, need = needT) => {
+        for (let k = 0; k < tries && !segs; k++) {
+          const must = need ? pick(r, tSlots) : -1, cand = builders[ty](must);
+          if (!cand) continue;
+          if (need && !cand.some(s => targets.includes(s.item))) continue;
+          const key = cand.map(s => s.from + '>' + s.to).sort().join(','), undo = cand.map(s => s.to + '>' + s.from).sort().join(',');
+          if (undo === prevKey && k < tries - 5) continue;
+          segs = cand; prevKey = key;
+        }
+      };
+      attemptType(type, 40);
+      if (!segs && needT) attemptType(type, 25, false);          // keep the variety of move types even when the target can't join this one
+      if (!segs) { type = 'pairs'; attemptType('pairs', 80); }
+      if (!segs) { const [a, b] = adj[Math.floor(r() * adj.length)]; segs = pairSegs([{ a, b, sg: 1 }]); type = 'pairs'; }
       moves.push({ type, segs }); apply(segs);
     }
-    // targets
     const finalSlot = []; for (let s = 0; s < n; s++) finalSlot[itemAt[s]] = s;
+    const any = moves.filter(m => m.segs.some(s => targets.includes(s.item))).length / count;
+    const each = targets.map(t => moves.filter(m => m.segs.some(s => s.item === t)).length / count);
     let score = 50;
-    const moved = targets.every(t => finalSlot[t] !== t);
-    const involve = targets.map(t => moves.filter(m => m.segs.some(s => s.item === t)).length);
-    if (moved) score += 25;
-    if (involve.every(x => x >= 7)) score += 25;
-    return { moves, finalSlot, score };
+    if (targets.every(t => finalSlot[t] !== t)) score += 20;
+    if (any >= 0.92) score += 15;
+    if (each.every(x => x >= (targets.length > 1 ? 0.6 : 0.9))) score += 15;
+    return { moves, finalSlot, score, any, each };
   }
 }
 
 function timeMoves(v) {
   const moves = v.moves, count = moves.length;
   const w = moves.map((m, i) => {
-    const base = i < 3 ? 1.0 : i >= count - 2 ? 0.38 : lerp(0.9, 0.55, easeIO((i - 3) / Math.max(1, count - 6)));
-    return base * ({ row: 1.15, col: 1.15, rot: 1.1, diag: 1.1, pairs: 1 }[m.type] || 1);
+    const base = i < 3 ? 1.0 : i >= count - 2 ? 0.3 : lerp(0.8, 0.45, easeIO((i - 3) / Math.max(1, count - 6)));
+    return base * ({ row: 1.1, col: 1.1, rot: 1.05, diag: 1.05, pairs: 1, rot180: 1.15, tri: 1, ring: 1.2, row2: 1.15 }[m.type] || 1);
   });
-  const gaps = moves.map((m, i) => i === count - 1 ? 0 : (i < 3 ? 0.09 : 0.045));
-  const pad = 0.08, span = T_END - T_SHUF0 - pad;
-  const k = (span - gaps.reduce((a, b) => a + b, 0)) / w.reduce((a, b) => a + b, 0);
+  const gaps = moves.map((m, i) => i === count - 1 ? 0 : (i < 3 ? 0.08 : 0.035));
+  const pad = 0.08, floorD = 0.26, target = (T_END - T_SHUF0 - pad) - gaps.reduce((a, b) => a + b, 0);
+  let lo = 0.01, hi = 4, k = 1;
+  for (let it = 0; it < 60; it++) { k = (lo + hi) / 2; const sum = w.reduce((a, x) => a + Math.max(floorD, x * k), 0); if (sum > target) hi = k; else lo = k; }
   let t = T_SHUF0 + pad;
-  moves.forEach((m, i) => { m.dur = Math.max(0.26, w[i] * k); m.t0 = t; t += m.dur + gaps[i]; });
+  moves.forEach((m, i) => { m.dur = Math.max(floorD, w[i] * k); m.t0 = t; t += m.dur + gaps[i]; });
   const durs = moves.map(m => m.dur), mn = Math.min(...durs), mx = Math.max(...durs);
   moves.forEach(m => { m.speed = mx > mn ? 1 - (m.dur - mn) / (mx - mn) : 0.5; });
   v.tl = Array.from({ length: v.L.n }, () => []);
@@ -1018,7 +1074,7 @@ const sfx = {
     const amb = bq('lowpass', 850, 0.6), ag = c.createGain();
     ag.gain.setValueAtTime(0.0001, at); ag.gain.linearRampToValueAtTime(0.045, at + 0.4); ag.gain.setValueAtTime(0.045, at + T_TOTAL - 0.5); ag.gain.linearRampToValueAtTime(0.0001, at + T_TOTAL);
     amb.connect(ag).connect(bus); ns(pink, at, T_TOTAL, amb);
-    for (let i = 0; i < 46; i++) click(at + rnd() * T_TOTAL, 2800 + rnd() * 4000, 0.025 + rnd() * 0.05, 0.004);
+    for (let i = 0, nC = Math.round(T_TOTAL * 2.6); i < nC; i++) click(at + rnd() * T_TOTAL, 2800 + rnd() * 4000, 0.025 + rnd() * 0.05, 0.004);
 
     // reveal / hide cues
     v.targets.forEach((_, k) => pop(at + 0.22 + k * 0.12, k ? 520 : 680, 0.55));
@@ -1177,7 +1233,10 @@ window.FTT = {
       const seed = (k * 2654435761 + 12345) >>> 0, v = makeVariation(seed, {});
       out.runs++; out.themes[v.key] = (out.themes[v.key] || 0) + 1; out.rows[v.rows] = (out.rows[v.rows] || 0) + 1; out.moves[v.moves.length] = (out.moves[v.moves.length] || 0) + 1;
       const bad = m => out.fails.push(`${seed}(${v.key},${v.rows}): ${m}`);
-      if (v.moves.length < 14 || v.moves.length > 20) bad('move count ' + v.moves.length);
+      if (v.moves.length < 40 || v.moves.length > 52) bad('move count ' + v.moves.length);
+      const ty = new Set(v.moves.map(m => m.type)); for (const need of ['row', 'col', 'rot', 'diag', 'rot180', 'tri', 'ring']) if (!ty.has(need)) bad('missing move type ' + need);
+      const anyInv = v.moves.filter(m => m.segs.some(s => v.targets.includes(s.item))).length / v.moves.length; out.minAny = Math.min(out.minAny ?? 1, anyInv); if (anyInv < 0.85) bad('target idle too often ' + anyInv.toFixed(2));
+      const durs = v.moves.map(m => m.dur); out.avgDur = +(((out.avgDur ?? 0) * (out.runs - 1) + durs.reduce((a, b) => a + b, 0) / durs.length) / out.runs).toFixed(3); out.minDur = Math.min(out.minDur ?? 9, ...durs);
       const last = v.moves[v.moves.length - 1]; if (Math.abs(last.t0 + last.dur - T_END) > 1e-6) bad('shuffle end ' + (last.t0 + last.dur));
       if (v.moves[0].t0 < T_SHUF0) bad('starts early');
       for (let i = 1; i < v.moves.length; i++) if (v.moves[i].t0 < v.moves[i - 1].t0 + v.moves[i - 1].dur - 1e-9) bad('overlapping moves');
@@ -1197,6 +1256,7 @@ window.FTT = {
 };
 
 /* go */
+$('brandLen').textContent = `1080 × 1920 · 60 fps · ${T_TOTAL.toFixed(0)} s`;
 try { sfx.ensure(false); } catch (e) { /* audio starts on the first click instead */ }
 generate(newSeed(), false);
 requestAnimationFrame(frame);
