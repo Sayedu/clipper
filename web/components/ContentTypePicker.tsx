@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { ContentType } from '@/lib/types';
 import { ContentTypeIcon } from './ContentTypeIcons';
 
@@ -47,6 +48,20 @@ export function ContentTypePicker({
           </button>
         );
       })}
+      {/* Follow the Target has its own page (a self-contained generator), so it
+          is a link, not a selectable content type */}
+      <Link
+        href="/follow-the-target"
+        title="Shuffle-video generator: cups, cars, jets, eggs, coins. Opens its own page."
+        className="flex flex-col items-center gap-2 rounded-[var(--radius)] border border-[color:var(--color-hairline-strong)] px-3 py-3.5 text-[12.5px] font-semibold text-[color:var(--color-muted)] transition-colors hover:border-[color:var(--color-muted)]"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        </svg>
+        Follow the target
+      </Link>
     </div>
   );
 }
