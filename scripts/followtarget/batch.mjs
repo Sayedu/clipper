@@ -48,7 +48,7 @@ for (let i = 0; i < count; i++) {
   const base = `${pad(n)}_${theme}`;
   console.log(`\n[${i + 1}/${count}] ${base}  rows ${rows}  voice line ${line}`);
   let ok = false, side = null, tooLong = null;
-  for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
+  for (let attempt = 1; attempt <= 4 && !ok; attempt++) {
     const args = [join(REPO, 'scripts', 'followtarget', 'render.mjs'), '--theme', theme, '--rows', String(rows), '--voice', voice, '--end-text', endText,
       '--voice-line', String(line), '--carton', 'egg', '--name', base, '--out', tmp, '--seed', String((rnd() * 4294967296) >>> 0),
       ...(P.want ? ['--want', P.want] : []), ...(P.object ? ['--object', P.object] : [])];
@@ -56,7 +56,15 @@ for (let i = 0; i < count; i++) {
     process.stdout.write((r.stdout || '').split('\n').filter((l) => /^(theme|voice \(|  ")/.test(l)).join('\n') + '\n');
     if (/WARNING: the voice line/.test(r.stderr || '')) tooLong = true;
     const jsonPath = join(tmp, `${base}.json`);
-    if (r.status === 0 && existsSync(jsonPath)) { side = JSON.parse(readFileSync(jsonPath, 'utf8')); ok = true; }
+    if (r.status === 0 && existsSync(jsonPath)) {
+      side = JSON.parse(readFileSync(jsonPath, 'utf8'));
+      // the page records in real time, so a busy computer can drop frames: measure the frame rate and redo a video below 58 fps
+      const pr = spawnSync('/opt/homebrew/opt/ffmpeg-full/bin/ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=avg_frame_rate', '-of', 'csv=p=0', join(tmp, side.file)], { encoding: 'utf8' });
+      const [n1, n2] = (pr.stdout || '60/1').trim().split('/').map(Number), fps = n1 / (n2 || 1);
+      side.fps = +fps.toFixed(1);
+      if (fps >= 58 || attempt === 4) { ok = true; if (fps < 58) console.error(`  WARNING: only ${side.fps} fps after ${attempt} tries`); }
+      else console.error(`  ${side.fps} fps is below 58, recording this one again`);
+    }
     else console.error(`  attempt ${attempt} failed: ${(r.stderr || '').trim().split('\n').pop()}`);
   }
   if (!ok) { console.error(`  SKIPPED ${base}`); continue; }

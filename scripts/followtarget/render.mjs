@@ -17,7 +17,7 @@
 //   --voice-line N|next|random   which line from the list (default next = rotate, remembered between renders)
 //   --voice-text "custom line"   use exactly this line (placeholders {question} and {find} still work)
 //   --voice-engine kokoro|edge   offline Kokoro (default) or online edge-tts
-//   --voice-name am_adam         --voice-rate +10%      --max-voice-sec 6
+//   --voice-name am_adam         --voice-rate +10%      --max-voice-sec 7
 //   --duck 35                 sound effects drop to this percent while the voice plays
 //   --end1 "TEXT" --end2 "TEXT" --end-switch 1.5   end texts and when the second one appears (seconds into the freeze)
 //   --out DIR                 default render/followtarget/out
@@ -100,6 +100,7 @@ try {
     else {
       console.log(`voice (${info.engine} ${info.name} ${info.rate}), line ${info.index + 1} of ${info.lines}, ${info.sec} s:\n  "${info.line}"`);
       if (info.tooLong) console.error(`WARNING: the voice line is ${info.sec} s, over the ${info.maxSec} s limit. Shorten the line, raise --voice-rate, or raise --max-voice-sec.`);
+      else if (info.longish) console.log(`note: ${info.sec} s is a little over 6 s, which is fine; under 6 s is better.`);
     }
   }
   if (!exit) {

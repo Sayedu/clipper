@@ -21,18 +21,20 @@ export function keywordFor(d) {
 
 const EMOJI = ['👀', '🎯', '🔎', '🧠', '⏱️', '✨', '🚀', '💬', '🤝', '🔄'];
 // first line: one of these, filled with true facts about the video
+// food dares (ordinary food only): "buys ___"
+const STAKES = ['lunch', 'dinner', 'breakfast', 'the coffee', 'ice cream', 'dessert', 'fries', 'snacks', 'the juice', 'a milkshake', 'donuts', 'cookies', 'the tea', 'popcorn', 'pancakes', 'waffles'];
 const OPENERS = [
   (d, K) => `${K}. One of the ${d.items} items glows for two seconds, then the shuffle starts.`,
-  (d, K) => `${K} test: keep your eyes on ${d.find} and don't blink.`,
+  (d, K, st) => `${K} dare: send this to a friend. Whoever gets it wrong buys ${st}.`,
   (d, K) => `${K}. No pausing and no rewinding, just your eyes.`,
   (d, K) => `${K} with ${d.moves} moves in 25 seconds.`,
-  (d, K) => `${K} dare: send this to a friend and see who finds ${d.find} first.`,
+  (d, K, st) => `${K}: wrong answer buys ${st}. Keep your eyes on ${d.find}.`,
   (d, K) => `${K}. ${cap(d.find)} glows at the start and then blends in with the rest.`,
-  (d, K) => `${K} on a 3 by ${d.rows} grid with one right answer.`,
+  (d, K, st) => `${K} on a 3 by ${d.rows} grid. Loser buys ${st}.`,
   (d, K) => `Quick focus test: ${K.toLowerCase()}. Watch it all the way to the end.`,
-  (d, K) => `${K}. It starts easy and gets fast by the end.`,
+  (d, K, st) => `${K}. Tag a friend and bet them ${st}.`,
   (d, K) => `${K}: pick your number before you scroll.`,
-  (d, K) => `${K} for the whole family. Who has the sharpest eyes?`,
+  (d, K, st) => `${K} for the whole family. Loser buys ${st}.`,
   (d, K) => `${K}. I reply to every comment and tell you if you got it right.`,
 ];
 // last line: a real question about the video
@@ -54,7 +56,8 @@ export function buildCaption(d, i, history = []) {
   let best = null;
   for (let t = 0; t < OPENERS.length * ASKS.length; t++) {
     const opener = OPENERS[(i + t) % OPENERS.length], ask = ASKS[(i * 3 + t) % ASKS.length], emoji = EMOJI[(i + t) % EMOJI.length];
-    const text = stripDashes(`${opener(d, K)} ${emoji}\n${ask}`);
+    const stake = STAKES[(i * 5 + t) % STAKES.length];
+    const text = stripDashes(`${opener(d, K, stake)} ${emoji}\n${ask}`);
     const ok = recent.every((h) => firstLine(h.caption) !== firstLine(text) && similarity(h.caption, text) < 0.5);
     if (!best) best = text;
     if (ok) { best = text; break; }

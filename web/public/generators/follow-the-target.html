@@ -197,41 +197,43 @@ const T_SHUF0 = 2.2, T_END = 27.2;       // shuffle window: 25 s of movement
 const T_HOLD = 2.8, T_TOTAL = T_END + T_HOLD;
 /* ── configuration: defaults, then what the settings card saved, then window.FTT_CONFIG (used by scripts/followtarget/render.mjs) ── */
 const DEFAULT_LINES = [
-  // your four, as written (1 and 3 run a little over 6 s with the offline voice; the page warns)
+  // your four, as written (3 runs about 7 s with the offline voice, the others 5 to 7 s)
   "{question} Comment the number and I'll tell you if you're right. Then send it to a friend. Loser buys lunch.",
   "Can you find {find}? Comment your answer and I'll reply. Bet your friend can't.",
   "Watch closely. {question} Comment the number, then send this to a friend. If they're wrong, they owe you food.",
   "Only a few people get this right. {question} Comment and I'll tell you.",
-  // a different challenge each, all under 6 s
-  "Eyes only. No pausing. {question} Comment the number and I'll check it.",
-  "Don't blink. {question} Comment your answer and tag a friend who'd get it wrong.",
-  "Think you have good eyes? {question} Prove it in the comments.",
-  "Bet you can't follow it. {question} Comment the number.",
-  "Quick focus test. Watch {find}. Comment the number where it stops.",
-  "No rewinding. {question} Comment the number and I'll reply right or wrong.",
-  "Send this to your best friend. Whoever gets it wrong buys lunch. {question}",
-  "This one gets fast. {question} Comment the number before you scroll.",
-  "I dare you to get this right. {question} Comment and I'll check.",
-  "Challenge your whole family. {question} Comment the number and I'll reply.",
-  "Phone down, eyes up. Follow {find} and comment the number.",
-  "Stay locked in. {find} is the one to follow. Comment the number when it stops.",
-  "Rules: no pausing, no slow motion. {question} Comment the number.",
-  "It glows for two seconds, then it blends in. {question} Comment the number.",
-  "Who has the sharpest eyes? {question} Comment your number and I'll reply.",
-  "Tag a friend who always loses. {question} Comment the number.",
-  "Winner gets bragging rights. {question} Comment the number and send it on.",
-  "Watch closely, then answer fast. {question} Drop your number below.",
-  "Can you beat this shuffle? {question} Comment the number, I'll reply to you.",
-  "Pick a number and stick with it. {question} I'll tell you if you're right.",
-  "Eyes on {find}. Don't look away. Comment the number when it stops.",
-  "One look, one guess. {question} Comment the number below.",
-  "Easy start, tricky finish. {question} Comment your number and I'll reply.",
-  "Show me your focus. {question} Comment the number and send it to a friend.",
+  // a different challenge and a different food dare each (ordinary food only), all under 6 s
+  "Eyes only, no pausing. {question} Comment the number. Wrong answer buys lunch.",
+  "Don't blink. {question} Comment it and tag a friend. Loser buys the coffee.",
+  "Think you have good eyes? {question} Bet your friend dinner and comment the number.",
+  "Bet you can't follow it. {question} Drop your number. Loser buys the ice cream.",
+  "Quick focus test. Watch {find}. Comment the number. Loser owes you fries.",
+  "No rewinding. {question} Comment your answer. Loser buys breakfast tomorrow.",
+  "Send this to your best friend. {question} Comment the number. Whoever's wrong buys dessert.",
+  "This one gets fast. {question} Comment the number. Loser buys the juice.",
+  "I dare you to get this right. {question} Comment below. Wrong answer buys snacks.",
+  "Challenge your whole family. {question} Comment the number. Loser buys dessert.",
+  "Phone down, eyes up. Follow {find}. Comment your number. Loser owes a milkshake.",
+  "Stay locked in. Follow {find}. Comment the number. Wrong answer buys donuts.",
+  "No pausing, no slow motion. {question} Comment it. Loser buys the pizza.",
+  "It glows, then it blends in. {question} Comment the number. Loser buys brunch.",
+  "Who has the sharpest eyes? {question} Comment your number. Loser buys smoothies.",
+  "Tag a friend who always loses. {question} Comment it. They owe you cookies.",
+  "Winner gets bragging rights. {question} Drop your number. Loser buys the tea.",
+  "Watch closely, then answer fast. {question} Comment it. Loser buys popcorn.",
+  "Can you beat this shuffle? {question} Comment your number. Loser owes dinner.",
+  "Pick a number and stick with it. {question} Comment it. Wrong means you buy takeout.",
+  "One look, one guess. {question} Comment the number. Loser buys the chips.",
+  "Easy start, tricky finish. {question} Comment your number. Loser buys cocoa.",
+  "Show me your focus. {question} Comment it and tag a friend. Loser buys the cake.",
+  "Eyes on {find}. Don't look away. Comment the number. Loser buys pancakes.",
+  "Dare your best friend. {question} Comment the number. Whoever loses buys waffles.",
+  "Team up with a friend. {question} Comment your number. If you both miss, you owe lunch.",
 ];
 const DEFAULT_CFG = {
   // voice: engine 'kokoro' = offline, 'edge' = online edge-tts. rate is edge-style ("+10%").
   // mode: 'rotate' = the next line for each recording, 'random', or 'fixed' (line number in `fixed`).
-  voice: { enabled: true, engine: 'kokoro', name: 'am_adam', rate: '+10%', mode: 'rotate', fixed: 1, maxSec: 6, duck: 35, lines: DEFAULT_LINES },
+  voice: { enabled: true, engine: 'kokoro', name: 'am_adam', rate: '+10%', mode: 'rotate', fixed: 1, maxSec: 7, duck: 35, lines: DEFAULT_LINES },
   endText: { enabled: true, texts: ["I'LL REPLY IF YOU'RE RIGHT", 'SEND TO A FRIEND • LOSER BUYS LUNCH'], switchAt: 1.5 },
   ttsUrl: '/worker/tts',
 };
@@ -1386,7 +1388,7 @@ function showVoice(v) {
   else {
     msg = `Line ${v.voiceIdx + 1} of ${n}: “${v.voice.text}” · ${v.voice.dur.toFixed(1)} s`;
     if (v.voice.dur > c.maxSec) { msg += `\nWARNING: that is ${v.voice.dur.toFixed(1)} s, over your ${c.maxSec} s limit. Shorten the line or raise the speaking rate.`; cls += ' warn'; }
-    else cls += ' ok';
+    else { if (v.voice.dur > 6) msg += `\nA little over 6 s, which is fine; under 6 s is better.`; cls += ' ok'; }
     if (c.mode === 'rotate') msg += `\nThe next recording uses line ${v.voiceIdx + 1}; the one after uses line ${(v.voiceIdx + 1) % n + 1}.`;
   }
   el.textContent = msg; el.className = cls; el.style.whiteSpace = 'pre-line';
@@ -1567,7 +1569,7 @@ window.FTT = {
     return null;
   },
   get cfg() { return CFG; }, setConfig(over) { CFG = mergeCfg(CFG, over); fillSettings(); if (cur) prepareVoice(cur); },
-  async voiceInfo() { const v = cur; await v.voiceP; return { enabled: CFG.voice.enabled, line: v.voiceText, index: v.voiceIdx, lines: lineList().length, sec: v.voice ? +v.voice.dur.toFixed(2) : null, error: v.voiceErr, tooLong: !!(v.voice && v.voice.dur > CFG.voice.maxSec), maxSec: CFG.voice.maxSec, engine: CFG.voice.engine, name: CFG.voice.name, rate: CFG.voice.rate }; },
+  async voiceInfo() { const v = cur; await v.voiceP; return { enabled: CFG.voice.enabled, line: v.voiceText, index: v.voiceIdx, lines: lineList().length, sec: v.voice ? +v.voice.dur.toFixed(2) : null, error: v.voiceErr, tooLong: !!(v.voice && v.voice.dur > CFG.voice.maxSec), longish: !!(v.voice && v.voice.dur > 6), maxSec: CFG.voice.maxSec, engine: CFG.voice.engine, name: CFG.voice.name, rate: CFG.voice.rate }; },
   selfTest(count = 200, opts = {}) {
     if (opts.theme === 'infinite') { const bad = OBJECTS.filter(o => isBlockedEmoji(o.e)).map(o => o.e + ' ' + o.n); if (bad.length) return { fails: ['library has blocked emoji: ' + bad.join(', ')] }; }
     const out = { runs: 0, fails: [], themes: {}, rows: {}, moves: {}, types: {} };

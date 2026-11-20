@@ -1,7 +1,7 @@
 // The hand-picked 20 for a batch (scripts/followtarget/batch.mjs) and the voice lines used.
-// a different voice challenge for each video: lines 2, 4, 5 ... of the page's list, which are all
-// under 6 s (lines 1 and 3, the two longest, are left out of batches)
-export const LINES = Array.from({ length: 40 }, (_, i) => i + 1).filter((n) => n !== 1 && n !== 3);
+// a different voice challenge (and food dare) for each video: lines 1, 2, 4, 5 ... of the page's list.
+// Line 3, the longest (about 7 s), is left out of batches.
+export const LINES = Array.from({ length: 40 }, (_, i) => i + 1).filter((n) => n !== 3);
 // The 20 are picked by hand: planes and jets, cars, cups, coins, eggs and some fun random
 // objects, shuffled so the same kind never comes twice in a row. `want` asks for a specific look.
 export const PLAN = [
