@@ -197,10 +197,36 @@ const T_SHUF0 = 2.2, T_END = 27.2;       // shuffle window: 25 s of movement
 const T_HOLD = 2.8, T_TOTAL = T_END + T_HOLD;
 /* ── configuration: defaults, then what the settings card saved, then window.FTT_CONFIG (used by scripts/followtarget/render.mjs) ── */
 const DEFAULT_LINES = [
+  // your four, as written (1 and 3 run a little over 6 s with the offline voice; the page warns)
   "{question} Comment the number and I'll tell you if you're right. Then send it to a friend. Loser buys lunch.",
   "Can you find {find}? Comment your answer and I'll reply. Bet your friend can't.",
   "Watch closely. {question} Comment the number, then send this to a friend. If they're wrong, they owe you food.",
   "Only a few people get this right. {question} Comment and I'll tell you.",
+  // a different challenge each, all under 6 s
+  "Eyes only. No pausing. {question} Comment the number and I'll check it.",
+  "Don't blink. {question} Comment your answer and tag a friend who'd get it wrong.",
+  "Think you have good eyes? {question} Prove it in the comments.",
+  "Bet you can't follow it. {question} Comment the number.",
+  "Quick focus test. Watch {find}. Comment the number where it stops.",
+  "No rewinding. {question} Comment the number and I'll reply right or wrong.",
+  "Send this to your best friend. Whoever gets it wrong buys lunch. {question}",
+  "This one gets fast. {question} Comment the number before you scroll.",
+  "I dare you to get this right. {question} Comment and I'll check.",
+  "Challenge your whole family. {question} Comment the number and I'll reply.",
+  "Phone down, eyes up. Follow {find} and comment the number.",
+  "Stay locked in. {find} is the one to follow. Comment the number when it stops.",
+  "Rules: no pausing, no slow motion. {question} Comment the number.",
+  "It glows for two seconds, then it blends in. {question} Comment the number.",
+  "Who has the sharpest eyes? {question} Comment your number and I'll reply.",
+  "Tag a friend who always loses. {question} Comment the number.",
+  "Winner gets bragging rights. {question} Comment the number and send it on.",
+  "Watch closely, then answer fast. {question} Drop your number below.",
+  "Can you beat this shuffle? {question} Comment the number, I'll reply to you.",
+  "Pick a number and stick with it. {question} I'll tell you if you're right.",
+  "Eyes on {find}. Don't look away. Comment the number when it stops.",
+  "One look, one guess. {question} Comment the number below.",
+  "Easy start, tricky finish. {question} Comment your number and I'll reply.",
+  "Show me your focus. {question} Comment the number and send it to a friend.",
 ];
 const DEFAULT_CFG = {
   // voice: engine 'kokoro' = offline, 'edge' = online edge-tts. rate is edge-style ("+10%").
@@ -215,7 +241,11 @@ function mergeCfg(base, over) {
   return o;
 }
 let CFG = DEFAULT_CFG;
-try { CFG = mergeCfg(DEFAULT_CFG, JSON.parse(localStorage.getItem('ftt.cfg.v1') || 'null')); } catch (e) { /* storage unavailable: defaults */ }
+try {
+  const saved = JSON.parse(localStorage.getItem('ftt.cfg.v1') || 'null');
+  if (saved && saved.voice && JSON.stringify(saved.voice.lines) === JSON.stringify(DEFAULT_LINES.slice(0, 4))) delete saved.voice.lines;   // still the old default: take the longer list
+  CFG = mergeCfg(DEFAULT_CFG, saved);
+} catch (e) { /* storage unavailable: defaults */ }
 if (window.FTT_CONFIG) CFG = mergeCfg(CFG, window.FTT_CONFIG);
 const saveCfg = () => { try { localStorage.setItem('ftt.cfg.v1', JSON.stringify(CFG)); } catch (e) { /* not saved */ } };
 
@@ -848,8 +878,8 @@ function drawBox(g, S, open, peek, cardboard, fur, blink, pulse) {
 }
 THEMES.carton = {
   name: 'Egg Carton / Mystery Boxes', noun: 'item', numDy: 0.0,
-  setup(r) {
-    const kind = pick(r, ['egg', 'box']);
+  setup(r, L, opt = {}) {
+    const kind0 = pick(r, ['egg', 'box']), kind = opt.kind === 'egg' || opt.kind === 'box' ? opt.kind : kind0;   // opt.kind lets a script force eggs
     if (kind === 'egg') {
       return { nT: 1, o: { kind, shell: pick(r, ['#f1e6d3', '#c99a6b', '#e9d9bf', '#f6f1e8']), tray: pick(r, ['#b9b3a3', '#a99f8c', '#c4bba6']) },
         hook: pick(r, [['TRACK THE', '*GOLDEN EGG*'], ['FOLLOW THE', '*GOLDEN EGG*'], ['WATCH THE', '*GOLDEN EGG*']]), fin: ['WHICH EGG IS', 'THE *GOLDEN* ONE?'], targetWord: 'golden egg', find: 'the golden egg',
@@ -1526,6 +1556,16 @@ fillSettings();
 window.FTT = {
   makeVariation, OBJECTS, customObjectStatus, parseCustomObject, render: (v, t) => render(g, v, t), get cur() { return cur; }, T_TOTAL, T_END, T_SHUF0, itemPos, setVariation,
   drawAt(t) { render(g, cur, t); }, load(seed, opt) { stopRun(); const v = makeVariation(seed, opt || {}); setVariation(v); run = null; return v; },
+  describe() { const v = cur, T = v.th; return { key: v.key, themeName: T.def.name, kind: T.o.kind || T.o.model || null, rows: v.rows, items: v.n, moves: v.moves.length, targets: T.nT, target: T.targetWord, find: T.find, question: questionOf(v), win: v.win }; },
+  /** first seed at or after `from` whose theme options match `want` (e.g. { kind: 'police' }); lets scripts ask for a specific look */
+  findSeed(theme, rows, want = {}, from = 1, extra = {}) {
+    const L = makeLayout(rows);
+    for (let sd = from >>> 0, k = 0; k < 60000; sd = (sd + 1) >>> 0, k++) {
+      const th = THEMES[theme].setup(mulberry32(sd), L, { ...extra, rows, theme });
+      if (Object.entries(want).every(([key, val]) => String(key in th.o ? th.o[key] : th[key]) === String(val))) return sd;
+    }
+    return null;
+  },
   get cfg() { return CFG; }, setConfig(over) { CFG = mergeCfg(CFG, over); fillSettings(); if (cur) prepareVoice(cur); },
   async voiceInfo() { const v = cur; await v.voiceP; return { enabled: CFG.voice.enabled, line: v.voiceText, index: v.voiceIdx, lines: lineList().length, sec: v.voice ? +v.voice.dur.toFixed(2) : null, error: v.voiceErr, tooLong: !!(v.voice && v.voice.dur > CFG.voice.maxSec), maxSec: CFG.voice.maxSec, engine: CFG.voice.engine, name: CFG.voice.name, rate: CFG.voice.rate }; },
   selfTest(count = 200, opts = {}) {

@@ -8,6 +8,9 @@
 //
 // Options (all optional):
 //   --theme cups|parking|sky|carton|coins|infinite   --rows 3|4|5   --seed N
+//   --carton egg|box          with --theme carton: force the eggs (or the boxes) instead of a random pick
+//   --want key=value[,k=v]    pick the first seed from --seed whose look matches, e.g. --theme parking --want kind=police
+//   --name BASENAME           file name without the extension (default follow-the-target-<theme>-<seed>)
 //   --object "🚀 rocket"     with --theme infinite: use this emoji (and name) instead of a random object; no animals, faces or people
 //   --voice on|off            voiceover at the start (default on)
 //   --end-text on|off         rotating text under the end button (default on)
@@ -79,11 +82,18 @@ try {
   await page.goto(`http://127.0.0.1:${port}/web/public/generators/follow-the-target.html`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.FTT && window.FTT.cur, null, { timeout: 30000 });
   if (rotating) await page.evaluate((n) => { const L = window.FTT.cfg.voice.lines.length; window.FTT.setConfig({ voice: { fixed: (n % L) + 1 } }); }, readState().next);
-  await page.evaluate(([seed, theme, rows, object]) => window.FTT.load(seed, { theme, rows, object }), [seed, theme, rows, opt('object')]);
+  let useSeed = seed;
+  if (opt('want')) {   // look for the first seed (from the given one) with these theme options, e.g. kind=police
+    const want = Object.fromEntries(opt('want').split(',').map((kv) => kv.split('=')));
+    useSeed = await page.evaluate(([theme, rows, want, from, object]) => window.FTT.findSeed(theme, rows || 4, want, from, { object }), [theme, rows, want, seed, opt('object')]);
+    if (useSeed == null) { console.error(`no ${theme} variation matches ${opt('want')}`); process.exit(1); }
+  }
+  await page.evaluate(([seed, theme, rows, object, kind]) => window.FTT.load(seed, { theme, rows, object, kind }), [useSeed, theme, rows, opt('object'), opt('carton')]);
   const info = await page.evaluate(() => window.FTT.voiceInfo());
   const v = await page.evaluate(() => ({ key: window.FTT.cur.key, rows: window.FTT.cur.rows, win: window.FTT.cur.win }));
+  const describe = await page.evaluate(() => window.FTT.describe());
 
-  console.log(`theme ${v.key}, ${v.rows} rows, seed ${seed}, winning number ${v.win.map((n) => '#' + n).join(' & ')}`);
+  console.log(`theme ${v.key}, ${v.rows} rows, seed ${useSeed}, winning number ${v.win.map((n) => '#' + n).join(' & ')}`);
   console.log(`voiceover: ${voiceOn ? 'ON' : 'off'}   end text: ${endOn ? 'ON' : 'off'}`);
   if (voiceOn) {
     if (info.error) { console.error(`ERROR: the voice could not be made: ${info.error}`); exit = 1; }
@@ -94,10 +104,11 @@ try {
   }
   if (!exit) {
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 180000 }), page.click('#btnRec')]);
-    const name = `follow-the-target-${v.key}-${seed}${voiceOn ? '' : '-novoice'}${endOn ? '' : '-noendtext'}.${dl.suggestedFilename().split('.').pop()}`;
+    const ext = dl.suggestedFilename().split('.').pop();
+    const name = opt('name') ? `${opt('name')}.${ext}` : `follow-the-target-${v.key}-${seed}${voiceOn ? '' : '-novoice'}${endOn ? '' : '-noendtext'}.${ext}`;
     const file = join(outDir, name);
     await dl.saveAs(file);
-    writeFileSync(join(outDir, name.replace(/\.[^.]+$/, '.json')), JSON.stringify({ file: name, seed, theme: v.key, rows: v.rows, winningNumber: v.win, voice: voiceOn ? info : null, endText, problems, renderedAt: new Date().toISOString() }, null, 1));
+    writeFileSync(join(outDir, name.replace(/\.[^.]+$/, '.json')), JSON.stringify({ file: name, seed: useSeed, theme: v.key, rows: v.rows, winningNumber: v.win, describe, voice: voiceOn ? info : null, endText, problems, renderedAt: new Date().toISOString() }, null, 1));
     console.log(`saved ${file}`);
     if (rotating && voiceOn) { mkdirSync(join(REPO, 'data', 'followtarget'), { recursive: true }); writeFileSync(statePath, JSON.stringify({ next: readState().next + 1 })); }
     if (problems.length) console.error('page errors:', problems);
