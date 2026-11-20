@@ -7,7 +7,8 @@
 //   node scripts/followtarget/render.mjs --voice off --end-text off
 //
 // Options (all optional):
-//   --theme cups|parking|sky|carton|coins   --rows 3|4|5   --seed N
+//   --theme cups|parking|sky|carton|coins|infinite   --rows 3|4|5   --seed N
+//   --object "🚀 rocket"     with --theme infinite: use this emoji (and name) instead of a random object; no animals, faces or people
 //   --voice on|off            voiceover at the start (default on)
 //   --end-text on|off         rotating text under the end button (default on)
 //   --voice-line N|next|random   which line from the list (default next = rotate, remembered between renders)
@@ -78,7 +79,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/web/public/generators/follow-the-target.html`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.FTT && window.FTT.cur, null, { timeout: 30000 });
   if (rotating) await page.evaluate((n) => { const L = window.FTT.cfg.voice.lines.length; window.FTT.setConfig({ voice: { fixed: (n % L) + 1 } }); }, readState().next);
-  await page.evaluate(([seed, theme, rows]) => window.FTT.load(seed, { theme, rows }), [seed, theme, rows]);
+  await page.evaluate(([seed, theme, rows, object]) => window.FTT.load(seed, { theme, rows, object }), [seed, theme, rows, opt('object')]);
   const info = await page.evaluate(() => window.FTT.voiceInfo());
   const v = await page.evaluate(() => ({ key: window.FTT.cur.key, rows: window.FTT.cur.rows, win: window.FTT.cur.win }));
 

@@ -16,7 +16,7 @@ export default function FollowTheTargetPage() {
         <header className="pb-4 pt-5">
           <h1 className="text-[22px] font-semibold tracking-tight">Follow the Target</h1>
           <p className="mt-1 max-w-[760px] text-[14px] text-[color:var(--color-muted)]">
-            Generates a new shuffle challenge every time: cups, parked cars, jets, eggs or boxes, vault coins. The target
+            Generates a new shuffle challenge every time: cups, parked cars, jets, eggs or boxes, vault coins, or Infinite, which uses any object you can think of. The target
             is shown for two seconds, the shuffle runs, and the video ends on numbered items with no reveal. Press
             Record &amp; Download to save a 1080 × 1920 video with sound. Keep this tab in front while it records.
           </p>

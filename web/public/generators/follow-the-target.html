@@ -10,6 +10,7 @@
   --gold:#ffcf3a; --green:#3dff8a; --red:#ff5a5a; color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,select,input{font:inherit;color:inherit}
@@ -161,7 +162,12 @@ textarea{width:100%;border-radius:8px;border:1px solid var(--line);background:#0
           <option value="sky">Sky / Runway</option>
           <option value="carton">Egg Carton / Mystery Boxes</option>
           <option value="coins">Vault Coins</option>
+          <option value="infinite">Infinite (any object)</option>
         </select>
+      </label>
+      <label for="inObj" id="lblObj" hidden>Your own object for Infinite (optional): type any emoji, like 🦖 or 🍉 watermelon
+        <input type="text" id="inObj" autocomplete="off" spellcheck="false" placeholder="leave empty for a random object">
+        <span class="note" id="objNote">No animals, faces or people are used.</span>
       </label>
       <label for="selGrid">Grid
         <select id="selGrid">
@@ -978,13 +984,117 @@ THEMES.coins = {
   },
 };
 
+/* ════════════════════════ theme: INFINITE (any object) ════════════════════════ */
+// Every video picks one object from this library (food, vehicles, sports, nature, tools and
+// everyday things). No animals, nothing with a face, no people, no weapons, no alcohol, pork or religious symbols,
+// then a random backdrop, slot shape and highlight style around it. Or type any emoji of your own.
+const OBJECT_LIBRARY = {
+  food: '🍎 apple|🍏 green apple|🍐 pear|🍊 orange|🍋 lemon|🍌 banana|🍉 watermelon|🍇 grapes|🍓 strawberry|🍒 cherries|🍑 peach|🥭 mango|🍍 pineapple|🥥 coconut|🥝 kiwi|🍅 tomato|🥑 avocado|🌽 corn|🥕 carrot|🥔 potato|🌶️ chili pepper|🥒 cucumber|🥦 broccoli|🍄 mushroom|🥜 peanut|🍞 bread|🥐 croissant|🥨 pretzel|🧀 cheese|🥚 egg|🥞 pancakes|🧇 waffle|🍟 fries|🍕 pizza|🍪 cookie|🍩 doughnut|🧁 cupcake|🍰 cake|🎂 birthday cake|🍦 ice cream|🍭 lollipop|🍬 candy|🍫 chocolate|🍿 popcorn|🍯 honey|🥛 milk|☕ coffee|🍵 tea|🍚 rice|🍜 noodles|🍙 rice ball|🍘 cracker|🥟 dumpling|🥧 pie|🍅 tomato',
+  vehicles: '🚗 car|🚕 taxi|🚌 bus|🚒 fire truck|🚑 ambulance|🚓 police car|🚚 truck|🚜 tractor|🏍️ motorcycle|🚲 bicycle|🛴 scooter|🚆 train|🚀 rocket|🚁 helicopter|✈️ airplane|🪂 parachute|⛵ sailboat|🚢 ship|🛶 canoe|🛸 UFO|🛰️ satellite|🚤 speedboat|🚂 steam train|🚃 tram|🛹 skateboard|🚛 lorry|🏎️ race car',
+  sports: '⚽ soccer ball|🏀 basketball|🏈 football|⚾ baseball|🎾 tennis ball|🏐 volleyball|🏉 rugby ball|🎳 bowling ball|🏓 ping pong paddle|🏸 badminton shuttle|🥊 boxing glove|🪁 kite|🪀 yo-yo|🧩 puzzle piece|🎈 balloon|🏆 trophy|🏅 medal|🎯 dartboard|🎮 game controller|🛼 roller skate|⛸️ ice skate|🥅 goal net|🎣 fishing rod|🎿 ski',
+  nature: '☀️ sun|🌙 moon|⭐ star|☄️ comet|🌍 earth|🪐 planet|🌈 rainbow|❄️ snowflake|🔥 fire|💧 water drop|⚡ lightning|☁️ cloud|🌋 volcano|⛰️ mountain|🌵 cactus|🌴 palm tree|🌲 pine tree|🌻 sunflower|🌹 rose|🌷 tulip|🌸 blossom|🍁 maple leaf|🍀 clover|🌱 seedling|🍂 leaf|🌊 wave|🪨 rock|🌾 wheat|🪵 log',
+  tools: '🔨 hammer|🔧 wrench|⚙️ gear|🧲 magnet|🔑 key|🔒 lock|🔔 bell|💡 light bulb|🔦 flashlight|🕯️ candle|⏰ alarm clock|⏳ hourglass|🔭 telescope|🔬 microscope|🔋 battery|🔌 plug|💻 laptop|📱 phone|📷 camera|🎧 headphones|📺 television|📻 radio|⌚ watch|👓 glasses|☂️ umbrella|🎒 backpack|🧳 suitcase|💼 briefcase|📖 book|📚 books|✏️ pencil|📎 paperclip|✂️ scissors|📏 ruler|🖍️ crayon|🖌️ paintbrush|✉️ envelope|🎁 gift|👑 crown|💎 gem|🧼 soap|🧹 broom|🏮 lantern|🧭 compass|🗺️ map|⚓ anchor|🧯 extinguisher|🧰 toolbox|📌 pushpin|🪑 chair|🛏️ bed|🚪 door|🪞 mirror|📦 box|🧺 basket',
+  things: '👟 sneaker|🥾 boot|🎩 top hat|🧢 cap|👕 t-shirt|👖 jeans|🧦 sock|🧣 scarf|🧤 glove|👒 sun hat|🏠 house|🏰 castle|⛺ tent|🌉 bridge|🎡 ferris wheel|🎢 roller coaster|🎪 circus tent|🗼 tower|🪟 window|🏺 vase|🪔 oil lamp|🎀 ribbon|🧵 thread|🧶 yarn|🪡 needle|🎨 palette|🖼️ picture',
+};
+const OBJECTS = Object.entries(OBJECT_LIBRARY).flatMap(([cat, str]) => str.split('|').map(x => { const i = x.indexOf(' '); return { e: x.slice(0, i), n: x.slice(i + 1), cat }; })).filter((o, i, a) => a.findIndex(x => x.e === o.e) === i);
+const stripVS = x => x.replace(/️/g, '');
+// emoji ranges that are animals, faces, people, body parts or creatures: the custom field refuses these
+const BLOCKED_RANGES = [[0x1F400, 0x1F43F], [0x1F980, 0x1F9AE], [0x1F9D0, 0x1F9DF], [0x1F440, 0x1F450], [0x1F466, 0x1F487], [0x1F47A, 0x1F480], [0x1F600, 0x1F64F], [0x1F910, 0x1F93F], [0x1F3C3, 0x1F3C4], [0x1F3C7, 0x1F3C7], [0x1F3CA, 0x1F3CC], [0x1F6B4, 0x1F6B6], [0x1F31A, 0x1F31E], [0x1F9B0, 0x1F9BF], [0x1F383, 0x1F385], [0x1F38E, 0x1F38E], [0x1F3AD, 0x1F3AD], [0x1F9F8, 0x1F9F8], [0x1FA86, 0x1FA86], [0x2603, 0x2603], [0x26C4, 0x26C4], [0x1F5FD, 0x1F5FF], [0x1F3F9, 0x1F3F9], [0x1F52B, 0x1F52B], [0x1F5E1, 0x1F5E1], [0x2694, 0x2694], [0x1F6E1, 0x1F6E1]];
+const isBlockedEmoji = x => { const c = x.codePointAt(0); return BLOCKED_RANGES.some(([a, b]) => c >= a && c <= b); };
+/** 'none' (empty), 'ok', 'blocked' (face / person / animal / weapon) or 'unknown' (not an emoji or a library name) */
+function customObjectStatus(str) { str = String(str || '').trim(); if (!str) return 'none'; if (parseCustomObject(str)) return 'ok'; return /\p{Extended_Pictographic}/u.test(str) ? 'blocked' : 'unknown'; }
+function parseCustomObject(str) {
+  str = String(str || '').trim(); if (!str) return null;
+  const byName = OBJECTS.find(o => o.n.toLowerCase() === str.toLowerCase()); if (byName) return byName;
+  let first, rest;
+  try { const seg = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(str)]; first = seg[0].segment; rest = str.slice(first.length).trim(); }
+  catch (e) { const m = Array.from(str); first = m[0]; rest = m.slice(1).join('').trim(); }
+  if (!/\p{Extended_Pictographic}/u.test(first) || isBlockedEmoji(first)) return null;
+  const known = OBJECTS.find(o => stripVS(o.e) === stripVS(first));
+  return { e: first, n: rest || (known ? known.n : 'thing'), cat: known ? known.cat : 'things' };
+}
+const INF_SFX = {
+  food: { f0: 480, f1: 1000, q: 0.8, scrape: 800, thump: 230, clink: 0 },
+  vehicles: { f0: 300, f1: 950, q: 0.7, scrape: 650, thump: 130, clink: 0, squeal: 1700 }, sports: { f0: 650, f1: 1400, q: 0.9, scrape: 1100, thump: 180, clink: 0 },
+  nature: { f0: 450, f1: 900, q: 0.8, scrape: 700, thump: 150, clink: 0 }, tools: { f0: 1100, f1: 2600, q: 1, scrape: 1800, thump: 0, clink: 1 },
+  things: { f0: 700, f1: 1500, q: 0.9, scrape: 1200, thump: 170, clink: 0 },
+};
+function hsl(h, sat, lig) { sat /= 100; lig /= 100; const k = n => (n + h / 30) % 12, a = sat * Math.min(lig, 1 - lig), f = n => lig - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return toHex(f(0) * 255, f(8) * 255, f(4) * 255); }
+const BG_STYLES = ['dots', 'grid', 'stripes', 'waves', 'stars', 'hex', 'rays', 'checker', 'confetti', 'bokeh'];
+const WELLS = ['circle', 'rounded', 'hex', 'diamond', 'ring', 'none'];
+const HIGHLIGHTS = ['ring', 'sparkle', 'rays', 'beam'];
+function wellPath(g, x, y, r, shape) {
+  g.beginPath();
+  if (shape === 'circle' || shape === 'ring') g.ellipse(x, y, r, r * 0.9, 0, 0, TAU);
+  else if (shape === 'rounded') { rr(g, x - r, y - r * 0.9, r * 2, r * 1.8, r * 0.35); }
+  else if (shape === 'hex') { for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; g.lineTo(x + Math.cos(a) * r * 1.08, y + Math.sin(a) * r * 1.08); } g.closePath(); }
+  else if (shape === 'diamond') { g.moveTo(x, y - r * 1.1); g.lineTo(x + r * 1.1, y); g.lineTo(x, y + r * 1.1); g.lineTo(x - r * 1.1, y); g.closePath(); }
+}
+THEMES.infinite = {
+  name: 'Infinite (any object)', numDy: 0.0,
+  setup(r, L, opt = {}) {
+    const obj = parseCustomObject(opt.object) || pick(r, OBJECTS), N = obj.n.toUpperCase();
+    const h = Math.floor(r() * 360), h2 = (h + pick(r, [25, 50, 90, 150, 180, 210, 300])) % 360, hl = pick(r, ['gold', 'cyan', 'pink', 'lime', 'white']);
+    const sprite = makeCanvas(256, 256), q = sprite.getContext('2d');
+    q.font = '200px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; q.textAlign = 'center'; q.textBaseline = 'alphabetic'; q.fillText(obj.e, 128, 128 + 200 * 0.34);
+    return {
+      nT: 1, sprite,
+      o: { kind: obj.n, obj, style: pick(r, BG_STYLES), well: pick(r, WELLS), highlight: pick(r, HIGHLIGHTS), glow: { gold: '#ffd23a', cyan: '#4de3ff', pink: '#ff5ec8', lime: '#9dff4a', white: '#ffffff' }[hl],
+        c1: hsl(h, 55, 9), c2: hsl(h, 45, 19), c3: hsl(h2, 50, 11), accent: hsl(h2, 75, 62) },
+      hook: pick(r, [['FOLLOW THE', `*GLOWING ${N}*`], ['TRACK THE', `*${N}*`], ["DON'T LOSE", `THE *${N}*`], ['WATCH THE', `*${N}*`]]),
+      fin: [`WHICH ${N}`, 'WAS THE *GLOWING* ONE?'], targetWord: `glowing ${obj.n}`, find: `the glowing ${obj.n}`, sfx: INF_SFX[obj.cat] || INF_SFX.things,
+    };
+  },
+  bg(g, v, r) {
+    const o = v.th.o, L = v.L, acc = o.accent;
+    g.fillStyle = lg(g, 0, 0, W * 0.4, H, [[0, o.c1], [0.5, o.c2], [1, o.c3]]); g.fillRect(0, 0, W, H);
+    glow(g, W * (0.15 + 0.7 * r()), H * (0.25 + 0.3 * r()), 900, acc, 0.14); glow(g, W * (0.15 + 0.7 * r()), H * (0.6 + 0.3 * r()), 800, o.c3, 0.2);
+    g.save();
+    switch (o.style) {
+      case 'dots': g.fillStyle = rgba(acc, 0.15); for (let y = 20; y < H; y += 56) for (let x = ((y / 56) % 2) * 28 + 10; x < W; x += 56) { g.beginPath(); g.arc(x, y, 4.5, 0, TAU); g.fill(); } break;
+      case 'grid': g.strokeStyle = rgba(acc, 0.1); g.lineWidth = 2; for (let x = 0; x < W; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } break;
+      case 'stripes': g.fillStyle = rgba(acc, 0.07); for (let k = -H; k < W; k += 70) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 34, 0); g.lineTo(k + 34 + H, H); g.lineTo(k + H, H); g.closePath(); g.fill(); } break;
+      case 'waves': g.strokeStyle = rgba(acc, 0.12); g.lineWidth = 6; for (let y = 60; y < H; y += 70) { g.beginPath(); for (let x = 0; x <= W; x += 12) g.lineTo(x, y + Math.sin(x / 46 + y) * 18); g.stroke(); } break;
+      case 'stars': for (let i = 0; i < 140; i++) { const x = r() * W, y = r() * H, s2 = 3 + r() * 9; g.fillStyle = rgba(acc, 0.1 + r() * 0.3); g.beginPath(); g.moveTo(x, y - s2); g.quadraticCurveTo(x, y, x + s2, y); g.quadraticCurveTo(x, y, x, y + s2); g.quadraticCurveTo(x, y, x - s2, y); g.quadraticCurveTo(x, y, x, y - s2); g.fill(); } break;
+      case 'hex': g.strokeStyle = rgba(acc, 0.11); g.lineWidth = 2.5; { const R = 48, hw = R * Math.sqrt(3); for (let row = -1; row < H / (R * 1.5) + 1; row++) for (let c = -1; c < W / hw + 1; c++) { const cx = c * hw + (row % 2 ? hw / 2 : 0), cy = row * R * 1.5; g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); } g.closePath(); g.stroke(); } } break;
+      case 'rays': g.fillStyle = rgba(acc, 0.07); for (let i = 0; i < 40; i += 2) { const a0 = i / 40 * TAU, a1 = (i + 1) / 40 * TAU; g.beginPath(); g.moveTo(W / 2, 900); g.lineTo(W / 2 + Math.cos(a0) * 2400, 900 + Math.sin(a0) * 2400); g.lineTo(W / 2 + Math.cos(a1) * 2400, 900 + Math.sin(a1) * 2400); g.closePath(); g.fill(); } break;
+      case 'checker': g.fillStyle = rgba(acc, 0.06); for (let y = 0; y < H; y += 120) for (let x = ((y / 120) % 2) * 120; x < W; x += 240) g.fillRect(x, y, 120, 120); break;
+      case 'confetti': for (let i = 0; i < 170; i++) { g.save(); g.translate(r() * W, r() * H); g.rotate(r() * TAU); g.fillStyle = hsl(Math.floor(r() * 360), 70, 60).replace('#', '#'); g.globalAlpha = 0.12 + r() * 0.2; g.fillRect(-9, -4, 18, 8); g.restore(); } break;
+      case 'bokeh': for (let i = 0; i < 26; i++) { const x = r() * W, y = r() * H, rad = 50 + r() * 140; g.fillStyle = rg(g, x, y, 0, x, y, rad, [[0, rgba(acc, 0.16)], [1, rgba(acc, 0)]]); g.beginPath(); g.arc(x, y, rad, 0, TAU); g.fill(); } break;
+    }
+    g.restore();
+    if (o.well !== 'none') for (let s2 = 0; s2 < L.n; s2++) {
+      const P = L.slot(s2), wr = Math.min(L.bw, L.bh) * 0.54;
+      wellPath(g, P.x, P.y + 4, wr, o.well); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fill();
+      g.lineWidth = o.well === 'ring' ? 5 : 3; g.strokeStyle = rgba(acc, o.well === 'ring' ? 0.55 : 0.4); g.stroke();
+    }
+    vignette(g, 0.5);
+  },
+  item(g, v, it) {
+    const o = v.th.o, L = v.L, S = Math.min(L.bw, L.bh) * 1.0;
+    g.save(); g.translate(it.x, it.y);
+    blob(g, 3 + it.elev * 0.3, S * 0.4 + it.elev * 0.5, S * 0.4, S * 0.12, 0.45 - Math.min(0.2, it.elev * 0.01));
+    if (it.isT && it.hl > 0.02) {
+      const hl = it.hl, pu = it.pulse, c = o.glow;
+      glow(g, 0, 0, S * 1.0, c, 0.5 * hl * (0.8 + 0.2 * pu));
+      if (o.highlight === 'ring') { g.strokeStyle = rgba(c, 0.9 * hl); g.lineWidth = 4 + 3 * pu; g.beginPath(); g.arc(0, 0, S * (0.6 + 0.06 * pu), 0, TAU); g.stroke(); }
+      else if (o.highlight === 'rays') { g.save(); g.rotate(it.t * 1.6); g.fillStyle = rgba(c, 0.35 * hl); for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a - 0.1) * S * 0.9, Math.sin(a - 0.1) * S * 0.9); g.lineTo(Math.cos(a + 0.1) * S * 0.9, Math.sin(a + 0.1) * S * 0.9); g.closePath(); g.fill(); } g.restore(); }
+      else if (o.highlight === 'sparkle') { const tw = it.t * 6; sparkle(g, S * 0.4, -S * 0.36, 16 + 8 * Math.sin(tw), hl * 0.95); sparkle(g, -S * 0.42, S * 0.05, 12 + 6 * Math.sin(tw + 2), hl * 0.85); sparkle(g, S * 0.1, S * 0.42, 10 + 6 * Math.sin(tw + 4), hl * 0.8); }
+      else { g.fillStyle = lg(g, 0, -S * 1.6, 0, S * 0.5, [[0, rgba(c, 0)], [1, rgba(c, 0.4 * hl)]]); g.beginPath(); g.moveTo(-S * 0.1, -S * 1.6); g.lineTo(S * 0.1, -S * 1.6); g.lineTo(S * 0.55, S * 0.5); g.lineTo(-S * 0.55, S * 0.5); g.closePath(); g.fill(); }
+    }
+    const k = it.sc * (1 + (it.isT ? 0.1 * it.hl + 0.03 * it.hl * it.pulse : 0)), bob = it.isT ? -7 * Math.sin(it.t * 9) * it.hl : 0;
+    g.scale(k, k); g.drawImage(v.th.sprite, -S / 2, -S / 2 + bob, S, S);
+    g.restore();
+  },
+};
+
 /* ════════════════════════ variation ════════════════════════ */
 const THEME_KEYS = ['cups', 'parking', 'sky', 'carton', 'coins'];
 function makeVariation(seed, opt = {}) {
   const r = mulberry32(seed >>> 0);
   const rows = opt.rows || [3, 4, 5][Math.floor(r() * 3)];
   const key = opt.theme && opt.theme !== 'random' ? opt.theme : THEME_KEYS[Math.floor(r() * THEME_KEYS.length)];
-  const L = makeLayout(rows), n = L.n, T = THEMES[key], th = T.setup(r, L);
+  const L = makeLayout(rows), n = L.n, T = THEMES[key], th = T.setup(r, L, opt);
   th.key = key; th.def = T; th.hlCol = pick(r, [GREEN, GOLD]);
   const targets = shuffled(r, Array.from({ length: n }, (_, i) => i)).slice(0, th.nT);
   const sh = genShuffle(r, L, targets);
@@ -1279,7 +1389,7 @@ async function withVoice(v, then) {
 async function generate(seed = newSeed(), sound = true) {
   stopRun();
   const rowsSel = +$('selGrid').value || 0;
-  const v = makeVariation(seed, { theme: $('selTheme').value, rows: rowsSel || undefined });
+  const v = makeVariation(seed, { theme: $('selTheme').value, rows: rowsSel || undefined, object: $('selTheme').value === 'infinite' ? $('inObj').value : undefined });
   setVariation(v);
   if (!sound) { startRun({ sound: false }); say('Preview is playing without sound. Press Replay to hear it.'); return; }
   await withVoice(v, () => { startRun({ sound: true }); say(v.voiceErr ? 'Playing without the voice (see the voice box).' : 'New variation playing.', v.voiceErr ? 'warn' : ''); });
@@ -1363,7 +1473,12 @@ $('btnPlay').addEventListener('click', () => { const v = cur; withVoice(v, () =>
 $('btnRec').addEventListener('click', recordAndDownload);
 $('btnSeed').addEventListener('click', () => { const s = Number($('inSeed').value.trim()); if (Number.isFinite(s) && s >= 0) generate(s >>> 0); else say('Enter a whole number for the seed.', 'err'); });
 $('inSeed').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnSeed').click(); });
-$('selTheme').addEventListener('change', () => generate());
+$('selTheme').addEventListener('change', () => { $('lblObj').hidden = $('selTheme').value !== 'infinite'; generate(); });
+$('inObj').addEventListener('change', () => {
+  const st = customObjectStatus($('inObj').value), n = $('objNote');
+  n.textContent = st === 'blocked' ? 'Skipped: that is a face, person, animal or weapon, so a random object is used.' : st === 'unknown' ? 'Not recognised: type an emoji, or a library name like "watermelon". A random object is used.' : 'No animals, faces or people are used.';
+  generate();
+});
 $('selGrid').addEventListener('change', () => generate());
 $('chkSafe').addEventListener('change', e => { $('safe').hidden = !e.target.checked; });
 $('btnCopy').addEventListener('click', async () => {
@@ -1409,14 +1524,15 @@ fillSettings();
 
 /* debug / test hooks */
 window.FTT = {
-  makeVariation, render: (v, t) => render(g, v, t), get cur() { return cur; }, T_TOTAL, T_END, T_SHUF0, itemPos, setVariation,
+  makeVariation, OBJECTS, customObjectStatus, parseCustomObject, render: (v, t) => render(g, v, t), get cur() { return cur; }, T_TOTAL, T_END, T_SHUF0, itemPos, setVariation,
   drawAt(t) { render(g, cur, t); }, load(seed, opt) { stopRun(); const v = makeVariation(seed, opt || {}); setVariation(v); run = null; return v; },
   get cfg() { return CFG; }, setConfig(over) { CFG = mergeCfg(CFG, over); fillSettings(); if (cur) prepareVoice(cur); },
   async voiceInfo() { const v = cur; await v.voiceP; return { enabled: CFG.voice.enabled, line: v.voiceText, index: v.voiceIdx, lines: lineList().length, sec: v.voice ? +v.voice.dur.toFixed(2) : null, error: v.voiceErr, tooLong: !!(v.voice && v.voice.dur > CFG.voice.maxSec), maxSec: CFG.voice.maxSec, engine: CFG.voice.engine, name: CFG.voice.name, rate: CFG.voice.rate }; },
-  selfTest(count = 200) {
+  selfTest(count = 200, opts = {}) {
+    if (opts.theme === 'infinite') { const bad = OBJECTS.filter(o => isBlockedEmoji(o.e)).map(o => o.e + ' ' + o.n); if (bad.length) return { fails: ['library has blocked emoji: ' + bad.join(', ')] }; }
     const out = { runs: 0, fails: [], themes: {}, rows: {}, moves: {}, types: {} };
     for (let k = 0; k < count; k++) {
-      const seed = (k * 2654435761 + 12345) >>> 0, v = makeVariation(seed, {});
+      const seed = (k * 2654435761 + 12345) >>> 0, v = makeVariation(seed, opts);
       out.runs++; out.themes[v.key] = (out.themes[v.key] || 0) + 1; out.rows[v.rows] = (out.rows[v.rows] || 0) + 1; out.moves[v.moves.length] = (out.moves[v.moves.length] || 0) + 1;
       const bad = m => out.fails.push(`${seed}(${v.key},${v.rows}): ${m}`);
       if (v.moves.length < 40 || v.moves.length > 52) bad('move count ' + v.moves.length);
